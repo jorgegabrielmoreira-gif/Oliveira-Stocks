@@ -848,6 +848,10 @@
             document.getElementById('print-report-title').textContent = "Oliveira & Gonçalves - Relatório de Movimentos de Armazém";
             document.getElementById('print-report-date').textContent = dateText;
             window.print();
+            function printReportsPDF() {
+            document.getElementById('print-report-title').textContent = "Oliveira & Gonçalves - Relatório e Análise de Inventário";
+            document.getElementById('print-report-date').textContent = `Emitido em: ${new Date().toLocaleDateString('pt-PT')} ${new Date().toLocaleTimeString('pt-PT', {hour:'2-digit', minute:'2-digit'})}`;
+            window.print();
         }
 
         /* --- EXPORTAR E REPOR BACKUP (JSON) --- */
