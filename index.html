@@ -414,14 +414,19 @@
             </div>
 
             <div class="bg-white p-6 rounded-2xl border border-slate-200 shadow-xs space-y-6">
-                <div class="flex items-center justify-between">
+                <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                     <div>
                         <h2 class="font-bold text-slate-900 text-lg flex items-center"><i data-lucide="bar-chart-3" class="w-5 h-5 text-blue-600 mr-2"></i> Relatórios e Análise de Inventário</h2>
                     </div>
-                    <button onclick="exportCSV()" class="inline-flex items-center space-x-2 bg-slate-800 hover:bg-slate-900 text-white text-xs sm:text-sm font-medium px-4 py-2 rounded-xl transition shadow-xs">
-                        <i data-lucide="file-spreadsheet" class="w-4 h-4"></i>
-                        <span>Exportar CSV</span>
-                    </button>
+                    <div class="flex items-center space-x-2">
+                        <button onclick="printReportsPDF()" class="bg-slate-800 hover:bg-slate-900 text-white text-xs font-medium px-3.5 py-2.5 rounded-xl transition flex items-center space-x-1.5 shadow-sm no-print">
+                            <i data-lucide="printer" class="w-4 h-4"></i> <span>Imprimir / PDF</span>
+                        </button>
+                        <button onclick="exportCSV()" class="inline-flex items-center space-x-2 bg-slate-800 hover:bg-slate-900 text-white text-xs font-medium px-3.5 py-2.5 rounded-xl transition shadow-xs no-print">
+                            <i data-lucide="file-spreadsheet" class="w-4 h-4"></i>
+                            <span>Exportar CSV</span>
+                        </button>
+                    </div>
                 </div>
 
                 <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
@@ -842,6 +847,12 @@
 
             document.getElementById('print-report-title').textContent = "Oliveira & Gonçalves - Relatório de Movimentos de Armazém";
             document.getElementById('print-report-date').textContent = dateText;
+            window.print();
+        }
+        
+        function printReportsPDF() {
+            document.getElementById('print-report-title').textContent = "Oliveira & Gonçalves - Relatório e Análise de Inventário";
+            document.getElementById('print-report-date').textContent = `Emitido em: ${new Date().toLocaleDateString('pt-PT')} ${new Date().toLocaleTimeString('pt-PT', {hour:'2-digit', minute:'2-digit'})}`;
             window.print();
         }
 
