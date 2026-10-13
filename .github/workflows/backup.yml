@@ -2,9 +2,12 @@ name: Backup Semanal CSV
 
 on:
   schedule:
-    # Corre todos os domingos às 03:00 da manhã
     - cron: '0 3 * * 0'
-  workflow_dispatch: # Permite-te clicar num botão para forçar o backup quando quiseres
+  workflow_dispatch:
+
+# ESTA É A PARTE NOVA: Dá permissão ao robô para guardar o ficheiro
+permissions:
+  contents: write
 
 jobs:
   fazer-backup:
