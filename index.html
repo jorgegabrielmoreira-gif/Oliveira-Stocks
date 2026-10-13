@@ -694,8 +694,8 @@
 
         function renderProductsTable() {
             const query = (document.getElementById('search-product')?.value || '').toLowerCase();
+            const filtered = products.filter(p => (p.name.toLowerCase().includes(query) || p.sku.toLowerCase().includes(query) || (p.lote && p.lote.toLowerCase().includes(query))) && (catFilter === '' || p.category === catFilter));
             const catFilter = document.getElementById('filter-category')?.value || '';
-            const filtered = products.filter(p => (p.name.toLowerCase().includes(query) || p.sku.toLowerCase().includes(query)) && (catFilter === '' || p.category === catFilter));
             const tbody = document.getElementById('products-table-body');
             
             tbody.innerHTML = filtered.map(p => `
