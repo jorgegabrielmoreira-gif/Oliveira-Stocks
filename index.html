@@ -1,0 +1,924 @@
+<!DOCTYPE html>
+<html lang="pt">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Oliveira & Gonçalves - Gestão de Stock</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <!-- Google Fonts Inter -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Inter', sans-serif; }
+        .custom-scrollbar::-webkit-scrollbar { width: 6px; height: 6px; }
+        .custom-scrollbar::-webkit-scrollbar-track { background: #f1f5f9; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 3px; }
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+
+        @media print {
+            header, nav, .no-print, button, input, select, #toast-container, .tabs-container {
+                display: none !important;
+            }
+            body {
+                background: white !important;
+                color: black !important;
+                padding: 0 !important;
+            }
+            main {
+                max-width: 100% !important;
+                padding: 0 !important;
+                margin: 0 !important;
+            }
+            .print-header {
+                display: block !important;
+                margin-bottom: 20px;
+                border-bottom: 2px solid #000;
+                padding-bottom: 10px;
+            }
+            table {
+                width: 100% !important;
+                border-collapse: collapse !important;
+            }
+            th, td {
+                border: 1px solid #cbd5e1 !important;
+                padding: 8px !important;
+                font-size: 11px !important;
+            }
+            th {
+                background-color: #f1f5f9 !important;
+                -webkit-print-color-adjust: exact;
+            }
+        }
+        .print-header { display: none; }
+    </style>
+</head>
+<body class="bg-slate-50 text-slate-800 antialiased min-h-screen flex flex-col">
+
+    <!-- Header visível apenas na aplicação -->
+    <header class="bg-white border-b border-slate-200 sticky top-0 z-30 shadow-xs no-print">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+            <div class="flex items-center space-x-3">
+                <div class="bg-blue-600 p-2 rounded-xl text-white shadow-md shadow-blue-200">
+                    <i data-lucide="building-2" class="w-6 h-6"></i>
+                </div>
+                <div>
+                    <h1 class="text-xl font-bold text-slate-900 tracking-tight">Oliveira & Gonçalves <span class="text-blue-600 text-xs font-semibold px-2 py-0.5 bg-blue-50 rounded-full border border-blue-100 uppercase">Gestão de Armazém</span></h1>
+                    <p class="text-xs text-slate-500 hidden sm:block">Gestão do armazém de fios e malhas (Cloud)</p>
+                </div>
+            </div>
+            
+            <div class="flex items-center space-x-2 sm:space-x-3">
+                <button onclick="openMovementModal('entrada')" class="inline-flex items-center space-x-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs sm:text-sm font-medium px-3 py-2 rounded-lg transition shadow-xs">
+                    <i data-lucide="arrow-down-left" class="w-4 h-4"></i>
+                    <span class="hidden sm:inline">Registar</span> Entrada
+                </button>
+                <button onclick="openMovementModal('saida')" class="inline-flex items-center space-x-1.5 bg-rose-600 hover:bg-rose-700 text-white text-xs sm:text-sm font-medium px-3 py-2 rounded-lg transition shadow-xs">
+                    <i data-lucide="arrow-up-right" class="w-4 h-4"></i>
+                    <span class="hidden sm:inline">Registar</span> Saída
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <div class="print-header">
+        <h1 class="text-xl font-bold" id="print-report-title">Oliveira & Gonçalves - Relatório de Armazém</h1>
+        <p class="text-xs text-gray-600" id="print-report-date"></p>
+    </div>
+
+    <main class="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
+
+        <!-- Navigation Tabs -->
+        <div class="tabs-container flex overflow-x-auto space-x-1 bg-white p-1 rounded-xl border border-slate-200 shadow-xs no-print">
+            <button onclick="switchTab('dashboard')" id="tab-dashboard" class="flex-1 min-w-[110px] py-2.5 px-3 text-sm font-medium rounded-lg transition flex items-center justify-center space-x-2 bg-blue-600 text-white shadow-xs">
+                <i data-lucide="layout-dashboard" class="w-4 h-4"></i>
+                <span>Dashboard</span>
+            </button>
+            <button onclick="switchTab('produtos')" id="tab-produtos" class="flex-1 min-w-[110px] py-2.5 px-3 text-sm font-medium rounded-lg transition flex items-center justify-center space-x-2 text-slate-600 hover:text-slate-900 hover:bg-slate-50">
+                <i data-lucide="package" class="w-4 h-4"></i>
+                <span>Produtos</span>
+            </button>
+            <button onclick="switchTab('entidades')" id="tab-entidades" class="flex-1 min-w-[110px] py-2.5 px-3 text-sm font-medium rounded-lg transition flex items-center justify-center space-x-2 text-slate-600 hover:text-slate-900 hover:bg-slate-50 relative">
+                <i data-lucide="users" class="w-4 h-4"></i>
+                <span>Entidades</span>
+                <span id="badge-entidades" class="absolute top-2 right-2 bg-blue-500 text-white text-[10px] px-1.5 py-0.2 rounded-full font-bold">0</span>
+            </button>
+            <button onclick="switchTab('movimentos')" id="tab-movimentos" class="flex-1 min-w-[110px] py-2.5 px-3 text-sm font-medium rounded-lg transition flex items-center justify-center space-x-2 text-slate-600 hover:text-slate-900 hover:bg-slate-50">
+                <i data-lucide="history" class="w-4 h-4"></i>
+                <span>Movimentos</span>
+            </button>
+            <button onclick="switchTab('alertas')" id="tab-alertas" class="flex-1 min-w-[110px] py-2.5 px-3 text-sm font-medium rounded-lg transition flex items-center justify-center space-x-2 text-slate-600 hover:text-slate-900 hover:bg-slate-50 relative">
+                <i data-lucide="alert-triangle" class="w-4 h-4"></i>
+                <span>Alertas</span>
+                <span id="badge-alertas" class="absolute top-2 right-2 bg-rose-500 text-white text-[10px] px-1.5 py-0.2 rounded-full font-bold hidden">0</span>
+            </button>
+            <button onclick="switchTab('relatorios')" id="tab-relatorios" class="flex-1 min-w-[110px] py-2.5 px-3 text-sm font-medium rounded-lg transition flex items-center justify-center space-x-2 text-slate-600 hover:text-slate-900 hover:bg-slate-50">
+                <i data-lucide="bar-chart-3" class="w-4 h-4"></i>
+                <span>Relatórios</span>
+            </button>
+        </div>
+
+        <!-- TAB 1: DASHBOARD -->
+        <div id="content-dashboard" class="space-y-6">
+            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-xs flex items-center justify-between">
+                    <div>
+                        <p class="text-xs font-medium text-slate-500 uppercase tracking-wider">Total de Produtos</p>
+                        <h3 id="stat-total-produtos" class="text-2xl font-bold text-slate-900 mt-1">0</h3>
+                    </div>
+                    <div class="w-12 h-12 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center border border-blue-100">
+                        <i data-lucide="package" class="w-6 h-6"></i>
+                    </div>
+                </div>
+
+                <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-xs flex items-center justify-between">
+                    <div>
+                        <p class="text-xs font-medium text-slate-500 uppercase tracking-wider">Stock Total em Peso</p>
+                        <h3 id="stat-peso-total" class="text-2xl font-bold text-slate-900 mt-1">0,00 kg</h3>
+                    </div>
+                    <div class="w-12 h-12 rounded-xl bg-purple-50 text-purple-600 flex items-center justify-center border border-purple-100">
+                        <i data-lucide="scale" class="w-6 h-6"></i>
+                    </div>
+                </div>
+
+                <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-xs flex items-center justify-between">
+                    <div>
+                        <p class="text-xs font-medium text-slate-500 uppercase tracking-wider">Valor do Inventário</p>
+                        <h3 id="stat-valor-inventario" class="text-2xl font-bold text-slate-900 mt-1">€0,00</h3>
+                    </div>
+                    <div class="w-12 h-12 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center border border-emerald-100">
+                        <i data-lucide="euro" class="w-6 h-6"></i>
+                    </div>
+                </div>
+
+                <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-xs flex items-center justify-between">
+                    <div>
+                        <p class="text-xs font-medium text-slate-500 uppercase tracking-wider">Stock Baixo / Esgotado</p>
+                        <h3 id="stat-stock-baixo" class="text-2xl font-bold text-rose-600 mt-1">0</h3>
+                    </div>
+                    <div class="w-12 h-12 rounded-xl bg-rose-50 text-rose-600 flex items-center justify-center border border-rose-100">
+                        <i data-lucide="alert-triangle" class="w-6 h-6"></i>
+                    </div>
+                </div>
+            </div>
+
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                <div class="bg-white p-6 rounded-2xl border border-slate-200 shadow-xs lg:col-span-1 space-y-4 hidden">
+                   <!-- Categoria Chart Oculto p/ simplificar -->
+                </div>
+
+                <div class="bg-white p-6 rounded-2xl border border-slate-200 shadow-xs lg:col-span-3 space-y-4">
+                    <div class="flex items-center justify-between">
+                        <h2 class="font-bold text-slate-900 flex items-center"><i data-lucide="activity" class="w-4 h-4 mr-2 text-blue-600"></i> Últimos Movimentos</h2>
+                        <button onclick="switchTab('movimentos')" class="text-xs font-semibold text-blue-600 hover:text-blue-700">Ver todos</button>
+                    </div>
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-left border-collapse">
+                            <thead>
+                                <tr class="border-b border-slate-100 text-[11px] font-semibold text-slate-400 uppercase">
+                                    <th class="py-2 px-3">Data/Hora</th>
+                                    <th class="py-2 px-3">Tipo</th>
+                                    <th class="py-2 px-3">Produto</th>
+                                    <th class="py-2 px-3">Entidade</th>
+                                    <th class="py-2 px-3 text-right">Qtd (kg)</th>
+                                </tr>
+                            </thead>
+                            <tbody id="dashboard-recent-movements" class="text-xs divide-y divide-slate-50"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- TAB 2: PRODUTOS -->
+        <div id="content-produtos" class="space-y-6 hidden">
+            <div class="bg-white p-6 rounded-2xl border border-slate-200 shadow-xs space-y-4">
+                <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                    <div class="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 flex-1">
+                        <div class="relative flex-1 max-w-md">
+                            <span class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
+                                <i data-lucide="search" class="w-4 h-4"></i>
+                            </span>
+                            <input type="text" id="search-product" oninput="renderProductsTable()" placeholder="Pesquisar..." class="w-full pl-9 pr-4 py-2 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/20">
+                        </div>
+                        <select id="filter-category" onchange="renderProductsTable()" class="py-2 px-3 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/20">
+                            <option value="">Todas as Categorias</option>
+                        </select>
+                    </div>
+                    <div class="flex items-center space-x-2">
+                        <button onclick="printProductsPDF()" class="bg-slate-800 hover:bg-slate-900 text-white text-xs font-medium px-3.5 py-2.5 rounded-xl transition flex items-center space-x-1.5 shadow-sm no-print">
+                            <i data-lucide="printer" class="w-4 h-4"></i> <span>Imprimir / PDF</span>
+                        </button>
+                        <button onclick="openProductModal()" class="inline-flex items-center justify-center space-x-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium px-4 py-2 rounded-xl transition shadow-sm">
+                            <i data-lucide="plus" class="w-4 h-4"></i>
+                            <span>Novo Produto</span>
+                        </button>
+                    </div>
+                </div>
+
+                <div class="overflow-x-auto rounded-xl border border-slate-200">
+                    <table class="w-full text-left border-collapse">
+                        <thead>
+                            <tr class="bg-slate-50 border-b border-slate-200 text-xs font-semibold text-slate-500 uppercase tracking-wider">
+                                <th class="py-3 px-4">SKU / Código</th>
+                                <th class="py-3 px-4">Descrição do Produto</th>
+                                <th class="py-3 px-4">Lote Atual</th>
+                                <th class="py-3 px-4">Categoria</th>
+                                <th class="py-3 px-4 text-center">Stock (kg)</th>
+                                <th class="py-3 px-4 text-center">Mín (kg)</th>
+                                <th class="py-3 px-4 text-right">P. Custo/kg</th>
+                                <th class="py-3 px-4 text-right">P. Venda/kg</th>
+                                <th class="py-3 px-4 text-center">Estado</th>
+                                <th class="py-3 px-4 text-center no-print">Ações</th>
+                            </tr>
+                        </thead>
+                        <tbody id="products-table-body" class="text-sm divide-y divide-slate-100 bg-white"></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- TAB 3: ENTIDADES -->
+        <div id="content-entidades" class="space-y-6 hidden">
+            <div class="bg-white p-6 rounded-2xl border border-slate-200 shadow-xs space-y-4">
+                <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                    <div class="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 flex-1">
+                        <div class="relative flex-1 max-w-md">
+                            <span class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
+                                <i data-lucide="search" class="w-4 h-4"></i>
+                            </span>
+                            <input type="text" id="search-entity" oninput="renderEntitiesTable()" placeholder="Pesquisar..." class="w-full pl-9 pr-4 py-2 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/20">
+                        </div>
+                    </div>
+                    <div class="flex items-center space-x-2">
+                        <button onclick="printEntitiesPDF()" class="bg-slate-800 hover:bg-slate-900 text-white text-xs font-medium px-3.5 py-2.5 rounded-xl transition flex items-center space-x-1.5 shadow-sm no-print">
+                            <i data-lucide="printer" class="w-4 h-4"></i> <span>Imprimir / PDF</span>
+                        </button>
+                        <button onclick="openEntityModal()" class="inline-flex items-center justify-center space-x-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium px-4 py-2 rounded-xl transition shadow-sm">
+                            <i data-lucide="user-plus" class="w-4 h-4"></i>
+                            <span>Nova Entidade</span>
+                        </button>
+                    </div>
+                </div>
+
+                <div class="overflow-x-auto rounded-xl border border-slate-200">
+                    <table class="w-full text-left border-collapse">
+                        <thead>
+                            <tr class="bg-slate-50 border-b border-slate-200 text-xs font-semibold text-slate-500 uppercase tracking-wider">
+                                <th class="py-3 px-4">Nome da Entidade</th>
+                                <th class="py-3 px-4">Tipo</th>
+                                <th class="py-3 px-4">NIF</th>
+                                <th class="py-3 px-4">Email</th>
+                                <th class="py-3 px-4">Telefone</th>
+                                <th class="py-3 px-4">Morada</th>
+                                <th class="py-3 px-4 text-center no-print">Ações</th>
+                            </tr>
+                        </thead>
+                        <tbody id="entities-table-body" class="text-sm divide-y divide-slate-100 bg-white"></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- TAB 4: MOVIMENTOS -->
+        <div id="content-movimentos" class="space-y-6 hidden">
+            <div class="bg-white p-6 rounded-2xl border border-slate-200 shadow-xs space-y-4">
+                <div class="flex flex-col lg:flex-row lg:items-center justify-between gap-4 no-print">
+                    <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3 flex-1">
+                        <div class="relative">
+                            <span class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
+                                <i data-lucide="search" class="w-4 h-4"></i>
+                            </span>
+                            <input type="text" id="search-movement" oninput="renderMovementsTable()" placeholder="Pesquisar..." class="w-full pl-9 pr-3 py-2 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/20">
+                        </div>
+                    </div>
+
+                    <div class="flex items-center space-x-2">
+                        <button onclick="printMovementsPDF()" class="bg-slate-800 hover:bg-slate-900 text-white text-xs font-medium px-3.5 py-2 rounded-xl transition flex items-center space-x-1.5 shadow-sm">
+                            <i data-lucide="printer" class="w-4 h-4"></i> <span>Imprimir / PDF</span>
+                        </button>
+                    </div>
+                </div>
+
+                <div class="overflow-x-auto rounded-xl border border-slate-200">
+                    <table class="w-full text-left border-collapse">
+                        <thead>
+                            <tr class="bg-slate-50 border-b border-slate-200 text-xs font-semibold text-slate-500 uppercase tracking-wider">
+                                <th class="py-3 px-4">Data/Hora</th>
+                                <th class="py-3 px-4">Tipo</th>
+                                <th class="py-3 px-4">Produto</th>
+                                <th class="py-3 px-4">Lote</th>
+                                <th class="py-3 px-4 text-center">Qtd (kg)</th>
+                                <th class="py-3 px-4">Entidade</th>
+                                <th class="py-3 px-4">Observações</th>
+                                <th class="py-3 px-4 text-center no-print">Ações</th>
+                            </tr>
+                        </thead>
+                        <tbody id="movements-table-body" class="text-sm divide-y divide-slate-100 bg-white"></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- TAB 5: ALERTAS -->
+        <div id="content-alertas" class="space-y-6 hidden">
+            <div class="bg-white p-6 rounded-2xl border border-slate-200 shadow-xs space-y-4">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <h2 class="font-bold text-slate-900 text-lg flex items-center"><i data-lucide="alert-triangle" class="w-5 h-5 text-rose-500 mr-2"></i> Alertas de Stock Mínimo</h2>
+                    </div>
+                </div>
+                <div id="alerts-container" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4"></div>
+            </div>
+        </div>
+
+        <!-- TAB 6: RELATÓRIOS -->
+        <div id="content-relatorios" class="space-y-6 hidden">
+            <div class="bg-blue-50 border border-blue-200 p-6 rounded-2xl shadow-xs flex flex-col md:flex-row items-center justify-between gap-4">
+                <div>
+                    <h3 class="font-bold text-blue-900 text-base flex items-center"><i data-lucide="database" class="w-5 h-5 mr-2 text-blue-600"></i> Exportar Dados</h3>
+                    <p class="text-xs text-blue-700 mt-0.5">Faça o download do inventário em CSV ou JSON.</p>
+                </div>
+                <div class="flex flex-wrap items-center gap-3">
+                    <button onclick="exportBackupJSON()" class="inline-flex items-center space-x-2 bg-blue-600 hover:bg-blue-700 text-white text-xs sm:text-sm font-medium px-4 py-2.5 rounded-xl transition shadow-xs">
+                        <i data-lucide="download" class="w-4 h-4"></i>
+                        <span>Exportar Backup (.json)</span>
+                    </button>
+                    <button onclick="exportCSV()" class="inline-flex items-center space-x-2 bg-slate-800 hover:bg-slate-900 text-white text-xs sm:text-sm font-medium px-4 py-2.5 rounded-xl transition shadow-xs">
+                        <i data-lucide="file-spreadsheet" class="w-4 h-4"></i>
+                        <span>Exportar CSV</span>
+                    </button>
+                </div>
+            </div>
+
+            <div class="bg-white p-6 rounded-2xl border border-slate-200 shadow-xs space-y-6">
+                <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                    <div class="bg-slate-50 p-5 rounded-2xl border border-slate-200">
+                        <p class="text-xs font-medium text-slate-500 uppercase">Peso Total em Stock</p>
+                        <h3 id="report-weight-value" class="text-2xl font-bold text-purple-600 mt-1">0,00 kg</h3>
+                    </div>
+                    <div class="bg-slate-50 p-5 rounded-2xl border border-slate-200">
+                        <p class="text-xs font-medium text-slate-500 uppercase">Valor Total Investido</p>
+                        <h3 id="report-cost-value" class="text-2xl font-bold text-slate-900 mt-1">€0,00</h3>
+                    </div>
+                    <div class="bg-slate-50 p-5 rounded-2xl border border-slate-200">
+                        <p class="text-xs font-medium text-slate-500 uppercase">Valor Potencial de Venda</p>
+                        <h3 id="report-sales-value" class="text-2xl font-bold text-blue-600 mt-1">€0,00</h3>
+                    </div>
+                </div>
+
+                <div class="space-y-3">
+                    <h3 class="font-bold text-slate-800 text-sm">Resumo por Categoria</h3>
+                    <div class="overflow-x-auto rounded-xl border border-slate-200">
+                        <table class="w-full text-left border-collapse">
+                            <thead>
+                                <tr class="bg-slate-50 border-b border-slate-200 text-xs font-semibold text-slate-500 uppercase">
+                                    <th class="py-3 px-4">Categoria</th>
+                                    <th class="py-3 px-4 text-center">Nº Produtos</th>
+                                    <th class="py-3 px-4 text-center">Stock Total (kg)</th>
+                                    <th class="py-3 px-4 text-right">Valor Custo Total</th>
+                                    <th class="py-3 px-4 text-right">Valor Venda Total</th>
+                                </tr>
+                            </thead>
+                            <tbody id="report-category-table" class="text-sm divide-y divide-slate-100 bg-white"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- MODAIS RESTANTES (Produtos, Entidades, Movimentos) -->
+    
+    <!-- MODAL PRODUTO -->
+    <div id="product-modal" class="fixed inset-0 bg-slate-900/50 backdrop-blur-xs z-50 flex items-center justify-center p-4 hidden no-print">
+        <div class="bg-white rounded-2xl shadow-xl max-w-lg w-full overflow-hidden border border-slate-200">
+            <div class="px-6 py-4 border-b border-slate-100 flex items-center justify-between bg-blue-50">
+                <h3 id="product-modal-title" class="font-bold text-blue-900 text-base">Novo Produto</h3>
+                <button onclick="closeProductModal()" class="text-slate-400 hover:text-slate-600 p-1"><i data-lucide="x" class="w-5 h-5"></i></button>
+            </div>
+            <form id="product-form" onsubmit="handleProductSubmit(event)" class="p-6 space-y-4">
+                <input type="hidden" id="product-edit-id" value="">
+                <div class="grid grid-cols-2 gap-4">
+                    <div><label class="block text-xs font-medium mb-1">SKU *</label><input type="text" id="product-sku" required class="w-full px-3 py-2 text-sm border rounded-xl"></div>
+                    <div><label class="block text-xs font-medium mb-1">Categoria *</label><input type="text" id="product-category" required class="w-full px-3 py-2 text-sm border rounded-xl"></div>
+                </div>
+                <div><label class="block text-xs font-medium mb-1">Descrição *</label><input type="text" id="product-name" required class="w-full px-3 py-2 text-sm border rounded-xl"></div>
+                <div class="grid grid-cols-3 gap-4">
+                    <div><label class="block text-xs font-medium mb-1">Stock (kg) *</label><input type="number" step="0.01" id="product-qty" required class="w-full px-3 py-2 text-sm border rounded-xl"></div>
+                    <div><label class="block text-xs font-medium mb-1">Stock Mín (kg) *</label><input type="number" step="0.01" id="product-min" required class="w-full px-3 py-2 text-sm border rounded-xl"></div>
+                    <div><label class="block text-xs font-medium mb-1">Lote Atual</label><input type="text" id="product-lote" class="w-full px-3 py-2 text-sm border rounded-xl"></div>
+                </div>
+                <div class="grid grid-cols-2 gap-4">
+                    <div><label class="block text-xs font-medium mb-1">Preço Custo/kg *</label><input type="number" step="0.01" id="product-cost" required class="w-full px-3 py-2 text-sm border rounded-xl"></div>
+                    <div><label class="block text-xs font-medium mb-1">Preço Venda/kg *</label><input type="number" step="0.01" id="product-price" required class="w-full px-3 py-2 text-sm border rounded-xl"></div>
+                </div>
+                <div class="pt-3 flex justify-end space-x-3 border-t">
+                    <button type="button" onclick="closeProductModal()" class="px-4 py-2 text-sm rounded-xl hover:bg-slate-100">Cancelar</button>
+                    <button type="submit" class="px-5 py-2 text-sm text-white bg-blue-600 rounded-xl hover:bg-blue-700">Guardar</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- MODAL ENTIDADE -->
+    <div id="entity-modal" class="fixed inset-0 bg-slate-900/50 backdrop-blur-xs z-50 flex items-center justify-center p-4 hidden no-print">
+        <div class="bg-white rounded-2xl shadow-xl max-w-lg w-full overflow-hidden border border-slate-200">
+            <div class="px-6 py-4 border-b border-slate-100 flex items-center justify-between bg-blue-50">
+                <h3 id="entity-modal-title" class="font-bold text-blue-900 text-base">Nova Entidade</h3>
+                <button onclick="closeEntityModal()" class="text-slate-400 hover:text-slate-600 p-1"><i data-lucide="x" class="w-5 h-5"></i></button>
+            </div>
+            <form id="entity-form" onsubmit="handleEntitySubmit(event)" class="p-6 space-y-4">
+                <input type="hidden" id="entity-edit-id" value="">
+                <div class="grid grid-cols-2 gap-4">
+                    <div><label class="block text-xs font-medium mb-1">Nome *</label><input type="text" id="entity-name" required class="w-full px-3 py-2 text-sm border rounded-xl"></div>
+                    <div><label class="block text-xs font-medium mb-1">Tipo *</label>
+                        <select id="entity-type" class="w-full px-3 py-2 text-sm border rounded-xl">
+                            <option value="Fornecedor">Fornecedor</option><option value="Cliente">Cliente</option><option value="Ambos">Ambos</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="grid grid-cols-2 gap-4">
+                    <div><label class="block text-xs font-medium mb-1">NIF *</label><input type="text" id="entity-nif" required class="w-full px-3 py-2 text-sm border rounded-xl"></div>
+                    <div><label class="block text-xs font-medium mb-1">Telefone</label><input type="text" id="entity-phone" class="w-full px-3 py-2 text-sm border rounded-xl"></div>
+                </div>
+                <div><label class="block text-xs font-medium mb-1">Email</label><input type="email" id="entity-email" class="w-full px-3 py-2 text-sm border rounded-xl"></div>
+                <div><label class="block text-xs font-medium mb-1">Morada</label><textarea id="entity-address" rows="2" class="w-full px-3 py-2 text-sm border rounded-xl"></textarea></div>
+                <div class="pt-3 flex justify-end space-x-3 border-t">
+                    <button type="button" onclick="closeEntityModal()" class="px-4 py-2 text-sm rounded-xl hover:bg-slate-100">Cancelar</button>
+                    <button type="submit" class="px-5 py-2 text-sm text-white bg-blue-600 rounded-xl hover:bg-blue-700">Guardar</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- MODAL MOVIMENTO -->
+    <div id="movement-modal" class="fixed inset-0 bg-slate-900/50 backdrop-blur-xs z-50 flex items-center justify-center p-4 hidden no-print">
+        <div class="bg-white rounded-2xl shadow-xl max-w-lg w-full overflow-hidden border border-slate-200">
+            <div id="movement-modal-header" class="px-6 py-4 border-b border-slate-100 flex items-center justify-between bg-emerald-50">
+                <h3 id="movement-modal-title" class="font-bold text-emerald-900 text-base">Registar Movimento</h3>
+                <button onclick="closeMovementModal()" class="text-slate-400 hover:text-slate-600 p-1"><i data-lucide="x" class="w-5 h-5"></i></button>
+            </div>
+            <form id="movement-form" onsubmit="handleMovementSubmit(event)" class="p-6 space-y-4">
+                <input type="hidden" id="movement-edit-id" value="">
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-xs font-medium mb-1">Tipo *</label>
+                        <select id="movement-type" onchange="onMovementTypeChange()" class="w-full px-3 py-2 text-sm border rounded-xl">
+                            <option value="entrada">Entrada (+)</option><option value="saida">Saída (-)</option>
+                        </select>
+                    </div>
+                    <div><label class="block text-xs font-medium mb-1">Data/Hora *</label><input type="datetime-local" id="movement-date" required class="w-full px-3 py-2 text-sm border rounded-xl"></div>
+                </div>
+                <div>
+                    <label class="block text-xs font-medium mb-1">Produto *</label>
+                    <select id="movement-product-id" onchange="onMovementProductChange()" required class="w-full px-3 py-2 text-sm border rounded-xl"></select>
+                </div>
+                <div class="grid grid-cols-2 gap-4">
+                    <div><label class="block text-xs font-medium mb-1">Lote *</label><input type="text" id="movement-lote" required class="w-full px-3 py-2 text-sm border rounded-xl"></div>
+                    <div><label class="block text-xs font-medium mb-1">Qtd (kg) *</label><input type="number" step="0.01" min="0.01" id="movement-qty" required class="w-full px-3 py-2 text-sm border rounded-xl"></div>
+                </div>
+                <div>
+                    <label class="block text-xs font-medium mb-1">Entidade</label>
+                    <select id="movement-entity-id" required class="w-full px-3 py-2 text-sm border rounded-xl"></select>
+                </div>
+                <div><label class="block text-xs font-medium mb-1">Observações</label><textarea id="movement-notes" rows="2" class="w-full px-3 py-2 text-sm border rounded-xl"></textarea></div>
+                <div class="pt-3 flex justify-end space-x-3 border-t">
+                    <button type="button" onclick="closeMovementModal()" class="px-4 py-2 text-sm rounded-xl hover:bg-slate-100">Cancelar</button>
+                    <button type="submit" id="movement-submit-btn" class="px-5 py-2 text-sm text-white bg-emerald-600 rounded-xl hover:bg-emerald-700">Confirmar</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div id="toast-container" class="fixed bottom-5 right-5 z-50 flex flex-col space-y-2 pointer-events-none no-print"></div>
+
+    <!-- SUPABASE CLIENT -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+    <!-- SCRIPT PRINCIPAL -->
+    <script>
+        // 1. INICIALIZAR SUPABASE
+        const SUPABASE_URL = 'https://qlcpbrsbelmchjelbesx.supabase.co';
+        const SUPABASE_KEY = 'sb_publishable_VDFOaGUzbMu3MmOmhsgu0w_81FzMbqW';
+        
+        // CORREÇÃO: Variável alterada para 'db' para evitar conflito com a biblioteca global
+        const db = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+        let products = [];
+        let entities = [];
+        let movements = [];
+
+        // 2. FUNÇÃO PARA CARREGAR OS DADOS DA CLOUD
+        async function loadData() {
+            try {
+                const [resProd, resEnt, resMov] = await Promise.all([
+                    db.from('products').select('*').order('created_at', { ascending: true }),
+                    db.from('entities').select('*').order('created_at', { ascending: true }),
+                    db.from('movements').select('*').order('date', { ascending: false })
+                ]);
+                
+                if (resProd.data) products = resProd.data;
+                if (resEnt.data) entities = resEnt.data;
+                if (resMov.data) movements = resMov.data;
+            } catch (error) {
+                console.error(error);
+                showToast('Erro de conexão à Cloud.', 'error');
+            }
+        }
+
+        window.addEventListener('DOMContentLoaded', async () => {
+            await loadData();
+            populateCategoryFilter();
+            refreshAll();
+            lucide.createIcons();
+        });
+
+        // 3. ATUALIZAR FUNÇÕES DE ESCRITA NO SUPABASE
+        async function handleProductSubmit(e) {
+            e.preventDefault();
+            const id = document.getElementById('product-edit-id').value;
+            const sku = document.getElementById('product-sku').value;
+            const name = document.getElementById('product-name').value;
+            const category = document.getElementById('product-category').value;
+            const qty = parseFloat(document.getElementById('product-qty').value) || 0;
+            const min = parseFloat(document.getElementById('product-min').value) || 0;
+            const lote = document.getElementById('product-lote').value;
+            const cost = parseFloat(document.getElementById('product-cost').value) || 0;
+            const price = parseFloat(document.getElementById('product-price').value) || 0;
+
+            const productData = { sku, name, category, qty, min, lote, cost, price };
+
+            if (id) {
+                const { error } = await db.from('products').update(productData).eq('id', id);
+                if (error) { showToast('Erro a atualizar produto', 'error'); return; }
+                showToast('Produto atualizado na Cloud!');
+            } else {
+                const { error } = await db.from('products').insert([productData]);
+                if (error) { showToast('Erro a adicionar produto', 'error'); return; }
+                showToast('Novo produto adicionado à Cloud!');
+            }
+
+            await loadData();
+            populateCategoryFilter();
+            refreshAll();
+            closeProductModal();
+        }
+
+        async function handleEntitySubmit(e) {
+            e.preventDefault();
+            const id = document.getElementById('entity-edit-id').value;
+            const name = document.getElementById('entity-name').value;
+            const type = document.getElementById('entity-type').value;
+            const nif = document.getElementById('entity-nif').value;
+            const phone = document.getElementById('entity-phone').value;
+            const email = document.getElementById('entity-email').value;
+            const address = document.getElementById('entity-address').value;
+
+            const entityData = { name, type, nif, phone, email, address };
+
+            if (id) {
+                const { error } = await db.from('entities').update(entityData).eq('id', id);
+                if (error) { showToast('Erro ao atualizar', 'error'); return; }
+                showToast('Entidade atualizada na Cloud!');
+            } else {
+                const { error } = await db.from('entities').insert([entityData]);
+                if (error) { showToast('Erro ao inserir', 'error'); return; }
+                showToast('Nova entidade adicionada à Cloud!');
+            }
+
+            await loadData();
+            refreshAll();
+            closeEntityModal();
+        }
+
+        async function handleMovementSubmit(e) {
+            e.preventDefault();
+            const editId = document.getElementById('movement-edit-id').value;
+            const type = document.getElementById('movement-type').value;
+            const date = document.getElementById('movement-date').value;
+            const product_id = document.getElementById('movement-product-id').value;
+            const lote = document.getElementById('movement-lote').value;
+            const qty = parseFloat(document.getElementById('movement-qty').value);
+            const entity_name = document.getElementById('movement-entity-id').value;
+            const notes = document.getElementById('movement-notes').value;
+
+            const targetProduct = products.find(p => p.id === product_id);
+            if (!targetProduct) return;
+
+            let newQty = targetProduct.qty;
+
+            if (editId) {
+                const oldMov = movements.find(m => m.id === editId);
+                let tempQty = targetProduct.qty;
+                if (oldMov.type === 'entrada') tempQty -= oldMov.qty;
+                else tempQty += oldMov.qty;
+
+                if (type === 'saida' && tempQty < qty) {
+                    showToast(`Stock insuficiente! (Disponível: ${tempQty}kg)`, 'error'); return;
+                }
+
+                newQty = type === 'entrada' ? (tempQty + qty) : (tempQty - qty);
+
+                await db.from('products').update({ qty: newQty, lote: (type === 'entrada' ? lote : targetProduct.lote) }).eq('id', product_id);
+                await db.from('movements').update({ date, type, product_id, product_name: targetProduct.name, lote, qty, entity_name, notes }).eq('id', editId);
+                
+                showToast('Movimento e stock atualizados na Cloud!');
+            } else {
+                if (type === 'saida' && targetProduct.qty < qty) {
+                    showToast(`Stock insuficiente! (Disponível: ${targetProduct.qty}kg)`, 'error'); return;
+                }
+
+                newQty = type === 'entrada' ? (targetProduct.qty + qty) : (targetProduct.qty - qty);
+
+                await db.from('products').update({ qty: newQty, lote: (type === 'entrada' ? lote : targetProduct.lote) }).eq('id', product_id);
+                await db.from('movements').insert([{ date, type, product_id, product_name: targetProduct.name, lote, qty, entity_name, notes }]);
+                
+                showToast('Movimento registado na Cloud!');
+            }
+
+            await loadData();
+            refreshAll();
+            closeMovementModal();
+        }
+
+        // 4. FUNÇÕES DE APRESENTAÇÃO (UI)
+        function populateCategoryFilter() {
+            const select = document.getElementById('filter-category');
+            const categories = [...new Set(products.map(p => p.category))];
+            select.innerHTML = `<option value="">Todas</option>` + categories.map(c => `<option value="${c}">${c}</option>`).join('');
+        }
+
+        function refreshAll() {
+            renderDashboard();
+            renderProductsTable();
+            renderEntitiesTable();
+            renderMovementsTable();
+            renderReports();
+            renderAlerts();
+            document.getElementById('badge-entidades').textContent = entities.length;
+            lucide.createIcons();
+        }
+
+        function switchTab(tabId) {
+            ['dashboard', 'produtos', 'entidades', 'movimentos', 'alertas', 'relatorios'].forEach(t => {
+                document.getElementById(`content-${t}`).classList.toggle('hidden', t !== tabId);
+                document.getElementById(`tab-${t}`).className = t === tabId 
+                    ? "flex-1 min-w-[110px] py-2.5 px-3 text-sm font-medium rounded-lg transition flex items-center justify-center space-x-2 bg-blue-600 text-white shadow-xs"
+                    : "flex-1 min-w-[110px] py-2.5 px-3 text-sm font-medium rounded-lg transition flex items-center justify-center space-x-2 text-slate-600 hover:text-slate-900 hover:bg-slate-50";
+            });
+            lucide.createIcons();
+        }
+
+        function formatEuro(val) { return new Intl.NumberFormat('pt-PT', { style: 'currency', currency: 'EUR' }).format(val); }
+        function formatKg(val) { return Number(val).toLocaleString('pt-PT', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' kg'; }
+        function formatDateTime(str) { if (!str) return '-'; const p = str.split('T'); return p.length === 2 ? `${p[0].split('-').reverse().join('/')} ${p[1]}` : str; }
+
+        function renderDashboard() {
+            document.getElementById('stat-total-produtos').textContent = products.length;
+            document.getElementById('stat-peso-total').textContent = formatKg(products.reduce((a, b) => a + b.qty, 0));
+            document.getElementById('stat-valor-inventario').textContent = formatEuro(products.reduce((a, b) => a + (b.qty * b.cost), 0));
+            document.getElementById('stat-stock-baixo').textContent = products.filter(p => p.qty <= p.min).length;
+
+            document.getElementById('dashboard-recent-movements').innerHTML = movements.slice(0, 5).map(m => `
+                <tr class="hover:bg-slate-50/50">
+                    <td class="py-2.5 px-3 text-slate-500">${formatDateTime(m.date)}</td>
+                    <td class="py-2.5 px-3"><span class="px-2 py-0.5 rounded-full text-[10px] font-semibold ${m.type === 'entrada' ? 'bg-emerald-50 text-emerald-700' : 'bg-rose-50 text-rose-700'}">${m.type === 'entrada' ? 'Entrada' : 'Saída'}</span></td>
+                    <td class="py-2.5 px-3 font-medium text-slate-800">${m.product_name}</td>
+                    <td class="py-2.5 px-3 text-slate-600 font-medium">${m.entity_name || '-'}</td>
+                    <td class="py-2.5 px-3 text-right font-semibold ${m.type === 'entrada' ? 'text-emerald-600' : 'text-rose-600'}">${m.type === 'entrada' ? '+' : '-'}${formatKg(m.qty)}</td>
+                </tr>
+            `).join('') || `<tr><td colspan="5" class="text-center py-4 text-slate-400">Nenhum movimento.</td></tr>`;
+        }
+
+        function renderProductsTable() {
+            const query = (document.getElementById('search-product')?.value || '').toLowerCase();
+            const catFilter = document.getElementById('filter-category')?.value || '';
+            const filtered = products.filter(p => (p.name.toLowerCase().includes(query) || p.sku.toLowerCase().includes(query)) && (catFilter === '' || p.category === catFilter));
+            const tbody = document.getElementById('products-table-body');
+            
+            tbody.innerHTML = filtered.map(p => `
+                <tr class="hover:bg-slate-50/80 transition">
+                    <td class="py-3 px-4 font-mono text-xs font-semibold text-slate-600">${p.sku}</td>
+                    <td class="py-3 px-4 font-medium text-slate-900">${p.name}</td>
+                    <td class="py-3 px-4 font-mono text-xs text-blue-700 font-semibold">${p.lote || '-'}</td>
+                    <td class="py-3 px-4"><span class="px-2.5 py-1 rounded-lg text-xs font-medium bg-slate-100 text-slate-700">${p.category}</span></td>
+                    <td class="py-3 px-4 text-center font-bold text-slate-800">${formatKg(p.qty)}</td>
+                    <td class="py-3 px-4 text-center text-xs text-slate-500">${formatKg(p.min)}</td>
+                    <td class="py-3 px-4 text-right text-slate-600">${formatEuro(p.cost)}</td>
+                    <td class="py-3 px-4 text-right font-semibold text-slate-800">${formatEuro(p.price)}</td>
+                    <td class="py-3 px-4 text-center">
+                        <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border ${p.qty <= 0 ? 'bg-rose-50 text-rose-700 border-rose-200' : p.qty <= p.min ? 'bg-amber-50 text-amber-700 border-amber-200' : 'bg-emerald-50 text-emerald-700 border-emerald-200'}">
+                            ${p.qty <= 0 ? 'Esgotado' : p.qty <= p.min ? 'Stock Baixo' : 'Normal'}
+                        </span>
+                    </td>
+                    <td class="py-3 px-4 text-center no-print">
+                        <button onclick="openProductModal('${p.id}')" class="p-1.5 text-slate-400 hover:text-blue-600"><i data-lucide="edit-3" class="w-4 h-4"></i></button>
+                    </td>
+                </tr>
+            `).join('') || `<tr><td colspan="10" class="text-center py-6 text-slate-400">Nenhum produto encontrado.</td></tr>`;
+            lucide.createIcons();
+        }
+
+        function renderEntitiesTable() {
+            const query = (document.getElementById('search-entity')?.value || '').toLowerCase();
+            const filtered = entities.filter(e => e.name.toLowerCase().includes(query) || e.nif.toLowerCase().includes(query));
+            const tbody = document.getElementById('entities-table-body');
+            
+            tbody.innerHTML = filtered.map(e => `
+                <tr class="hover:bg-slate-50/80 transition">
+                    <td class="py-3 px-4 font-medium text-slate-900">${e.name}</td>
+                    <td class="py-3 px-4"><span class="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-blue-50 text-blue-700 border border-blue-200">${e.type}</span></td>
+                    <td class="py-3 px-4 font-mono text-xs text-slate-700">${e.nif}</td>
+                    <td class="py-3 px-4 text-xs font-medium">
+                        ${e.email ? `<a href="mailto:${e.email}" class="text-blue-600 hover:underline"><i data-lucide="mail" class="w-3.5 h-3.5 inline"></i> ${e.email}</a>` : '-'}
+                    </td>
+                    <td class="py-3 px-4 text-xs text-slate-600">${e.phone || '-'}</td>
+                    <td class="py-3 px-4 text-xs text-slate-500">${e.address || '-'}</td>
+                    <td class="py-3 px-4 text-center">
+                        <button onclick="openEntityModal('${e.id}')" class="p-1.5 text-slate-400 hover:text-blue-600"><i data-lucide="edit-3" class="w-4 h-4"></i></button>
+                    </td>
+                </tr>
+            `).join('') || `<tr><td colspan="7" class="text-center py-6 text-slate-400">Nenhuma entidade encontrada.</td></tr>`;
+            lucide.createIcons();
+        }
+
+        function renderMovementsTable() {
+            const search = (document.getElementById('search-movement')?.value || '').toLowerCase();
+            const filtered = movements.filter(m => m.product_name.toLowerCase().includes(search) || (m.lote && m.lote.toLowerCase().includes(search)));
+            const tbody = document.getElementById('movements-table-body');
+            
+            tbody.innerHTML = filtered.map(m => `
+                <tr class="hover:bg-slate-50/80 transition">
+                    <td class="py-3 px-4 text-slate-500 text-xs">${formatDateTime(m.date)}</td>
+                    <td class="py-3 px-4">
+                        <span class="inline-flex items-center space-x-1 px-2.5 py-1 rounded-full text-xs font-semibold ${m.type === 'entrada' ? 'bg-emerald-50 text-emerald-700' : 'bg-rose-50 text-rose-700'}">
+                            <i data-lucide="${m.type === 'entrada' ? 'arrow-down-left' : 'arrow-up-right'}" class="w-3 h-3"></i>
+                            <span>${m.type === 'entrada' ? 'Entrada' : 'Saída'}</span>
+                        </span>
+                    </td>
+                    <td class="py-3 px-4 font-medium text-slate-900">${m.product_name}</td>
+                    <td class="py-3 px-4 font-mono text-xs font-semibold text-blue-700">${m.lote || '-'}</td>
+                    <td class="py-3 px-4 text-center font-bold ${m.type === 'entrada' ? 'text-emerald-600' : 'text-rose-600'}">
+                        ${m.type === 'entrada' ? '+' : '-'}${formatKg(m.qty)}
+                    </td>
+                    <td class="py-3 px-4 text-slate-700 text-xs font-medium">${m.entity_name || '-'}</td>
+                    <td class="py-3 px-4 text-slate-500 text-xs">${m.notes || '-'}</td>
+                    <td class="py-3 px-4 text-center no-print">
+                        <button onclick="openMovementModal('${m.type}', '${m.id}')" class="p-1.5 text-slate-400 hover:text-blue-600"><i data-lucide="edit-3" class="w-4 h-4"></i></button>
+                    </td>
+                </tr>
+            `).join('') || `<tr><td colspan="8" class="text-center py-8 text-slate-400">Nenhum movimento.</td></tr>`;
+            lucide.createIcons();
+        }
+
+        function openProductModal(id = null) {
+            document.getElementById('product-form').reset();
+            document.getElementById('product-edit-id').value = id || '';
+            if (id) {
+                const p = products.find(prod => prod.id === id);
+                if (p) {
+                    ['sku','name','category','qty','min','lote','cost','price'].forEach(field => {
+                        document.getElementById(`product-${field}`).value = p[field] || '';
+                    });
+                }
+            }
+            document.getElementById('product-modal').classList.remove('hidden');
+        }
+        function closeProductModal() { document.getElementById('product-modal').classList.add('hidden'); }
+
+        function openEntityModal(id = null) {
+            document.getElementById('entity-form').reset();
+            document.getElementById('entity-edit-id').value = id || '';
+            if (id) {
+                const e = entities.find(ent => ent.id === id);
+                if (e) {
+                    ['name','type','nif','phone','email','address'].forEach(field => {
+                        document.getElementById(`entity-${field}`).value = e[field] || '';
+                    });
+                }
+            }
+            document.getElementById('entity-modal').classList.remove('hidden');
+        }
+        function closeEntityModal() { document.getElementById('entity-modal').classList.add('hidden'); }
+
+        function openMovementModal(type = 'entrada', id = null) {
+            document.getElementById('movement-form').reset();
+            document.getElementById('movement-edit-id').value = id || '';
+            document.getElementById('movement-type').value = type;
+            
+            document.getElementById('movement-product-id').innerHTML = products.map(p => `<option value="${p.id}">${p.name} (${formatKg(p.qty)})</option>`).join('');
+            document.getElementById('movement-entity-id').innerHTML = entities.map(e => `<option value="${e.name}">${e.name}</option>`).join('');
+
+            if (id) {
+                const m = movements.find(mov => mov.id === id);
+                if (m) {
+                    document.getElementById('movement-type').value = m.type;
+                    document.getElementById('movement-date').value = m.date ? m.date.slice(0, 16) : '';
+                    document.getElementById('movement-product-id').value = m.product_id;
+                    document.getElementById('movement-lote').value = m.lote || '';
+                    document.getElementById('movement-qty').value = m.qty;
+                    document.getElementById('movement-entity-id').value = m.entity_name || '';
+                    document.getElementById('movement-notes').value = m.notes || '';
+                }
+            } else {
+                const now = new Date();
+                const tzOffset = now.getTimezoneOffset() * 60000;
+                document.getElementById('movement-date').value = (new Date(now - tzOffset)).toISOString().slice(0, 16);
+                onMovementProductChange();
+            }
+            onMovementTypeChange();
+            document.getElementById('movement-modal').classList.remove('hidden');
+        }
+        
+        function closeMovementModal() { document.getElementById('movement-modal').classList.add('hidden'); }
+        function onMovementProductChange() {
+            const pId = document.getElementById('movement-product-id').value;
+            const prod = products.find(p => p.id === pId);
+            if (prod && prod.lote) document.getElementById('movement-lote').value = prod.lote;
+        }
+
+        function onMovementTypeChange() {
+            const type = document.getElementById('movement-type').value;
+            const header = document.getElementById('movement-modal-header');
+            const title = document.getElementById('movement-modal-title');
+            const submitBtn = document.getElementById('movement-submit-btn');
+
+            if (type === 'entrada') {
+                header.className = "px-6 py-4 flex items-center justify-between bg-emerald-50";
+                title.className = "font-bold text-emerald-900";
+                submitBtn.className = "px-5 py-2 text-sm text-white rounded-xl bg-emerald-600 hover:bg-emerald-700";
+            } else {
+                header.className = "px-6 py-4 flex items-center justify-between bg-rose-50";
+                title.className = "font-bold text-rose-900";
+                submitBtn.className = "px-5 py-2 text-sm text-white rounded-xl bg-rose-600 hover:bg-rose-700";
+            }
+        }
+
+        function showToast(message, type = 'success') {
+            const container = document.getElementById('toast-container');
+            const toast = document.createElement('div');
+            toast.className = `flex items-center space-x-2 px-4 py-3 rounded-xl shadow-lg text-sm text-white ${type === 'success' ? 'bg-emerald-600' : 'bg-rose-600'}`;
+            toast.innerHTML = `<span>${message}</span>`;
+            container.appendChild(toast);
+            setTimeout(() => toast.remove(), 3500);
+        }
+
+        function renderAlerts() {
+            const low = products.filter(p => p.qty <= p.min);
+            const badge = document.getElementById('badge-alertas');
+            if (low.length > 0) { badge.textContent = low.length; badge.classList.remove('hidden'); } else badge.classList.add('hidden');
+            
+            document.getElementById('alerts-container').innerHTML = low.length === 0 
+                ? `<div class="col-span-full p-6 text-center text-emerald-600 font-medium bg-emerald-50 rounded-xl">Stock seguro!</div>` 
+                : low.map(p => `
+                <div class="bg-rose-50/50 p-4 rounded-xl border border-rose-200">
+                    <span class="font-mono text-xs font-semibold text-rose-700">${p.sku}</span>
+                    <h4 class="font-bold text-slate-900 mt-1">${p.name}</h4>
+                    <div class="mt-2 text-xs text-slate-600">Atual: <strong class="text-rose-700">${formatKg(p.qty)}</strong> | Mínimo: ${formatKg(p.min)}</div>
+                </div>
+            `).join('');
+        }
+
+        function renderReports() {
+            const totalWeight = products.reduce((acc, p) => acc + p.qty, 0);
+            const totalCost = products.reduce((acc, p) => acc + (p.qty * p.cost), 0);
+            const totalSales = products.reduce((acc, p) => acc + (p.qty * p.price), 0);
+
+            document.getElementById('report-weight-value').textContent = formatKg(totalWeight);
+            document.getElementById('report-cost-value').textContent = formatEuro(totalCost);
+            document.getElementById('report-sales-value').textContent = formatEuro(totalSales);
+
+            const map = {};
+            products.forEach(p => {
+                if (!map[p.category]) map[p.category] = { c: 0, q: 0, cost: 0, sales: 0 };
+                map[p.category].c++; map[p.category].q += p.qty;
+                map[p.category].cost += p.qty * p.cost; map[p.category].sales += p.qty * p.price;
+            });
+
+            document.getElementById('report-category-table').innerHTML = Object.keys(map).map(cat => `
+                <tr class="hover:bg-slate-50"><td class="py-3 px-4">${cat}</td><td class="text-center">${map[cat].c}</td>
+                <td class="text-center">${formatKg(map[cat].q)}</td><td class="text-right">${formatEuro(map[cat].cost)}</td>
+                <td class="text-right">${formatEuro(map[cat].sales)}</td></tr>`).join('');
+        }
+
+        function exportBackupJSON() {
+            const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify({products, entities, movements}, null, 2));
+            const a = document.createElement('a'); a.href = dataStr; a.download = 'backup.json';
+            document.body.appendChild(a); a.click(); a.remove();
+        }
+
+        function exportCSV() {
+            let csv = "data:text/csv;charset=utf-8,SKU;Nome;Categoria;Lote;Stock;Custo;Venda\n" + 
+                products.map(p => `"${p.sku}";"${p.name}";"${p.category}";"${p.lote || ''}";${p.qty};${p.cost};${p.price}`).join('\n');
+            const a = document.createElement("a"); a.href = encodeURI(csv); a.download = 'inventario.csv';
+            document.body.appendChild(a); a.click(); a.remove();
+        }
+
+        function printProductsPDF() { window.print(); }
+        function printEntitiesPDF() { window.print(); }
+        function printMovementsPDF() { window.print(); }
+    </script>
+</body>
+</html>
