@@ -653,8 +653,9 @@
                 <p id="saida-info" class="text-xs text-slate-500"></p>
                 <div>
                     <label class="block text-xs font-medium mb-1">Entidade de Destino (Cliente / Tinturaria) *</label>
-                    <input type="text" id="saida-search" oninput="fillEntitySelect('saida-cliente','saida-search',['Cliente','Ambos'],null,true)" autocomplete="off" placeholder="🔍 Pesquisar entidade (nome ou NIF)..." class="w-full px-3 py-2 mb-2 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:bg-white outline-none">
-                    <select id="saida-cliente" required class="w-full px-3 py-2 text-sm border rounded-xl"></select>
+                    <input type="text" id="saida-search" oninput="filterEntidadesSaida(null, true)" onkeydown="if(event.key==='Enter'){event.preventDefault();}" autocomplete="off" placeholder="🔍 Pesquisar entidade (nome ou NIF)..." class="w-full px-3 py-2 mb-2 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:bg-white outline-none">
+                    <select id="saida-cliente" size="5" required onchange="updateSaidaLabel()" class="w-full px-2 py-1 text-sm border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500/20 outline-none"></select>
+                    <p class="text-[11px] mt-1 text-slate-500">Selecionado: <strong id="saida-label" class="text-blue-700">—</strong> · lista de todas as entidades.</p>
                 </div>
                 <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div><label class="block text-xs font-medium mb-1">Rolos a Retirar *</label><input type="number" id="saida-rolos" required min="1" step="1" oninput="calcularPesoSaida()" class="w-full px-3 py-2 text-sm border rounded-xl"></div>
@@ -1111,6 +1112,11 @@
         }
         function filterFornecedores(keep, typing) { fillEntitySelect('fornecedorEntrada', 'forn-search', ['Fornecedor', 'Ambos'], keep, typing); updateFornLabel(); }
 
+        function updateSaidaLabel() {
+            document.getElementById('saida-label').textContent = document.getElementById('saida-cliente').value || '—';
+        }
+        function filterEntidadesSaida(keep, typing) { fillEntitySelect('saida-cliente', 'saida-search', null, keep, typing); updateSaidaLabel(); }
+
         // Preenche um <select> com entidades. size>1 = lista (sem opção vazia).
         function fillEntitySelect(selId, searchId, types, keep, typing) {
             const sel = document.getElementById(selId);
@@ -1278,7 +1284,7 @@
             const r = document.getElementById('saida-rolos'); r.max = l.rolos;
             document.getElementById('saida-peso').max = l.peso;
             document.getElementById('saida-search').value = '';
-            fillEntitySelect('saida-cliente', 'saida-search', ['Cliente', 'Ambos'], '');
+            filterEntidadesSaida('');
             document.getElementById('saida-modal').classList.remove('hidden');
         }
         function closeSaidaModal() { document.getElementById('saida-modal').classList.add('hidden'); }
