@@ -180,15 +180,29 @@
         /* mantém o erro de validação a vermelho */
         body .input-error { border-color: #e11d48 !important; }
 
-        /* Caixas de pesquisa (Produtos, Entidades, Movimentos): mesmo destaque dos campos das Entradas/Saídas */
-        body #search-product, body #search-entity, body #search-movement {
+        /* Todos os campos de preenchimento: mesmo destaque dos campos de Entrada/Saída */
+        body main input:not([type=hidden]):not([type=checkbox]):not([type=radio]):not([type=file]):not([readonly]):not([disabled]),
+        body main select,
+        body main textarea,
+        body #login-screen input:not([type=hidden]):not([type=checkbox]):not([type=radio]):not([type=file]):not([readonly]):not([disabled]),
+        body #login-screen select,
+        body #login-screen textarea {
             background-color: #ffffff; border: 2px solid #a5b4fc; border-radius: 12px;
             box-shadow: 0 1px 2px rgba(67,56,202,.10);
         }
-        body #search-product:hover, body #search-entity:hover, body #search-movement:hover { border-color: #818cf8; }
-        body #search-product:focus, body #search-entity:focus, body #search-movement:focus {
-            border-color: #4f46e5; box-shadow: 0 0 0 3px rgba(79,70,229,.25);
-        }
+        body main input:not([type=hidden]):not([type=checkbox]):not([type=radio]):not([type=file]):not([readonly]):not([disabled]):hover,
+        body main select:hover,
+        body main textarea:hover,
+        body #login-screen input:not([type=hidden]):not([type=checkbox]):not([type=radio]):not([type=file]):not([readonly]):not([disabled]):hover,
+        body #login-screen select:hover,
+        body #login-screen textarea:hover { border-color: #818cf8; }
+        body main input:not([type=hidden]):not([type=checkbox]):not([type=radio]):not([type=file]):not([readonly]):not([disabled]):focus,
+        body main select:focus,
+        body main textarea:focus,
+        body #login-screen input:not([type=hidden]):not([type=checkbox]):not([type=radio]):not([type=file]):not([readonly]):not([disabled]):focus,
+        body #login-screen select:focus,
+        body #login-screen textarea:focus { border-color: #4f46e5; box-shadow: 0 0 0 3px rgba(79,70,229,.25); }
+        body .input-error { border-color: #e11d48 !important; }
     </style>
 </head>
 <body class="bg-slate-50 text-slate-800 antialiased min-h-screen flex flex-col">

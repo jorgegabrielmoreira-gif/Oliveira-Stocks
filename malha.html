@@ -157,6 +157,67 @@
         body #saida-modal > div, body #edit-mov-modal > div { border-radius: 20px; box-shadow: 0 30px 60px -20px rgba(27,31,74,.55); }
         select[size] option { padding: 6px 8px; border-radius: 8px; }
         select[size] option:checked { background: #e0e7ff linear-gradient(0deg, #e0e7ff, #e0e7ff); color: #312e81; }
+
+        /* Todos os campos de preenchimento: mesmo destaque dos campos de Entrada/Saída */
+        body #saida-modal form, body #edit-mov-modal form, body #entity-modal form { background: #f5f6fe; }
+        body main input:not([type=hidden]):not([type=checkbox]):not([type=radio]):not([type=file]):not([readonly]):not([disabled]),
+        body main select,
+        body main textarea,
+        body #login-screen input:not([type=hidden]):not([type=checkbox]):not([type=radio]):not([type=file]):not([readonly]):not([disabled]),
+        body #login-screen select,
+        body #login-screen textarea,
+        body #saida-modal input:not([type=hidden]):not([type=checkbox]):not([type=radio]):not([type=file]):not([readonly]):not([disabled]),
+        body #saida-modal select,
+        body #saida-modal textarea,
+        body #edit-mov-modal input:not([type=hidden]):not([type=checkbox]):not([type=radio]):not([type=file]):not([readonly]):not([disabled]),
+        body #edit-mov-modal select,
+        body #edit-mov-modal textarea,
+        body #entity-modal input:not([type=hidden]):not([type=checkbox]):not([type=radio]):not([type=file]):not([readonly]):not([disabled]),
+        body #entity-modal select,
+        body #entity-modal textarea,
+        body #label-modal input:not([type=hidden]):not([type=checkbox]):not([type=radio]):not([type=file]):not([readonly]):not([disabled]),
+        body #label-modal select,
+        body #label-modal textarea {
+            background-color: #ffffff; border: 2px solid #a5b4fc; border-radius: 12px;
+            box-shadow: 0 1px 2px rgba(67,56,202,.10);
+        }
+        body main input:not([type=hidden]):not([type=checkbox]):not([type=radio]):not([type=file]):not([readonly]):not([disabled]):hover,
+        body main select:hover,
+        body main textarea:hover,
+        body #login-screen input:not([type=hidden]):not([type=checkbox]):not([type=radio]):not([type=file]):not([readonly]):not([disabled]):hover,
+        body #login-screen select:hover,
+        body #login-screen textarea:hover,
+        body #saida-modal input:not([type=hidden]):not([type=checkbox]):not([type=radio]):not([type=file]):not([readonly]):not([disabled]):hover,
+        body #saida-modal select:hover,
+        body #saida-modal textarea:hover,
+        body #edit-mov-modal input:not([type=hidden]):not([type=checkbox]):not([type=radio]):not([type=file]):not([readonly]):not([disabled]):hover,
+        body #edit-mov-modal select:hover,
+        body #edit-mov-modal textarea:hover,
+        body #entity-modal input:not([type=hidden]):not([type=checkbox]):not([type=radio]):not([type=file]):not([readonly]):not([disabled]):hover,
+        body #entity-modal select:hover,
+        body #entity-modal textarea:hover,
+        body #label-modal input:not([type=hidden]):not([type=checkbox]):not([type=radio]):not([type=file]):not([readonly]):not([disabled]):hover,
+        body #label-modal select:hover,
+        body #label-modal textarea:hover { border-color: #818cf8; }
+        body main input:not([type=hidden]):not([type=checkbox]):not([type=radio]):not([type=file]):not([readonly]):not([disabled]):focus,
+        body main select:focus,
+        body main textarea:focus,
+        body #login-screen input:not([type=hidden]):not([type=checkbox]):not([type=radio]):not([type=file]):not([readonly]):not([disabled]):focus,
+        body #login-screen select:focus,
+        body #login-screen textarea:focus,
+        body #saida-modal input:not([type=hidden]):not([type=checkbox]):not([type=radio]):not([type=file]):not([readonly]):not([disabled]):focus,
+        body #saida-modal select:focus,
+        body #saida-modal textarea:focus,
+        body #edit-mov-modal input:not([type=hidden]):not([type=checkbox]):not([type=radio]):not([type=file]):not([readonly]):not([disabled]):focus,
+        body #edit-mov-modal select:focus,
+        body #edit-mov-modal textarea:focus,
+        body #entity-modal input:not([type=hidden]):not([type=checkbox]):not([type=radio]):not([type=file]):not([readonly]):not([disabled]):focus,
+        body #entity-modal select:focus,
+        body #entity-modal textarea:focus,
+        body #label-modal input:not([type=hidden]):not([type=checkbox]):not([type=radio]):not([type=file]):not([readonly]):not([disabled]):focus,
+        body #label-modal select:focus,
+        body #label-modal textarea:focus { border-color: #4f46e5; box-shadow: 0 0 0 3px rgba(79,70,229,.25); }
+        body .input-error { border-color: #e11d48 !important; }
     </style>
 </head>
 <body class="bg-slate-50 text-slate-800 antialiased min-h-screen flex flex-col">
@@ -739,6 +800,9 @@
         let products = [];     // tabela products (fios)  → NE do Fio
         let fioLots = [], fioLotsByProduct = {};   // tabela lots (lotes do fio) → pesquisa por lote
         let entities = [];     // tabela entities         → fornecedores / clientes
+        // Ordem alfabética das entidades (igual ao index)
+        const compareByName = (a, b) => (a || '').localeCompare(b || '', 'pt', { sensitivity: 'base', numeric: true });
+        const sortedEntities = () => entities.slice().sort((a, b) => compareByName(a.name, b.name));
         let lotes = [];        // tabela malha
         let movimentos = [];   // tabela malha_movimentos
         let labelLot = null;
@@ -1123,12 +1187,12 @@
             if (!sel) return;
             const current = typeof keep === 'string' ? keep : sel.value;
             const term = ((document.getElementById(searchId) || {}).value || '').trim().toLowerCase();
-            const matches = entities
+            const matches = sortedEntities()
                 .filter(e => (!types || types.includes(e.type)) &&
                     (!term || (e.name || '').toLowerCase().includes(term) || (e.nif || '').toLowerCase().includes(term)))
                 .map(e => e.name);
             const names = matches.slice();
-            if (current && !term && !names.includes(current)) names.unshift(current);
+            if (current && !term && !names.includes(current)) { names.push(current); names.sort(compareByName); }
             const isList = sel.size > 1;
             let html = (isList ? '' : '<option value="">— Selecione —</option>') + names.map(n => `<option value="${esc(n)}">${esc(n)}</option>`).join('');
             if (term && !matches.length) html += '<option value="" disabled>Nenhuma entidade encontrada</option>';
@@ -1440,7 +1504,7 @@
         // ===== ENTIDADES (tabela partilhada com o index) =====
         function renderEntities() {
             const q = (document.getElementById('search-entity')?.value || '').toLowerCase();
-            const filtered = entities.filter(e => (e.name && e.name.toLowerCase().includes(q)) || (e.nif && e.nif.toLowerCase().includes(q)));
+            const filtered = sortedEntities().filter(e => (e.name && e.name.toLowerCase().includes(q)) || (e.nif && e.nif.toLowerCase().includes(q)));
             document.getElementById('entities-table-body').innerHTML = filtered.map(e => `
                 <tr class="hover:bg-slate-50/80 transition">
                     <td class="py-3 px-4 font-medium text-slate-900">${esc(e.name)}</td>
