@@ -151,6 +151,34 @@
             border-image: linear-gradient(90deg, #6366f1, #a855f7, #ec4899, #f59e0b, #10b981) 1; }
         .print-header { display: none; }
         #printable-label-area { display: none; }
+
+        /* Utilizador no cabeçalho */
+        #header-user { display: none; align-items: center; gap: 4px; max-width: 190px; font-size: 11px; color: #c7d2fe; }
+        #header-user.show { display: inline-flex; }
+        #header-user span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+
+        /* Campos a preencher nos submenus (modais): fundo e contorno bem visíveis */
+        body #product-modal form, body #entity-modal form, body #movement-modal form, body #lot-modal form { background: #f5f6fe; }
+        body #product-modal input:not([type=hidden]):not([type=checkbox]):not([type=radio]):not([readonly]):not([disabled]),
+        body #entity-modal input:not([type=hidden]):not([type=checkbox]):not([type=radio]):not([readonly]):not([disabled]),
+        body #movement-modal input:not([type=hidden]):not([type=checkbox]):not([type=radio]):not([readonly]):not([disabled]),
+        body #lot-modal input:not([type=hidden]):not([type=checkbox]):not([type=radio]):not([readonly]):not([disabled]),
+        body #product-modal select, body #entity-modal select, body #movement-modal select, body #lot-modal select,
+        body #product-modal textarea, body #entity-modal textarea, body #movement-modal textarea, body #lot-modal textarea {
+            background-color: #ffffff; border: 2px solid #a5b4fc; border-radius: 12px;
+            box-shadow: 0 1px 2px rgba(67,56,202,.10);
+        }
+        body #product-modal input:hover, body #entity-modal input:hover, body #movement-modal input:hover, body #lot-modal input:hover,
+        body #product-modal select:hover, body #entity-modal select:hover, body #movement-modal select:hover, body #lot-modal select:hover,
+        body #product-modal textarea:hover, body #entity-modal textarea:hover, body #movement-modal textarea:hover, body #lot-modal textarea:hover { border-color: #818cf8; }
+        body #product-modal input:focus, body #entity-modal input:focus, body #movement-modal input:focus, body #lot-modal input:focus,
+        body #product-modal select:focus, body #entity-modal select:focus, body #movement-modal select:focus, body #lot-modal select:focus,
+        body #product-modal textarea:focus, body #entity-modal textarea:focus, body #movement-modal textarea:focus, body #lot-modal textarea:focus {
+            border-color: #4f46e5; box-shadow: 0 0 0 3px rgba(79,70,229,.25);
+        }
+        /* mantém o erro de validação a vermelho */
+        body .input-error { border-color: #e11d48 !important; }
     </style>
 </head>
 <body class="bg-slate-50 text-slate-800 antialiased min-h-screen flex flex-col">
@@ -211,6 +239,7 @@
             </div>
             
             <div class="flex items-center space-x-2 sm:space-x-3">
+                <div id="header-user" title="Utilizador com sessão iniciada"><i data-lucide="user" class="w-3 h-3 shrink-0"></i><span id="header-user-name"></span></div>
                 <a href="malha.html" title="Abrir o Armazém de Malhas" class="inline-flex items-center space-x-1.5 bg-white/10 hover:bg-white/20 border border-white/25 text-white text-xs sm:text-sm font-medium px-3 py-2 rounded-lg transition">
                     <i data-lucide="layers" class="w-4 h-4"></i>
                     <span class="hidden sm:inline">Armazém de Malhas</span><span class="sm:hidden">Malhas</span>
@@ -349,6 +378,10 @@
                         <select id="filter-category" onchange="renderProductsTable()" class="py-2 px-3 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/20">
                             <option value="">Todas as Categorias</option>
                         </select>
+                        <label class="no-print inline-flex items-center gap-2 text-xs font-medium text-slate-600 cursor-pointer select-none whitespace-nowrap" title="A impressão sai igual ao que está no ecrã">
+                            <input type="checkbox" id="show-zero-stock" checked onchange="renderProductsTable()" class="w-4 h-4 rounded border-slate-300 text-blue-600">
+                            Mostrar esgotados
+                        </label>
                     </div>
                     <div class="flex items-center space-x-2">
                         <button onclick="printProductsPDF()" class="bg-slate-800 hover:bg-slate-900 text-white text-xs font-medium px-3.5 py-2.5 rounded-xl transition flex items-center space-x-1.5 shadow-sm no-print">
@@ -1078,11 +1111,25 @@
             refreshAll();
         }
 
+        // Mostra no cabeçalho o utilizador que entrou (nome definido no Supabase, ou o email)
+        function setHeaderUser(user) {
+            const box = document.getElementById('header-user');
+            const name = document.getElementById('header-user-name');
+            if (!box || !name) return;
+            const m = (user && user.user_metadata) || {};
+            const label = m.full_name || m.name || m.display_name || (user && user.email) || '';
+            name.textContent = label;
+            box.title = user && user.email ? 'Sessão iniciada como ' + user.email : '';
+            box.classList.toggle('show', !!label);
+            scheduleIcons();
+        }
+
         // VERIFICAR SESSÃO DE AUTENTICAÇÃO AO CARREGAR A PÁGINA
         window.addEventListener('DOMContentLoaded', async () => {
             const { data: { session } } = await db.auth.getSession();
             
             if (session) {
+                setHeaderUser(session.user);
                 document.getElementById('login-screen').classList.add('hidden');
                 if (loadCache()) { populateCategoryFilter(); refreshAll(); }
                 await loadData();
@@ -1114,6 +1161,7 @@
                 btn.disabled = false;
                 btn.textContent = 'Entrar no Sistema';
             } else {
+                setHeaderUser(data && data.user);
                 document.getElementById('login-screen').classList.add('hidden');
                 btn.disabled = false;
                 btn.textContent = 'Entrar no Sistema';
@@ -1432,16 +1480,25 @@
             const tbody = document.getElementById('products-table-body');
             const pKey = query + '|' + catFilter;
             if (pKey !== lastProductKey) { lastProductKey = pKey; productLimit = 100; }
-            const shownProducts = filtered.slice(0, productLimit);
-            const moreProducts = filtered.length > shownProducts.length
-                ? `<tr><td colspan="11" class="text-center py-4"><button onclick="productLimit += 200; renderProductsTable()" class="px-4 py-2 text-sm font-medium text-blue-600 hover:bg-blue-50 rounded-lg">Mostrar mais (${shownProducts.length} de ${filtered.length})</button></td></tr>` : '';
+            // Stock 0: a caixa "Mostrar esgotados" decide o que aparece no ecrã e, por isso, também na impressão
+            const showZero = !!document.getElementById('show-zero-stock')?.checked;
+            const isZero = p => Number(p.qty) <= 0;
+            const listed = showZero ? filtered : filtered.filter(p => !isZero(p));
+            const shownProducts = listed.slice(0, productLimit);
+            const visibleCount = shownProducts.length;
+            const visibleTotal = listed.length;
+            const moreProducts = visibleTotal > visibleCount
+                ? `<tr><td colspan="11" class="text-center py-4"><button onclick="productLimit += 200; renderProductsTable()" class="px-4 py-2 text-sm font-medium text-blue-600 hover:bg-blue-50 rounded-lg">Mostrar mais (${visibleCount} de ${visibleTotal})</button></td></tr>` : '';
+            const emptyRow = visibleCount === 0
+                ? `<tr><td colspan="11" class="text-center py-6 text-slate-400 no-print">Nenhum produto encontrado.</td></tr>` : '';
 
             tbody.innerHTML = shownProducts.map(p => {
                 const pl = lotsByProduct[p.id] || [];
                 const active = pl.filter(l => l.qty > 0).length;
                 const open = expandedProducts.has(p.id) || (query && !productOwnMatch(p, query) && productLotMatch(p, query));
+                const zc = isZero(p) ? 'zero-stock' : '';
                 return `
-                <tr data-pid="${esc(p.id)}" class="hover:bg-slate-50/80 transition ${p.id === highlightProductId ? 'row-flash' : ''}">
+                <tr data-pid="${esc(p.id)}" class="${zc} hover:bg-slate-50/80 transition ${p.id === highlightProductId ? 'row-flash' : ''}">
                     <td class="py-3 px-3 font-mono text-xs font-semibold text-slate-600">
                         <div>${esc(p.sku || '-')}</div>
                         ${p.barcode ? `<div class="text-[10px] text-slate-400"><i data-lucide="barcode" class="w-3 h-3 inline"></i> ${esc(p.barcode)}</div>` : ''}
@@ -1471,8 +1528,8 @@
                             <button onclick="deleteProduct('${esc(p.id)}')" title="Eliminar Produto" class="p-1.5 text-slate-400 hover:text-rose-600 transition"><i data-lucide="trash-2" class="w-4 h-4"></i></button>
                         </div>
                     </td>
-                </tr>${open ? renderLotsDetail(p, query) : ''}`;
-            }).join('') + moreProducts || `<tr><td colspan="11" class="text-center py-6 text-slate-400">Nenhum produto encontrado.</td></tr>`;
+                </tr>${open ? renderLotsDetail(p, query).replace('<tr', `<tr class="${zc}"`) : ''}`;
+            }).join('') + moreProducts + emptyRow;
             scheduleIcons();
         }
 
