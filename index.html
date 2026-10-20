@@ -766,7 +766,8 @@
                 </div>
                 <div>
                     <label class="block text-xs font-medium mb-1">Entidade</label>
-                    <select id="movement-entity-id" required class="w-full px-3 py-2 text-sm border rounded-xl"></select>
+                    <input type="text" id="search-movement-entity" oninput="filterMovementEntities(null, true)" onkeydown="if(event.key==='Enter'){event.preventDefault();}" autocomplete="off" placeholder="🔍 Pesquisar entidade (nome ou NIF)..." class="w-full px-3 py-2 mb-2 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:bg-white outline-none focus:ring-2 focus:ring-blue-500/20">
+                    <select id="movement-entity-id" size="4" required class="w-full px-2 py-1 text-sm border rounded-xl"></select>
                 </div>
                 <div><label class="block text-xs font-medium mb-1">Observações</label><textarea id="movement-notes" rows="2" class="w-full px-3 py-2 text-sm border rounded-xl"></textarea></div>
                 <div class="pt-3 flex justify-end space-x-3 border-t shrink-0">
@@ -835,6 +836,9 @@
 
         let products = [];
         let entities = [];
+        // Ordem alfabética (A-Z) por nome, ignorando maiúsculas e acentos — usada em todas as listagens de entidades
+        const compareByName = (a, b) => (a || '').localeCompare(b || '', 'pt', { sensitivity: 'base', numeric: true });
+        const sortedEntities = () => entities.slice().sort((a, b) => compareByName(a.name, b.name));
         let movements = [];
         let selectedProductForLabel = null;
         let lots = [], lotsByProduct = {};
@@ -1043,18 +1047,37 @@
             const sel = document.getElementById('lot-supplier');
             const current = typeof keep === 'string' ? keep : sel.value;
             const term = document.getElementById('lot-supplier-search').value.trim().toLowerCase();
-            const names = entities
+            const names = sortedEntities()
                 .filter(e => (e.type === 'Fornecedor' || e.type === 'Ambos') &&
                     (!term || (e.name || '').toLowerCase().includes(term) || (e.nif || '').toLowerCase().includes(term)))
                 .map(e => e.name);
             const matches = names.slice();
-            if (current && !names.includes(current)) names.unshift(current);
+            if (current && !names.includes(current)) { names.push(current); names.sort(compareByName); }
             let html = '<option value="">— Sem fornecedor —</option>' + names.map(n => `<option value="${esc(n)}">${esc(n)}</option>`).join('');
             if (term && !matches.length) html += '<option value="" disabled>Nenhum fornecedor encontrado</option>';
             sel.innerHTML = html;
             // ao escrever, o 1.º resultado fica logo selecionado
             sel.value = (typing && term && matches.length) ? matches[0] : current;
             updateLotSupplierLabel();
+        }
+
+        // keep: entidade a manter selecionada (string) | typing: true quando vem da caixa de pesquisa
+        function filterMovementEntities(keep, typing) {
+            const sel = document.getElementById('movement-entity-id');
+            const current = typeof keep === 'string' ? keep : sel.value;
+            const term = document.getElementById('search-movement-entity').value.trim().toLowerCase();
+            const names = sortedEntities()
+                .filter(e => !term || (e.name || '').toLowerCase().includes(term) || (e.nif || '').toLowerCase().includes(term))
+                .map(e => e.name);
+            const matches = names.slice();
+            if (current && !names.includes(current) && entities.some(e => e.name === current)) { names.push(current); names.sort(compareByName); }
+            let html = names.map(n => `<option value="${esc(n)}">${esc(n)}</option>`).join('');
+            if (term && !matches.length) html += '<option value="" disabled>Nenhuma entidade encontrada</option>';
+            sel.innerHTML = html;
+            // ao escrever, o 1.º resultado fica logo selecionado; sem pesquisa mantém a seleção (ou a 1.ª da lista)
+            if (typing && term && matches.length) sel.value = matches[0];
+            else if (current && names.includes(current)) sel.value = current;
+            else if (names.length && !term) sel.value = names[0];
         }
 
         function filterLotMoveProducts() {
@@ -1535,7 +1558,8 @@
 
         function renderEntitiesTable() {
             const query = (document.getElementById('search-entity')?.value || '').toLowerCase();
-            const filtered = entities.filter(e => (e.name && e.name.toLowerCase().includes(query)) || (e.nif && e.nif.toLowerCase().includes(query)));
+            const filtered = sortedEntities()
+                .filter(e => (e.name && e.name.toLowerCase().includes(query)) || (e.nif && e.nif.toLowerCase().includes(query)));
             const tbody = document.getElementById('entities-table-body');
             
             tbody.innerHTML = filtered.map(e => `
@@ -1762,7 +1786,8 @@
             
             document.getElementById('search-movement-product').value = '';
             filterMovementProducts();
-            document.getElementById('movement-entity-id').innerHTML = entities.map(e => `<option value="${esc(e.name)}">${esc(e.name)}</option>`).join('');
+            document.getElementById('search-movement-entity').value = '';
+            filterMovementEntities('');
 
             if (id) {
                 const m = movements.find(mov => mov.id === id);
