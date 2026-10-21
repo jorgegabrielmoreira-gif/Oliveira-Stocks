@@ -388,6 +388,23 @@
                     <p class="text-xs text-slate-500 mt-0.5">Ao confirmar é gerado o SKU e a etiqueta do lote.</p>
                 </div>
                 <form id="entrada-form" novalidate onsubmit="handleEntradaSubmit(event)" class="space-y-4">
+                    <div>
+                        <label class="block text-xs font-medium text-slate-700 mb-1">SKU do lote <span class="text-slate-400 font-normal">(gerado automaticamente)</span></label>
+                        <input type="text" id="entrada-sku" readonly tabindex="-1" class="w-full sm:w-1/2 px-3 py-2 text-sm font-mono font-semibold text-slate-700 bg-slate-50 border border-slate-200 rounded-xl outline-none cursor-default">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-600 mb-2">Identificação Visual <span class="text-slate-400 font-normal">(gerada automaticamente a partir do SKU)</span></label>
+                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 bg-slate-50 p-3 rounded-xl border border-slate-200 text-center">
+                            <div class="flex flex-col items-center justify-center">
+                                <span class="text-[10px] text-slate-400 font-bold uppercase mb-1">Código de Barras</span>
+                                <svg id="entrada-barcode-svg" class="max-h-16 max-w-full"></svg>
+                            </div>
+                            <div class="flex flex-col items-center justify-center">
+                                <span class="text-[10px] text-slate-400 font-bold uppercase mb-1">QR Code (SKU)</span>
+                                <div id="entrada-qrcode-container" class="p-1 bg-white rounded border"></div>
+                            </div>
+                        </div>
+                    </div>
                     <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
                         <div><label class="block text-xs font-medium text-slate-700 mb-1">N.º OF / Encomenda</label><input type="text" id="of" placeholder="Ex: OF-8921 (opcional)" class="w-full px-3 py-2 text-sm border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500/20 outline-none"></div>
                         <div><label class="block text-xs font-medium text-slate-700 mb-1">N.º do Tear *</label><input type="text" id="tearNum" required placeholder="Ex: Tear 04" class="w-full px-3 py-2 text-sm border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500/20 outline-none"></div>
@@ -1026,6 +1043,7 @@
             fillTipoMalha();
             filterNeProducts();
             filterFornecedores();
+            updateSkuPreview();
             scheduleIcons();
         }
 
@@ -1210,6 +1228,36 @@
             document.getElementById('pesoLiquido').value = Math.max(0, round2(bruto - rolos * tara)).toFixed(2);
         }
 
+        // SKU AUTOMÁTICO: MC-AAAAMMDD-0001, 0002, ... (sequencial por dia)
+        function diaSku(d = new Date()) {
+            return `${d.getFullYear()}${String(d.getMonth() + 1).padStart(2, '0')}${String(d.getDate()).padStart(2, '0')}`;
+        }
+        function generateNextSku(dia = diaSku()) {
+            const prefix = `MC-${dia}-`;
+            let max = 0;
+            lotes.forEach(l => {
+                const sku = String(l.sku || '');
+                if (sku.startsWith(prefix)) {
+                    const n = parseInt(sku.slice(prefix.length), 10);
+                    if (!isNaN(n)) max = Math.max(max, n);
+                }
+            });
+            return prefix + String(max + 1).padStart(4, '0');
+        }
+        function updateSkuPreview() {
+            const el = document.getElementById('entrada-sku');
+            if (!el) return;
+            const sku = generateNextSku();
+            el.value = sku;
+            // Código de barras e QR Code gerados automaticamente a partir do SKU
+            try { JsBarcode('#entrada-barcode-svg', sku, { format: 'CODE128', height: 40, fontSize: 12, margin: 0 }); } catch (e) { console.error(e); }
+            const qr = document.getElementById('entrada-qrcode-container');
+            if (qr) {
+                qr.innerHTML = '';
+                try { new QRCode(qr, { text: sku, width: 60, height: 60 }); } catch (e) { console.error(e); }
+            }
+        }
+
         function numOrNull(id) { const v = document.getElementById(id).value; return v === '' ? null : Number(v); }
 
         async function handleEntradaSubmit(e) {
@@ -1231,12 +1279,13 @@
             const btn = document.getElementById('entrada-btn');
             btn.disabled = true;
             const agora = new Date();
-            const dia = `${agora.getFullYear()}${String(agora.getMonth() + 1).padStart(2, '0')}${String(agora.getDate()).padStart(2, '0')}`;
+            const dia = diaSku(agora);
 
             let lote = null, error = null;
-            for (let i = 0; i < 4; i++) {   // repete se o SKU aleatório colidir
+            for (let i = 0; i < 4; i++) {   // se o SKU colidir (outro utilizador), recarrega e gera o seguinte
+                if (i > 0) await loadData();
                 const row = {
-                    sku: `MC-${dia}-${Math.floor(1000 + Math.random() * 9000)}`,
+                    sku: generateNextSku(dia),
                     of_num: val('of') || null,
                     tear: val('tearNum'),
                     ne_fio: prod ? prod.name : '',
@@ -1273,6 +1322,7 @@
             btn.disabled = false;
             showToast('Lote registado com sucesso!');
             form.reset();
+            updateSkuPreview();
             document.getElementById('ne-search').value = '';
             document.getElementById('forn-search').value = '';
             document.getElementById('pesoLiquido').value = '';

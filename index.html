@@ -663,8 +663,15 @@
                 <input type="hidden" id="product-edit-id" value="">
                 
                 <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <div><label class="block text-xs font-medium text-slate-700 mb-1">SKU *</label><input type="text" id="product-sku" required class="w-full px-3 py-2 text-sm border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500/20 outline-none" oninput="renderModalCodes()"></div>
-                    <div><label class="block text-xs font-medium text-slate-700 mb-1">Cód. Barras / EAN</label><input type="text" id="product-barcode" placeholder="Ex: 5601234567890" class="w-full px-3 py-2 text-sm border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500/20 outline-none" oninput="renderModalCodes()"></div>
+                    <div>
+                        <div class="flex items-center justify-between mb-1">
+                            <label class="block text-xs font-medium text-slate-700">SKU *</label>
+                            <button type="button" id="product-sku-generate" onclick="generateSkuIntoForm()" class="text-[11px] text-blue-600 font-medium hover:underline">Gerar automaticamente</button>
+                        </div>
+                        <input type="text" id="product-sku" required class="w-full px-3 py-2 text-sm border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500/20 outline-none" oninput="this.dataset.auto='';syncBarcodeWithSku();renderModalCodes()">
+                    </div>
+                    <div><label class="block text-xs font-medium text-slate-700 mb-1">Cód. Barras / EAN</label><input type="text" id="product-barcode" placeholder="Ex: 5601234567890" class="w-full px-3 py-2 text-sm border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500/20 outline-none" oninput="this.dataset.auto='';renderModalCodes()">
+                        <p class="text-[10px] text-slate-400 mt-1">Gerado automaticamente a partir do SKU. Pode substituir por um EAN real.</p></div>
                 </div>
 
                 <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -1253,7 +1260,10 @@
             if (!validateForm(document.getElementById('product-form'))) return;
             const id = document.getElementById('product-edit-id').value;
             const sku = document.getElementById('product-sku').value;
-            const barcode = document.getElementById('product-barcode').value;
+            const barcodeEl = document.getElementById('product-barcode');
+            let barcode = barcodeEl.value;
+            const barcodeIsAuto = barcodeEl.dataset.auto === '1';
+            if (!id && !barcode.trim()) barcode = sku;   // novo produto sem código: usa o SKU
             const name = document.getElementById('product-name').value;
             const category = document.getElementById('product-category').value;
             const min = parseFloat(document.getElementById('product-min').value) || 0;
@@ -1269,7 +1279,16 @@
                 if (error) { showProductError(error, 'Erro a atualizar produto'); return; }
                 showToast('Produto atualizado na Cloud!');
             } else {
-                const { error } = await db.from('products').insert([{ ...productData, qty: 0, lote: '' }]);
+                let { error } = await db.from('products').insert([{ ...productData, qty: 0, lote: '' }]);
+                const skuIsAuto = document.getElementById('product-sku').dataset.auto === '1';
+                if (error && error.code === '23505' && skuIsAuto && (barcodeIsAuto || !((error.details || '') + (error.message || '')).toLowerCase().includes('barcode'))) {
+                    // SKU automático já usado entretanto: atualiza a lista e tenta com o seguinte
+                    await loadData();
+                    productData.sku = generateNextSku();
+                    document.getElementById('product-sku').value = productData.sku;
+                    if (barcodeIsAuto) { productData.barcode = productData.sku; barcodeEl.value = productData.sku; }
+                    ({ error } = await db.from('products').insert([{ ...productData, qty: 0, lote: '' }]));
+                }
                 if (error) { showProductError(error, 'Erro a adicionar produto'); return; }
                 showToast('Novo produto adicionado à Cloud!');
             }
@@ -1768,10 +1787,46 @@
             }
         }
 
+        // SKU AUTOMÁTICO: PRD-0001, PRD-0002, ... (continua a partir do maior número já existente)
+        const SKU_PREFIX = 'PRD-';
+        function generateNextSku() {
+            const re = new RegExp('^' + SKU_PREFIX + '(\\d+)$', 'i');
+            let max = 0;
+            products.forEach(p => {
+                const m = re.exec((p.sku || '').trim());
+                if (m) max = Math.max(max, parseInt(m[1], 10));
+            });
+            return SKU_PREFIX + String(max + 1).padStart(4, '0');
+        }
+        // Código de barras automático = SKU (enquanto o utilizador não o alterar manualmente)
+        function syncBarcodeWithSku() {
+            const bc = document.getElementById('product-barcode');
+            if (bc && bc.dataset.auto === '1') bc.value = document.getElementById('product-sku').value;
+        }
+        function generateSkuIntoForm() {
+            const el = document.getElementById('product-sku');
+            el.value = generateNextSku();
+            el.dataset.auto = '1';
+            syncBarcodeWithSku();
+            clearFieldErrors(document.getElementById('product-form'));
+            renderModalCodes();
+        }
+
         function openProductModal(id = null) {
             document.getElementById('product-form').reset();
             clearFieldErrors(document.getElementById('product-form'));
             document.getElementById('product-edit-id').value = id || '';
+            const skuEl = document.getElementById('product-sku');
+            const bcEl = document.getElementById('product-barcode');
+            skuEl.dataset.auto = '';
+            bcEl.dataset.auto = '';
+            document.getElementById('product-sku-generate').classList.toggle('hidden', !!id);
+            if (!id) {
+                skuEl.value = generateNextSku();
+                skuEl.dataset.auto = '1';
+                bcEl.value = skuEl.value;
+                bcEl.dataset.auto = '1';
+            }
             if (id) {
                 const p = products.find(prod => prod.id === id);
                 if (p) {
