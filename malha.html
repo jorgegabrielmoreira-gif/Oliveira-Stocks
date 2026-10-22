@@ -142,6 +142,11 @@
         /* Modais */
         body #product-modal > div, body #entity-modal > div, body #movement-modal > div, body #label-modal > div { border-radius: 20px; box-shadow: 0 30px 60px -20px rgba(27,31,74,.55); }
 
+        /* Utilizador no cabeçalho */
+        #header-user { display: none; align-items: center; gap: 4px; max-width: 190px; font-size: 11px; color: #c7d2fe; }
+        #header-user.show { display: inline-flex; }
+        #header-user span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
         /* Ecrã de login */
         .login-bg { background:
             radial-gradient(900px 500px at 12% 8%, rgba(99,102,241,.45), transparent 60%),
@@ -225,8 +230,8 @@
     <!-- ÁREA EXCLUSIVA DE IMPRESSÃO DE ETIQUETA -->
     <div id="printable-label-area" class="p-4 bg-white"></div>
 
-    <!-- ECRÃ DE LOGIN (a sessão é partilhada com o index) -->
-    <div id="login-screen" class="login-bg fixed inset-0 z-50 flex items-center justify-center p-4 hidden">
+    <!-- ECRÃ DE LOGIN (PROTEÇÃO SUPABASE · a sessão é partilhada com o index) -->
+    <div id="login-screen" class="login-bg fixed inset-0 z-50 flex items-center justify-center p-4">
         <div class="bg-white rounded-2xl shadow-xl max-w-sm w-full p-6 border border-slate-200 space-y-6">
             <div class="text-center space-y-2">
                 <div class="inline-flex items-center justify-center mb-2">
@@ -274,7 +279,8 @@
                 </div>
             </div>
             <div class="flex items-center space-x-2 sm:space-x-3">
-                <a href="index.html" title="Voltar ao Armazém de Fios" class="inline-flex items-center space-x-1.5 bg-white/10 hover:bg-white/20 border border-white/25 text-white text-xs sm:text-sm font-medium px-3 py-2 rounded-lg transition">
+                <div id="header-user" title="Utilizador com sessão iniciada"><i data-lucide="user" class="w-3 h-3 shrink-0"></i><span id="header-user-name"></span></div>
+                <a href="index.html" onclick="goToPage(event, 'index.html')" title="Voltar ao Armazém de Fios" class="inline-flex items-center space-x-1.5 bg-white/10 hover:bg-white/20 border border-white/25 text-white text-xs sm:text-sm font-medium px-3 py-2 rounded-lg transition">
                     <i data-lucide="arrow-left" class="w-4 h-4"></i>
                     <span class="hidden sm:inline">Armazém de Fios</span><span class="sm:hidden">Fios</span>
                 </a>
@@ -282,8 +288,13 @@
                     <i data-lucide="arrow-down-left" class="w-4 h-4"></i>
                     <span class="hidden sm:inline">Registar</span> Entrada
                 </button>
-                <button onclick="handleLogout()" title="Sair da conta" class="p-2 text-indigo-200 hover:text-white hover:bg-white/10 rounded-lg transition no-print">
-                    <i data-lucide="log-out" class="w-5 h-5"></i>
+                <button onclick="openPickLoteSaida()" class="inline-flex items-center space-x-1.5 bg-rose-600 hover:bg-rose-700 text-white text-xs sm:text-sm font-medium px-3 py-2 rounded-lg transition shadow-xs">
+                    <i data-lucide="arrow-up-right" class="w-4 h-4"></i>
+                    <span class="hidden sm:inline">Registar</span> Saída
+                </button>
+                <button onclick="handleLogout()" title="Sair da conta" class="flex items-center gap-1.5 px-3 py-1.5 text-sm font-semibold text-white bg-white/15 hover:bg-rose-500/80 border border-white/30 rounded-lg transition no-print">
+                    <i data-lucide="log-out" class="w-4 h-4"></i>
+                    <span>Sair</span>
                 </button>
             </div>
         </div>
@@ -545,7 +556,7 @@
                     </div>
                 </div>
                 <div class="overflow-x-auto rounded-xl border border-slate-200 custom-scrollbar">
-                    <table class="w-full text-left border-collapse min-w-[950px]">
+                    <table class="w-full text-left border-collapse min-w-[1050px]">
                         <thead>
                             <tr class="bg-slate-50 border-b border-slate-200 text-xs font-semibold text-slate-500 uppercase tracking-wider">
                                 <th class="py-3 px-4">Data/Hora</th>
@@ -556,6 +567,7 @@
                                 <th class="py-3 px-4">Entidade</th>
                                 <th class="py-3 px-4 text-center">Rolos</th>
                                 <th class="py-3 px-4 text-center">Peso Líq. (kg)</th>
+                                <th class="py-3 px-4">Utilizador</th>
                                 <th class="py-3 px-4 text-center no-print sticky-col-right bg-slate-100 shadow-md min-w-[90px]">Ações</th>
                             </tr>
                         </thead>
@@ -720,6 +732,20 @@
     </div>
 
     <!-- MODAL SAÍDA -->
+    <div id="pick-saida-modal" class="fixed inset-0 bg-slate-900/50 backdrop-blur-xs z-50 flex items-center justify-center p-4 hidden no-print">
+        <div class="bg-white rounded-2xl shadow-xl max-w-2xl w-full border border-slate-200 max-h-[90vh] flex flex-col my-auto">
+            <div class="px-6 py-4 border-b border-slate-100 flex items-center justify-between bg-rose-50 shrink-0">
+                <h3 class="font-bold text-rose-900 text-base">Registar Saída · escolher lote</h3>
+                <button onclick="closePickLoteSaida()" class="text-slate-400 hover:text-slate-600 p-1"><i data-lucide="x" class="w-5 h-5"></i></button>
+            </div>
+            <div class="p-4 border-b border-slate-100 shrink-0">
+                <input type="text" id="pick-saida-search" oninput="renderPickLoteSaida()" onkeydown="pickSaidaKey(event)" autocomplete="off" placeholder="🔍 Pesquisar lote (SKU, OF, tear, fio, localização...)" class="w-full px-3 py-2 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:bg-white outline-none">
+                <p class="text-[11px] mt-1 text-slate-400">Só aparecem lotes com stock. Escreve o SKU completo e carrega em Enter para escolher diretamente.</p>
+            </div>
+            <div id="pick-saida-list" class="overflow-y-auto custom-scrollbar flex-1 divide-y divide-slate-100"></div>
+        </div>
+    </div>
+
     <div id="saida-modal" class="fixed inset-0 bg-slate-900/50 backdrop-blur-xs z-50 flex items-center justify-center p-4 hidden no-print">
         <div class="bg-white rounded-2xl shadow-xl max-w-lg w-full border border-slate-200 max-h-[90vh] flex flex-col my-auto">
             <div class="px-6 py-4 border-b border-slate-100 flex items-center justify-between bg-rose-50 shrink-0">
@@ -974,16 +1000,66 @@
         const normMov = m => ({ ...m, rolos: Number(m.rolos), peso: Number(m.peso) });
 
         // ===== SESSÃO =====
+        function setHeaderUser(user) {
+            const box = document.getElementById('header-user');
+            const name = document.getElementById('header-user-name');
+            if (!box || !name) return;
+            const m = (user && user.user_metadata) || {};
+            const label = m.full_name || m.name || m.display_name || (user && user.email) || '';
+            name.textContent = label;
+            box.title = user && user.email ? 'Sessão iniciada como ' + user.email : '';
+            box.classList.toggle('show', !!label);
+            scheduleIcons();
+        }
+        // VERIFICAR SESSÃO DE AUTENTICAÇÃO AO CARREGAR A PÁGINA
+        // ===== PARTILHA DE SESSÃO ENTRE index.html E malha.html =====
+        // Normalmente a sessão é partilhada pelo armazenamento do browser. Se as duas páginas estiverem em
+        // origens diferentes (ex.: ficheiros locais), a sessão segue no link e é restaurada na página de destino.
+        async function goToPage(ev, url) {
+            if (ev && (ev.ctrlKey || ev.metaKey || ev.shiftKey || ev.button === 1)) return;   // novo separador: comportamento normal
+            if (ev) ev.preventDefault();
+            let target = url;
+            try {
+                const { data: { session } } = await db.auth.getSession();
+                if (session) target += '#sb_at=' + encodeURIComponent(session.access_token) + '&sb_rt=' + encodeURIComponent(session.refresh_token);
+            } catch (e) { console.error(e); }
+            window.location.href = target;
+        }
+        async function restoreSessionFromLink() {
+            const h = new URLSearchParams(window.location.hash.slice(1));
+            const at = h.get('sb_at'), rt = h.get('sb_rt');
+            if (!at || !rt) return;
+            history.replaceState(null, '', window.location.pathname + window.location.search);   // tira os tokens do endereço
+            try {
+                const { data: { session } } = await db.auth.getSession();
+                if (!session) await db.auth.setSession({ access_token: at, refresh_token: rt });   // só se não houver sessão partilhada
+            } catch (e) { console.error('Erro ao restaurar a sessão:', e); }
+        }
+
         window.addEventListener('DOMContentLoaded', async () => {
-            const { data: { session } } = await db.auth.getSession();
+            await restoreSessionFromLink();
+            let session = null;
+            try { ({ data: { session } } = await db.auth.getSession()); }
+            catch (e) { console.error('Erro ao verificar a sessão:', e); }
             if (session) {
-                await startApp();
+                await startApp(session.user);
             } else {
                 document.getElementById('login-screen').classList.remove('hidden');
             }
             scheduleIcons();
         });
-        async function startApp() {
+        // Mantém o utilizador do cabeçalho sempre em sintonia com a sessão do Supabase
+        // (restauro da sessão, renovação do token, login/logout feito noutro separador, ex.: no index)
+        db.auth.onAuthStateChange((event, session) => {
+            if (session && session.user) setHeaderUser(session.user);
+            else if (event === 'SIGNED_OUT') {
+                setHeaderUser(null);
+                document.getElementById('login-screen').classList.remove('hidden');
+            }
+        });
+        async function startApp(user) {
+            if (!user) { try { ({ data: { user } } = await db.auth.getUser()); } catch (e) { console.error(e); } }
+            setHeaderUser(user);
             document.getElementById('login-screen').classList.add('hidden');
             await loadData();
             refreshAll();
@@ -996,14 +1072,14 @@
             const btn = document.getElementById('login-btn');
             errorElem.classList.add('hidden');
             btn.disabled = true; btn.textContent = 'A verificar...';
-            const { error } = await db.auth.signInWithPassword({ email, password });
+            const { data, error } = await db.auth.signInWithPassword({ email, password });
             btn.disabled = false; btn.textContent = 'Entrar no Sistema';
             if (error) {
                 errorElem.textContent = 'Credenciais incorretas. Tente novamente.';
                 errorElem.classList.remove('hidden');
                 return;
             }
-            await startApp();
+            await startApp(data && data.user);
         }
         async function handleLogout() {
             try {
@@ -1388,6 +1464,48 @@
         window.addEventListener('afterprint', () => document.body.classList.remove('printing-label'));
 
         // ===== SAÍDA =====
+        // ===== REGISTAR SAÍDA (botão do cabeçalho): escolher o lote e abrir o modal de saída =====
+        function lotesParaSaida(q) {
+            q = (q || '').trim().toLowerCase();
+            return lotes.filter(l => l.rolos > 0 && (!q || [l.sku, l.of_num, l.tear, l.ne_fio, l.jogo, l.lote_fio, l.localizacao, l.tipo_malha, l.fornecedor]
+                .some(v => String(v || '').toLowerCase().includes(q))));
+        }
+        function openPickLoteSaida() {
+            document.getElementById('pick-saida-search').value = '';
+            renderPickLoteSaida();
+            document.getElementById('pick-saida-modal').classList.remove('hidden');
+            setTimeout(() => document.getElementById('pick-saida-search').focus(), 50);
+        }
+        function closePickLoteSaida() { document.getElementById('pick-saida-modal').classList.add('hidden'); }
+        function renderPickLoteSaida() {
+            const rows = lotesParaSaida(document.getElementById('pick-saida-search').value);
+            const shown = rows.slice(0, 50);
+            document.getElementById('pick-saida-list').innerHTML = shown.map(l => `
+                <button type="button" onclick="pickLoteSaida('${esc(l.id)}')" class="w-full text-left px-5 py-3 hover:bg-rose-50 transition flex items-center justify-between gap-3">
+                    <div class="min-w-0">
+                        <div class="font-mono text-xs font-bold text-slate-900">${esc(l.sku)}</div>
+                        <div class="text-xs text-slate-500 truncate">OF ${esc(l.of_num || '-')} · Tear ${esc(l.tear || '-')} · ${esc(l.tipo_malha || '-')} · ${esc(l.localizacao || '-')}</div>
+                    </div>
+                    <div class="text-right shrink-0">
+                        <div class="text-sm font-bold text-slate-900">${l.rolos} rolos</div>
+                        <div class="text-xs text-slate-500">${esc(formatKg(l.peso))}</div>
+                    </div>
+                </button>`).join('')
+                + (rows.length > shown.length ? `<p class="text-center text-xs text-slate-400 py-3">A mostrar ${shown.length} de ${rows.length} · refina a pesquisa</p>` : '')
+                || '<p class="text-center text-sm text-slate-400 py-8">Nenhum lote em stock encontrado.</p>';
+        }
+        function pickLoteSaida(id) { closePickLoteSaida(); openSaidaModal(id); }
+        function pickSaidaKey(e) {
+            if (e.key === 'Escape') { closePickLoteSaida(); return; }
+            if (e.key !== 'Enter') return;
+            e.preventDefault();
+            const q = e.target.value.trim().toLowerCase();
+            const rows = lotesParaSaida(q);
+            const exact = rows.find(l => String(l.sku || '').toLowerCase() === q);
+            if (exact) pickLoteSaida(exact.id);
+            else if (rows.length === 1) pickLoteSaida(rows[0].id);
+        }
+
         function openSaidaModal(id) {
             const l = lotes.find(x => x.id === id);
             if (!l) return;
@@ -1455,6 +1573,16 @@
                 return okSearch && (!start || day >= start) && (!end || day <= end);
             });
         }
+        // Utilizador que registou (created_by) e, se for diferente, quem alterou por último (updated_by)
+        function userCell(m) {
+            const c = m.created_by || '', u = m.updated_by || '';
+            if (!c && !u) return '<span class="text-slate-300">-</span>';
+            const short = e => esc(String(e).split('@')[0]);
+            let html = `<div class="font-medium text-slate-700" title="${esc(c || u)}">${short(c || u)}</div>`;
+            if (c && u && c !== u) html += `<div class="text-[10px] text-slate-400" title="${esc(u)}">alt.: ${short(u)}</div>`;
+            return html;
+        }
+
         function renderMovimentos() {
             document.getElementById('mov-table-body').innerHTML = filteredMovimentos().slice(0, 500).map(m => `
                 <tr class="hover:bg-slate-50/80 transition">
@@ -1466,13 +1594,14 @@
                     <td class="py-3 px-4 text-xs text-slate-600">${esc(m.entity_name || '-')}</td>
                     <td class="py-3 px-4 text-center font-bold">${m.rolos}</td>
                     <td class="py-3 px-4 text-center font-bold ${m.type === 'entrada' ? 'text-emerald-600' : 'text-rose-600'}">${m.type === 'entrada' ? '+' : '-'}${esc(formatKg(m.peso))}</td>
+                    <td class="py-3 px-4 text-xs">${userCell(m)}</td>
                     <td class="py-3 px-4 text-center sticky-col-right bg-white shadow-xs border-l border-slate-100">
                         <div class="flex items-center justify-center space-x-1">
                             <button onclick="openEditMovModal('${esc(m.id)}')" title="Editar" class="p-1.5 text-slate-400 hover:text-blue-600 transition"><i data-lucide="edit-3" class="w-4 h-4"></i></button>
                             <button onclick="deleteMovimento('${esc(m.id)}')" title="Eliminar" class="p-1.5 text-slate-400 hover:text-rose-600 transition"><i data-lucide="trash-2" class="w-4 h-4"></i></button>
                         </div>
                     </td>
-                </tr>`).join('') || '<tr><td colspan="9" class="text-center py-6 text-slate-400">Nenhum movimento encontrado.</td></tr>';
+                </tr>`).join('') || '<tr><td colspan="10" class="text-center py-6 text-slate-400">Nenhum movimento encontrado.</td></tr>';
             scheduleIcons();
         }
         function clearDateFilter() {

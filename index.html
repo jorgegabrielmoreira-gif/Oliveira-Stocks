@@ -264,7 +264,7 @@
             
             <div class="flex items-center space-x-2 sm:space-x-3">
                 <div id="header-user" title="Utilizador com sessão iniciada"><i data-lucide="user" class="w-3 h-3 shrink-0"></i><span id="header-user-name"></span></div>
-                <a href="malha.html" title="Abrir o Armazém de Malhas" class="inline-flex items-center space-x-1.5 bg-white/10 hover:bg-white/20 border border-white/25 text-white text-xs sm:text-sm font-medium px-3 py-2 rounded-lg transition">
+                <a href="malha.html" onclick="goToPage(event, 'malha.html')" title="Abrir o Armazém de Malhas" class="inline-flex items-center space-x-1.5 bg-white/10 hover:bg-white/20 border border-white/25 text-white text-xs sm:text-sm font-medium px-3 py-2 rounded-lg transition">
                     <i data-lucide="layers" class="w-4 h-4"></i>
                     <span class="hidden sm:inline">Armazém de Malhas</span><span class="sm:hidden">Malhas</span>
                 </a>
@@ -276,8 +276,9 @@
                     <i data-lucide="arrow-up-right" class="w-4 h-4"></i>
                     <span class="hidden sm:inline">Registar</span> Saída
                 </button>
-                <button onclick="handleLogout()" title="Sair da conta" class="p-2 text-indigo-200 hover:text-white hover:bg-white/10 rounded-lg transition no-print">
-                    <i data-lucide="log-out" class="w-5 h-5"></i>
+                <button onclick="handleLogout()" title="Sair da conta" class="flex items-center gap-1.5 px-3 py-1.5 text-sm font-semibold text-white bg-white/15 hover:bg-rose-500/80 border border-white/30 rounded-lg transition no-print">
+                    <i data-lucide="log-out" class="w-4 h-4"></i>
+                    <span>Sair</span>
                 </button>
             </div>
         </div>
@@ -531,6 +532,7 @@
                                 <th class="py-3 px-4 text-center">Qtd (kg)</th>
                                 <th class="py-3 px-4">Entidade</th>
                                 <th class="py-3 px-4">Observações</th>
+                                <th class="py-3 px-4">Utilizador</th>
                                 <th class="py-3 px-4 text-center no-print sticky-col-right bg-slate-100 shadow-md min-w-[90px]">Ações</th>
                             </tr>
                         </thead>
@@ -1179,7 +1181,32 @@
         }
 
         // VERIFICAR SESSÃO DE AUTENTICAÇÃO AO CARREGAR A PÁGINA
+        // ===== PARTILHA DE SESSÃO ENTRE index.html E malha.html =====
+        // Normalmente a sessão é partilhada pelo armazenamento do browser. Se as duas páginas estiverem em
+        // origens diferentes (ex.: ficheiros locais), a sessão segue no link e é restaurada na página de destino.
+        async function goToPage(ev, url) {
+            if (ev && (ev.ctrlKey || ev.metaKey || ev.shiftKey || ev.button === 1)) return;   // novo separador: comportamento normal
+            if (ev) ev.preventDefault();
+            let target = url;
+            try {
+                const { data: { session } } = await db.auth.getSession();
+                if (session) target += '#sb_at=' + encodeURIComponent(session.access_token) + '&sb_rt=' + encodeURIComponent(session.refresh_token);
+            } catch (e) { console.error(e); }
+            window.location.href = target;
+        }
+        async function restoreSessionFromLink() {
+            const h = new URLSearchParams(window.location.hash.slice(1));
+            const at = h.get('sb_at'), rt = h.get('sb_rt');
+            if (!at || !rt) return;
+            history.replaceState(null, '', window.location.pathname + window.location.search);   // tira os tokens do endereço
+            try {
+                const { data: { session } } = await db.auth.getSession();
+                if (!session) await db.auth.setSession({ access_token: at, refresh_token: rt });   // só se não houver sessão partilhada
+            } catch (e) { console.error('Erro ao restaurar a sessão:', e); }
+        }
+
         window.addEventListener('DOMContentLoaded', async () => {
+            await restoreSessionFromLink();
             const { data: { session } } = await db.auth.getSession();
             
             if (session) {
@@ -1626,6 +1653,16 @@
             scheduleIcons();
         }
 
+        // Utilizador que registou (created_by) e, se for diferente, quem alterou por último (updated_by)
+        function userCell(m) {
+            const c = m.created_by || '', u = m.updated_by || '';
+            if (!c && !u) return '<span class="text-slate-300">-</span>';
+            const short = e => esc(String(e).split('@')[0]);
+            let html = `<div class="font-medium text-slate-700" title="${esc(c || u)}">${short(c || u)}</div>`;
+            if (c && u && c !== u) html += `<div class="text-[10px] text-slate-400" title="${esc(u)}">alt.: ${short(u)}</div>`;
+            return html;
+        }
+
         function renderMovementsTable() {
             const search = (document.getElementById('search-movement')?.value || '').toLowerCase();
             const startDate = document.getElementById('filter-movement-start-date')?.value || '';
@@ -1651,7 +1688,7 @@
             if (mKey !== lastMovementKey) { lastMovementKey = mKey; movementLimit = 100; }
             const shownMovements = filtered.slice(0, movementLimit);
             const moreMovements = filtered.length > shownMovements.length
-                ? `<tr><td colspan="8" class="text-center py-4"><button onclick="movementLimit += 200; renderMovementsTable()" class="px-4 py-2 text-sm font-medium text-blue-600 hover:bg-blue-50 rounded-lg">Mostrar mais (${shownMovements.length} de ${filtered.length})</button></td></tr>` : '';
+                ? `<tr><td colspan="9" class="text-center py-4"><button onclick="movementLimit += 200; renderMovementsTable()" class="px-4 py-2 text-sm font-medium text-blue-600 hover:bg-blue-50 rounded-lg">Mostrar mais (${shownMovements.length} de ${filtered.length})</button></td></tr>` : '';
             
             tbody.innerHTML = shownMovements.map(m => `
                 <tr class="hover:bg-slate-50/80 transition">
@@ -1669,6 +1706,7 @@
                     </td>
                     <td class="py-3 px-4 text-slate-700 text-xs font-medium">${esc(m.entity_name || '-')}</td>
                     <td class="py-3 px-4 text-slate-500 text-xs">${esc(m.notes || '-')}</td>
+                    <td class="py-3 px-4 text-xs">${userCell(m)}</td>
                     <td class="py-3 px-4 text-center no-print sticky-col-right bg-white shadow-xs border-l border-slate-100">
                         <div class="flex items-center justify-center space-x-1">
                             <button onclick="openMovementModal('${esc(m.type)}', '${esc(m.id)}')" title="Editar Movimento" class="p-1.5 text-slate-400 hover:text-blue-600 transition"><i data-lucide="edit-3" class="w-4 h-4"></i></button>
@@ -1676,7 +1714,7 @@
                         </div>
                     </td>
                 </tr>
-            `).join('') + moreMovements || `<tr><td colspan="8" class="text-center py-8 text-slate-400">Nenhum movimento encontrado.</td></tr>`;
+            `).join('') + moreMovements || `<tr><td colspan="9" class="text-center py-8 text-slate-400">Nenhum movimento encontrado.</td></tr>`;
             
             scheduleIcons();
         }
