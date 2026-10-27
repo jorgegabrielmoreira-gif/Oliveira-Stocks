@@ -5,32 +5,42 @@ on:
     - cron: '0 3 * * 0'
   workflow_dispatch:
 
-# ESTA É A PARTE NOVA: Dá permissão ao robô para guardar o ficheiro
+# Este repositório é só de leitura: os backups vão para um repositório PRIVADO à parte
 permissions:
-  contents: write
+  contents: read
 
 jobs:
   fazer-backup:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout do código
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - name: Configurar Node.js
-        uses: actions/setup-node@v3
+        uses: actions/setup-node@v4
         with:
-          node-version: '18'
+          node-version: '20'
 
       - name: Instalar biblioteca do Supabase
         run: npm install @supabase/supabase-js
 
       - name: Executar o script de Backup CSV
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
         run: node gerar_backup.js
 
-      - name: Guardar o novo CSV no GitHub
+      - name: Guardar os CSV no repositório privado de backups
+        env:
+          BACKUP_REPO_TOKEN: ${{ secrets.BACKUP_REPO_TOKEN }}
+          OWNER: ${{ github.repository_owner }}
         run: |
-          git config --global user.name "Backup Automático"
-          git config --global user.email "backup@teusite.com"
+          git clone "https://x-access-token:${BACKUP_REPO_TOKEN}@github.com/${OWNER}/Oliveira-Stocks-Backups.git" destino
+          mkdir -p destino/backups
+          cp backups/*.csv destino/backups/
+          cd destino
+          git config user.name "Backup Automático"
+          git config user.email "backup@users.noreply.github.com"
           git add backups/
-          git commit -m "Adicionado backup semanal CSV" || echo "Sem alterações"
+          git commit -m "Backup semanal $(date +%F)" || echo "Sem alterações"
           git push
