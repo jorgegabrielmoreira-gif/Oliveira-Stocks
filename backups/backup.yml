@@ -1,0 +1,36 @@
+name: Backup Semanal CSV
+
+on:
+  schedule:
+    - cron: '0 3 * * 0'
+  workflow_dispatch:
+
+# ESTA É A PARTE NOVA: Dá permissão ao robô para guardar o ficheiro
+permissions:
+  contents: write
+
+jobs:
+  fazer-backup:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout do código
+        uses: actions/checkout@v3
+
+      - name: Configurar Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '18'
+
+      - name: Instalar biblioteca do Supabase
+        run: npm install @supabase/supabase-js
+
+      - name: Executar o script de Backup CSV
+        run: node gerar_backup.js
+
+      - name: Guardar o novo CSV no GitHub
+        run: |
+          git config --global user.name "Backup Automático"
+          git config --global user.email "backup@teusite.com"
+          git add backups/
+          git commit -m "Adicionado backup semanal CSV" || echo "Sem alterações"
+          git push
