@@ -39,6 +39,11 @@ jobs:
           mkdir -p destino/backups
           cp backups/*.csv destino/backups/
           cd destino
+          LIMITE=$(date -d '60 days ago' +%F)
+          for f in backups/*_????-??-??.csv; do
+            d="${f##*_}"; d="${d%.csv}"
+            if [[ "$d" < "$LIMITE" ]]; then git rm -q "$f"; fi
+          done
           git config user.name "Backup Automático"
           git config user.email "backup@users.noreply.github.com"
           git add backups/
