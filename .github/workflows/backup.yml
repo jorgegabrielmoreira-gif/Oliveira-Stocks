@@ -38,7 +38,7 @@ jobs:
           git clone "https://x-access-token:${BACKUP_REPO_TOKEN}@github.com/${OWNER}/Oliveira-Stocks-Backups.git" destino
           mkdir -p destino/backups
           cp backups/*.csv destino/backups/
-          cd destino
+                   cd destino
           LIMITE=$(date -d '60 days ago' +%F)
           for f in backups/*_????-??-??.csv; do
             d="${f##*_}"; d="${d%.csv}"
