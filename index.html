@@ -1,0 +1,2796 @@
+<!DOCTYPE html>
+<html lang="pt">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Oliveira & Gonçalves - Gestão de Stock</title>
+    <link rel="preconnect" href="https://qlcpbrsbelmchjelbesx.supabase.co" crossorigin>
+    <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com/3.4.17"></script>
+    <script>
+        tailwind.config = {
+            theme: { extend: {
+                colors: {
+                        blue:  { 50:'#eef2ff',100:'#e0e7ff',200:'#c7d2fe',300:'#a5b4fc',400:'#818cf8',500:'#6366f1',600:'#4f46e5',700:'#4338ca',800:'#3730a3',900:'#312e81' },
+                        slate: { 50:'#f7f8fd',100:'#eef0f9',200:'#dfe3f1',300:'#c2c8e0',400:'#8e95b8',500:'#666e96',600:'#4b5379',700:'#363d5f',800:'#232949',900:'#151934' }
+                    }
+            } }
+        };
+    </script>
+    <!-- Lucide Icons -->
+    <script defer src="https://unpkg.com/lucide@0.469.0"></script>
+    <!-- Google Fonts Inter -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Manrope:wght@600;700;800&family=Plus+Jakarta+Sans:wght@600;700;800&display=swap" rel="stylesheet">
+    
+    <!-- JsBarcode para Gerar Códigos de Barras -->
+    <script defer src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.5/dist/JsBarcode.all.min.js"></script>
+    <!-- html5-qrcode: leitura de códigos de barras / QR pela câmara -->
+    <script defer src="https://cdn.jsdelivr.net/npm/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+    <!-- QRCode.js para Gerar QR Codes -->
+    <script defer src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+
+    <style>
+        body { font-family: 'Inter', sans-serif; }
+        .custom-scrollbar::-webkit-scrollbar { width: 6px; height: 6px; }
+        .custom-scrollbar::-webkit-scrollbar-track { background: #f1f5f9; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 3px; }
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+
+        /* Erros de validação junto aos campos */
+        .input-error { border-color: #e11d48 !important; }
+        .input-error:focus { --tw-ring-color: rgba(225, 29, 72, 0.2) !important; }
+        /* Destaque temporário da linha de produto (vindo dos Alertas) */
+        @keyframes rowflash { 0%, 65% { background-color: #e0e7ff; } 100% { background-color: transparent; } }
+        .row-flash > td { animation: rowflash 2.5s ease-out; }
+
+        /* Estilo para fixar a coluna de Ações no lado direito da tabela */
+        .sticky-col-right {
+            position: sticky;
+            right: 0;
+            z-index: 10;
+        }
+
+        @media print {
+            header, nav, .no-print, button, input, select, #toast-container, .tabs-container {
+                display: none !important;
+            }
+            main {
+                display: block !important;
+                max-width: none !important;
+                padding: 0 !important;
+                margin: 0 !important;
+            }
+            .overflow-x-auto { overflow: visible !important; }
+            table { min-width: 0 !important; }
+            tr { page-break-inside: avoid; }
+            thead { display: table-header-group; }
+            /* Impressão de etiqueta: só a etiqueta aparece */
+            body.printing-label main,
+            body.printing-label .print-header,
+            body.printing-list main,
+            body.printing-list #printable-label-area {
+                display: none !important;
+            }
+            body.printing-list #printable-list-area { display: block !important; }
+            #printable-list-area table th, #printable-list-area table td { font-size: 11px !important; }
+            #printable-list-area .num { text-align: right !important; white-space: nowrap; }
+            #printable-list-area .lst-bar { display: block; width: 40mm; max-width: 100%; height: auto; }
+            #printable-list-area td.bar-cell { width: 44mm; }
+            body {
+                background: white !important;
+                color: black !important;
+                padding: 0 !important;
+            }
+            .print-header {
+                display: block !important;
+                margin-bottom: 20px;
+                border-bottom: 2px solid #000;
+                padding-bottom: 10px;
+            }
+            table {
+                width: 100% !important;
+                border-collapse: collapse !important;
+            }
+            th, td {
+                border: 1px solid #cbd5e1 !important;
+                padding: 8px !important;
+                font-size: 11px !important;
+            }
+            th {
+                background-color: #f1f5f9 !important;
+                -webkit-print-color-adjust: exact;
+            }
+            #printable-label-area {
+                display: block !important;
+                position: absolute !important;
+                left: 0 !important;
+                top: 0 !important;
+                width: 210mm !important;
+                height: 296mm !important;      /* A4; 1 mm de folga evita uma 2.ª página em branco */
+                padding: 6mm !important;       /* margem física da impressora; o @page fica a 0 (sem cabeçalhos/rodapés do browser) */
+                margin: 0 !important;
+                box-sizing: border-box !important;
+                overflow: hidden !important;
+                background: #fff !important;
+            }
+        }
+
+
+        /* ===== ETIQUETAS: folha A4 com até 8 (2 colunas × 4 linhas, 99 × 71 mm cada) ===== */
+        .label-sheet { display: grid; grid-template-columns: repeat(2, 99mm); grid-template-rows: repeat(4, 71.25mm); width: 198mm; height: 285mm; background: #fff; }
+        .label-cell { box-sizing: border-box; padding: 2.5mm; min-width: 0; min-height: 0; }
+        .label-card { box-sizing: border-box; width: 100%; height: 100%; border: 0.3mm solid #64748b; border-radius: 2.5mm; padding: 3mm; display: flex; flex-direction: column; justify-content: space-between; gap: 1.5mm; overflow: hidden; background: #fff; color: #0f172a; font-family: 'Inter', sans-serif; line-height: 1.25; }
+        .label-card, .label-card * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+        .label-empty { box-sizing: border-box; width: 100%; height: 100%; border: 0.4mm dashed #cbd5e1; border-radius: 2.5mm; }
+        .lb-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 2mm; border-bottom: 0.25mm solid #cbd5e1; padding-bottom: 1.5mm; }
+        .lb-head > div { min-width: 0; }
+        .lb-title { font-weight: 800; font-size: 12.5pt; line-height: 1.15; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; word-break: break-word; }
+        .lb-title.mono { font-family: ui-monospace, 'SFMono-Regular', Menlo, Consolas, monospace; }
+        .lb-sub { font-size: 8.5pt; color: #475569; margin-top: 0.5mm; word-break: break-word; }
+        .lb-badge { flex: none; max-width: 45%; font-size: 8.5pt; font-weight: 700; color: #1d4ed8; background: #eff6ff; border: 0.25mm solid #bfdbfe; border-radius: 1mm; padding: 0.5mm 1.8mm; overflow-wrap: anywhere; }
+        .lb-lines { font-size: 8pt; color: #334155; line-height: 1.35; }
+        .lb-lines > div { overflow-wrap: anywhere; }
+        .lb-codes { flex: 1; min-height: 0; display: flex; align-items: center; justify-content: space-between; gap: 3mm; }
+        .lb-bar { flex: 1; min-width: 0; display: flex; align-items: center; justify-content: center; }
+        .lb-barcode { width: 100%; height: auto; max-height: 18mm; }
+        .lb-qr { flex: none; width: 20mm; height: 20mm; box-sizing: border-box; padding: 0.8mm; border: 0.25mm solid #cbd5e1; border-radius: 1mm; background: #fff; }
+        .lb-qr img, .lb-qr canvas { width: 100% !important; height: 100% !important; }
+        .lb-foot { display: flex; justify-content: space-between; align-items: center; gap: 2mm; border-top: 0.25mm solid #cbd5e1; padding-top: 1.5mm; font-size: 8.5pt; font-weight: 500; color: #475569; }
+        .lb-foot b { color: #0f172a; font-weight: 800; }
+
+        /* ===== TEMA VISUAL: fio & malha ===== */
+        body { background: linear-gradient(180deg, #e9ecfb 0px, #f3f4fc 360px, #f7f8fd 100%) fixed; font-family: 'Inter', sans-serif; }
+        h1, h2, h3, h4 { font-family: 'Manrope', 'Inter', sans-serif; }
+
+        /* Cabeçalho */
+        .app-header { background: linear-gradient(120deg, #1b1f4a 0%, #2b2770 55%, #4338ca 100%); box-shadow: 0 6px 24px -10px rgba(27,31,74,.55); }
+        .app-header::after { content: ''; display: block; height: 4px;
+            background: linear-gradient(90deg, #6366f1, #a855f7, #ec4899, #f59e0b, #10b981, #06b6d4); }
+
+        /* Separadores */
+        body .tabs-container { border-radius: 16px; border-color: #dfe3f1; box-shadow: 0 8px 24px -14px rgba(43,39,112,.35); }
+        body .tabs-container button.bg-blue-600 { background: linear-gradient(135deg, #4f46e5, #7c3aed); box-shadow: 0 6px 14px -6px rgba(79,70,229,.7); }
+
+        /* Cartões */
+        body main .rounded-2xl.bg-white { border-color: #e2e5f4; box-shadow: 0 1px 2px rgba(27,31,74,.05), 0 14px 30px -18px rgba(43,39,112,.28); }
+        .stat-card { position: relative; overflow: hidden; border-top: 4px solid var(--c) !important; }
+        .stat-card::before { content: ''; position: absolute; right: -28px; top: -28px; width: 110px; height: 110px; border-radius: 50%;
+            background: radial-gradient(circle, color-mix(in srgb, var(--c) 16%, transparent), transparent 70%); pointer-events: none; }
+        .stat-card:nth-child(1) { --c: #4f46e5; }
+        .stat-card:nth-child(2) { --c: #9333ea; }
+        .stat-card:nth-child(3) { --c: #059669; }
+        .stat-card:nth-child(4) { --c: #e11d48; }
+        .stat-card h3 { font-size: 1.65rem; letter-spacing: -0.02em; }
+
+        /* Tabelas */
+        body thead tr { background: #f1f3fc; }
+        body thead th { color: #5a62a0; }
+        body tbody tr:hover { background-color: rgba(99,102,241,.06); }
+        body tbody tr:hover .sticky-col-right { background-color: #f4f5fd; }
+
+        /* Botões e campos */
+        body button.bg-emerald-600 { background: linear-gradient(135deg, #059669, #10b981); }
+        body button.bg-rose-600 { background: linear-gradient(135deg, #e11d48, #f43f5e); }
+        body button.bg-slate-800 { background: linear-gradient(135deg, #232949, #363d5f); }
+        body input:focus, body select:focus, body textarea:focus { border-color: #818cf8; box-shadow: 0 0 0 3px rgba(99,102,241,.18); outline: none; }
+
+        /* Modais */
+        body #product-modal > div, body #entity-modal > div, body #movement-modal > div, body #label-modal > div { border-radius: 20px; box-shadow: 0 30px 60px -20px rgba(27,31,74,.55); }
+
+        /* Ecrã de login */
+        .login-bg { background:
+            radial-gradient(900px 500px at 12% 8%, rgba(99,102,241,.45), transparent 60%),
+            radial-gradient(700px 500px at 90% 92%, rgba(236,72,153,.30), transparent 60%),
+            linear-gradient(135deg, #14173b, #2b2770); }
+        .login-bg > div { box-shadow: 0 30px 70px -20px rgba(0,0,0,.6); border-top: 4px solid transparent;
+            border-image: linear-gradient(90deg, #6366f1, #a855f7, #ec4899, #f59e0b, #10b981) 1; }
+        .print-header { display: none; }
+        #printable-label-area { display: none; }
+        #printable-list-area { display: none; }
+
+        /* Utilizador no cabeçalho */
+        #header-user { display: none; align-items: center; gap: 4px; max-width: 190px; font-size: 11px; color: #c7d2fe; }
+        #header-user.show { display: inline-flex; }
+        #header-user span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+
+        /* Campos a preencher nos submenus (modais): fundo e contorno bem visíveis */
+        body #product-modal form, body #entity-modal form, body #movement-modal form, body #lot-modal form { background: #f5f6fe; }
+        body #product-modal input:not([type=hidden]):not([type=checkbox]):not([type=radio]):not([readonly]):not([disabled]),
+        body #entity-modal input:not([type=hidden]):not([type=checkbox]):not([type=radio]):not([readonly]):not([disabled]),
+        body #movement-modal input:not([type=hidden]):not([type=checkbox]):not([type=radio]):not([readonly]):not([disabled]),
+        body #lot-modal input:not([type=hidden]):not([type=checkbox]):not([type=radio]):not([readonly]):not([disabled]),
+        body #product-modal select, body #entity-modal select, body #movement-modal select, body #lot-modal select,
+        body #product-modal textarea, body #entity-modal textarea, body #movement-modal textarea, body #lot-modal textarea {
+            background-color: #ffffff; border: 2px solid #a5b4fc; border-radius: 12px;
+            box-shadow: 0 1px 2px rgba(67,56,202,.10);
+        }
+        body #product-modal input:hover, body #entity-modal input:hover, body #movement-modal input:hover, body #lot-modal input:hover,
+        body #product-modal select:hover, body #entity-modal select:hover, body #movement-modal select:hover, body #lot-modal select:hover,
+        body #product-modal textarea:hover, body #entity-modal textarea:hover, body #movement-modal textarea:hover, body #lot-modal textarea:hover { border-color: #818cf8; }
+        body #product-modal input:focus, body #entity-modal input:focus, body #movement-modal input:focus, body #lot-modal input:focus,
+        body #product-modal select:focus, body #entity-modal select:focus, body #movement-modal select:focus, body #lot-modal select:focus,
+        body #product-modal textarea:focus, body #entity-modal textarea:focus, body #movement-modal textarea:focus, body #lot-modal textarea:focus {
+            border-color: #4f46e5; box-shadow: 0 0 0 3px rgba(79,70,229,.25);
+        }
+        /* mantém o erro de validação a vermelho */
+        body .input-error { border-color: #e11d48 !important; }
+
+        /* Todos os campos de preenchimento: mesmo destaque dos campos de Entrada/Saída */
+        body main input:not([type=hidden]):not([type=checkbox]):not([type=radio]):not([type=file]):not([readonly]):not([disabled]),
+        body main select,
+        body main textarea,
+        body #login-screen input:not([type=hidden]):not([type=checkbox]):not([type=radio]):not([type=file]):not([readonly]):not([disabled]),
+        body #login-screen select,
+        body #login-screen textarea {
+            background-color: #ffffff; border: 2px solid #a5b4fc; border-radius: 12px;
+            box-shadow: 0 1px 2px rgba(67,56,202,.10);
+        }
+        body main input:not([type=hidden]):not([type=checkbox]):not([type=radio]):not([type=file]):not([readonly]):not([disabled]):hover,
+        body main select:hover,
+        body main textarea:hover,
+        body #login-screen input:not([type=hidden]):not([type=checkbox]):not([type=radio]):not([type=file]):not([readonly]):not([disabled]):hover,
+        body #login-screen select:hover,
+        body #login-screen textarea:hover { border-color: #818cf8; }
+        body main input:not([type=hidden]):not([type=checkbox]):not([type=radio]):not([type=file]):not([readonly]):not([disabled]):focus,
+        body main select:focus,
+        body main textarea:focus,
+        body #login-screen input:not([type=hidden]):not([type=checkbox]):not([type=radio]):not([type=file]):not([readonly]):not([disabled]):focus,
+        body #login-screen select:focus,
+        body #login-screen textarea:focus { border-color: #4f46e5; box-shadow: 0 0 0 3px rgba(79,70,229,.25); }
+        body .input-error { border-color: #e11d48 !important; }
+
+        /* ===== TEMA VISUAL v2: cor & vida (só ecrã; não afeta a impressão) ===== */
+        @media screen {
+            :root { --violet:#7c3aed; --indigo:#4f46e5; --blue:#2563eb; --cyan:#06b6d4; --teal:#14b8a6; --emerald:#10b981; --amber:#f59e0b; --orange:#f97316; --rose:#f43f5e; --fuchsia:#d946ef; }
+
+            body {
+                font-family: 'Inter', sans-serif;
+                background:
+                    radial-gradient(900px 520px at 6% -6%, rgba(124,58,237,.20), transparent 62%),
+                    radial-gradient(800px 520px at 96% 0%, rgba(6,182,212,.18), transparent 62%),
+                    radial-gradient(760px 520px at 55% 105%, rgba(244,63,94,.10), transparent 62%),
+                    #f5f4ff fixed;
+            }
+            h1, h2, h3, h4, .stat-card h3 { font-family: 'Plus Jakarta Sans', 'Manrope', 'Inter', sans-serif; }
+            .app-header h1, .app-header h1 * { font-family: 'Manrope', 'Inter', sans-serif; }
+
+
+            /* Separadores: cada um com a sua cor */
+            body .tabs-container { background: rgba(255,255,255,.85); backdrop-filter: blur(8px); border-color: #e4e0fb; border-radius: 18px; padding: 6px; box-shadow: 0 10px 28px -16px rgba(76,29,149,.45); }
+            body .tabs-container button { border-radius: 12px; font-weight: 600; transition: transform .15s ease, box-shadow .15s ease, background .15s ease; }
+            body .tabs-container button:not(.bg-blue-600):hover { background: #f1eefe; }
+            body .tabs-container button.bg-blue-600 { color: #fff; }
+            body .tabs-container button.bg-blue-600 > svg { color: #fff; }
+            body #tab-dashboard.bg-blue-600  { background: linear-gradient(135deg,#4f46e5,#2563eb); box-shadow: 0 8px 18px -8px rgba(79,70,229,.8); }
+            body #tab-produtos.bg-blue-600   { background: linear-gradient(135deg,#7c3aed,#d946ef); box-shadow: 0 8px 18px -8px rgba(124,58,237,.8); }
+            body #tab-entidades.bg-blue-600  { background: linear-gradient(135deg,#0891b2,#14b8a6); box-shadow: 0 8px 18px -8px rgba(8,145,178,.8); }
+            body #tab-movimentos.bg-blue-600 { background: linear-gradient(135deg,#f59e0b,#f97316); box-shadow: 0 8px 18px -8px rgba(245,158,11,.85); }
+            body #tab-alertas.bg-blue-600    { background: linear-gradient(135deg,#f43f5e,#fb7185); box-shadow: 0 8px 18px -8px rgba(244,63,94,.8); }
+            body #tab-relatorios.bg-blue-600 { background: linear-gradient(135deg,#059669,#10b981); box-shadow: 0 8px 18px -8px rgba(5,150,105,.8); }
+            body #tab-dashboard:not(.bg-blue-600) > svg  { color: #4f46e5; }
+            body #tab-produtos:not(.bg-blue-600) > svg   { color: #9333ea; }
+            body #tab-entidades:not(.bg-blue-600) > svg  { color: #0891b2; }
+            body #tab-movimentos:not(.bg-blue-600) > svg { color: #d97706; }
+            body #tab-alertas:not(.bg-blue-600) > svg    { color: #e11d48; }
+            body #tab-relatorios:not(.bg-blue-600) > svg { color: #059669; }
+            body #badge-entidades { background: linear-gradient(135deg,#06b6d4,#3b82f6); box-shadow: 0 2px 6px rgba(6,182,212,.5); }
+            body #badge-alertas { background: linear-gradient(135deg,#f43f5e,#f97316); box-shadow: 0 2px 6px rgba(244,63,94,.5); }
+
+            /* Cor de cada secção */
+            #content-dashboard  { --tab:#4f46e5; --tab2:#2563eb; }
+            #content-produtos   { --tab:#7c3aed; --tab2:#d946ef; }
+            #content-entidades  { --tab:#0891b2; --tab2:#14b8a6; }
+            #content-movimentos { --tab:#d97706; --tab2:#f97316; }
+            #content-alertas    { --tab:#e11d48; --tab2:#f97316; }
+            #content-relatorios { --tab:#059669; --tab2:#06b6d4; }
+
+            /* Cartões */
+            body main .rounded-2xl.bg-white { border-color: #e6e2fa; border-radius: 20px; box-shadow: 0 1px 2px rgba(46,16,101,.05), 0 18px 36px -22px rgba(76,29,149,.38); }
+            body #content-dashboard > .grid ~ .grid > .bg-white,
+            body #content-produtos > .bg-white,
+            body #content-entidades > .bg-white,
+            body #content-movimentos > .bg-white,
+            body #content-alertas > .bg-white,
+            body #content-relatorios > .bg-white { border-top: 4px solid var(--tab); background-image: linear-gradient(180deg, color-mix(in srgb, var(--tab) 6%, #fff), #fff 140px); }
+
+            .stat-card { border-top-width: 4px !important; background-image: linear-gradient(160deg, #fff 45%, color-mix(in srgb, var(--c) 11%, #fff)) !important; }
+            .stat-card::before { width: 140px; height: 140px; right: -34px; top: -34px; background: radial-gradient(circle, color-mix(in srgb, var(--c2) 26%, transparent), transparent 68%); }
+            .stat-card:nth-child(1) { --c:#4f46e5; --c2:#2563eb; }
+            .stat-card:nth-child(2) { --c:#9333ea; --c2:#d946ef; }
+            .stat-card:nth-child(3) { --c:#059669; --c2:#14b8a6; }
+            .stat-card:nth-child(4) { --c:#e11d48; --c2:#f97316; }
+            .stat-card > div:last-child { position: relative; z-index: 1; background: linear-gradient(135deg, var(--c), var(--c2)); color: #fff; border-color: transparent; box-shadow: 0 10px 20px -8px color-mix(in srgb, var(--c) 70%, transparent); }
+            .stat-card > div:last-child > svg { color: #fff; }
+            .stat-card h3 { font-weight: 800; background: linear-gradient(90deg, var(--c), var(--c2)); -webkit-background-clip: text; background-clip: text; color: transparent; }
+            .stat-card p { color: #5b5683; }
+
+            /* Títulos e ícones das secções */
+            body main h2 { font-weight: 800; color: #1e1b4b; }
+            body #content-dashboard h2 > svg { color: var(--tab); }
+            body #content-dashboard button.text-blue-600 { color: #7c3aed; }
+
+            /* Tabelas */
+            body thead tr { background: linear-gradient(90deg, color-mix(in srgb, var(--tab, #4f46e5) 13%, #fff), color-mix(in srgb, var(--tab2, #7c3aed) 11%, #fff)); }
+            body thead th { color: color-mix(in srgb, var(--tab, #4f46e5) 82%, #1e1b4b); font-weight: 700; }
+            body thead th.sticky-col-right { background: color-mix(in srgb, var(--tab, #4f46e5) 11%, #fff); }
+            body table .divide-y > tr, body tbody.divide-y > tr { border-color: #eeecfb; }
+            body tbody tr { transition: background-color .12s ease; }
+            body tbody tr:hover { background-color: color-mix(in srgb, var(--tab, #6366f1) 8%, transparent); }
+            body tbody tr:hover .sticky-col-right { background-color: color-mix(in srgb, var(--tab, #6366f1) 8%, #fff); }
+            body tbody td.sticky-col-right { border-left-color: #eeecfb; }
+            body tbody td .hover\:text-blue-600:hover { color: #7c3aed; }
+            body tbody td .hover\:text-rose-600:hover { color: #e11d48; }
+            body tbody td .hover\:text-slate-900:hover { color: #0891b2; }
+
+            /* Etiquetas de estado e tipo */
+            body span.bg-emerald-50.text-emerald-700 { background: linear-gradient(135deg,#d1fae5,#a7f3d0); color: #047857; border-color: #6ee7b7; }
+            body span.bg-rose-50.text-rose-700 { background: linear-gradient(135deg,#ffe4e6,#fecdd3); color: #be123c; border-color: #fda4af; }
+            body span.bg-amber-50.text-amber-700 { background: linear-gradient(135deg,#fef3c7,#fde68a); color: #b45309; border-color: #fcd34d; }
+            body span.bg-blue-50.text-blue-700 { background: linear-gradient(135deg,#e0e7ff,#cffafe); color: #3730a3; border-color: #a5b4fc; }
+            body tbody span.bg-slate-100.text-slate-700 { background: #ede9fe; color: #5b21b6; }
+            body tbody button.text-blue-700 { color: #7c3aed; }
+            body tbody button.text-blue-700:hover { background: #f3e8ff; }
+
+            /* Alertas */
+            body #alerts-container > div.bg-rose-50\/50 { background: linear-gradient(135deg,#fff1f2,#fff7ed); border: 1px solid #fecdd3; border-left: 6px solid #f43f5e; border-radius: 16px; box-shadow: 0 12px 24px -18px rgba(244,63,94,.7); }
+            body #alerts-container > div.bg-emerald-50 { background: linear-gradient(135deg,#d1fae5,#cffafe); }
+
+            /* Relatórios */
+            body #content-relatorios > .bg-blue-50 { background: linear-gradient(120deg,#4f46e5 0%,#7c3aed 55%,#d946ef 100%); border: 0; border-radius: 22px; box-shadow: 0 20px 40px -22px rgba(124,58,237,.9); }
+            body #content-relatorios > .bg-blue-50 h3 { color: #fff; }
+            body #content-relatorios > .bg-blue-50 h3 > svg { color: #fff; }
+            body #content-relatorios > .bg-blue-50 p { color: rgba(255,255,255,.85); }
+            body #content-relatorios > .bg-blue-50 button.bg-blue-600 { background: #fff; color: #4338ca; box-shadow: 0 8px 18px -8px rgba(0,0,0,.45); }
+            body #content-relatorios > .bg-blue-50 button.bg-slate-800 { background: rgba(255,255,255,.18); border: 1px solid rgba(255,255,255,.4); box-shadow: none; }
+            body #content-relatorios .grid > .bg-slate-50.rounded-2xl { border-width: 1px; border-top: 4px solid var(--k); background: linear-gradient(160deg,#fff 40%, color-mix(in srgb, var(--k) 10%, #fff)); }
+            body #content-relatorios .grid > .bg-slate-50.rounded-2xl:nth-child(1) { --k:#9333ea; }
+            body #content-relatorios .grid > .bg-slate-50.rounded-2xl:nth-child(2) { --k:#059669; }
+            body #content-relatorios .grid > .bg-slate-50.rounded-2xl:nth-child(3) { --k:#2563eb; }
+            body #content-relatorios .grid > .bg-slate-50.rounded-2xl h3 { font-weight: 800; }
+            body #content-relatorios .grid > .bg-slate-50.rounded-2xl:nth-child(2) h3 { color: #059669; }
+
+            /* Botões */
+            body button.bg-blue-600:not([id^="tab-"]) { background: linear-gradient(135deg,#4f46e5,#7c3aed); box-shadow: 0 8px 18px -8px rgba(79,70,229,.8); }
+            body button.bg-indigo-600 { background: linear-gradient(135deg,#0891b2,#4f46e5); box-shadow: 0 8px 18px -8px rgba(8,145,178,.8); }
+            body button.bg-emerald-600 { background: linear-gradient(135deg,#059669,#14b8a6); box-shadow: 0 8px 18px -8px rgba(5,150,105,.75); }
+            body button.bg-rose-600 { background: linear-gradient(135deg,#e11d48,#f97316); box-shadow: 0 8px 18px -8px rgba(225,29,72,.75); }
+            body button.bg-slate-800, body button.bg-slate-900 { background: linear-gradient(135deg,#1e1b4b,#4c1d95); box-shadow: 0 8px 18px -8px rgba(30,27,75,.8); }
+            body button.bg-blue-600:not([id^="tab-"]), body button.bg-indigo-600, body button.bg-emerald-600,
+            body button.bg-rose-600, body button.bg-slate-800, body button.bg-slate-900 { transition: transform .15s ease, filter .15s ease, box-shadow .15s ease; }
+            body button.bg-blue-600:not([id^="tab-"]):hover, body button.bg-indigo-600:hover, body button.bg-emerald-600:hover,
+            body button.bg-rose-600:hover, body button.bg-slate-800:hover, body button.bg-slate-900:hover { transform: translateY(-1px); filter: brightness(1.08) saturate(1.1); }
+            body button:focus-visible, body a:focus-visible { outline: 3px solid rgba(124,58,237,.45); outline-offset: 2px; }
+
+            /* Campos */
+            body input:focus, body select:focus, body textarea:focus { border-color: #7c3aed !important; box-shadow: 0 0 0 3px rgba(124,58,237,.22) !important; }
+            body main input:not([type=hidden]):not([type=checkbox]):not([type=radio]):not([type=file]):not([readonly]):not([disabled]),
+            body main select, body main textarea { border-color: #c4b5fd; }
+            body input[type=checkbox] { accent-color: #7c3aed; }
+
+            /* Modais */
+            body #product-modal > div, body #entity-modal > div, body #movement-modal > div, body #label-modal > div, body #lot-modal > div, body #scanner-modal > div { border-radius: 22px; border: 0; box-shadow: 0 40px 80px -24px rgba(46,16,101,.65); overflow: hidden; }
+            body #label-modal > div { overflow-y: auto; }
+            body .fixed.inset-0.bg-slate-900\/50, body .fixed.inset-0.bg-slate-900\/60 { background: radial-gradient(800px 500px at 20% 10%, rgba(124,58,237,.35), transparent 60%), rgba(20,16,56,.62); }
+            body .bg-blue-50.shrink-0, body .bg-indigo-50.shrink-0 { background: linear-gradient(100deg,#ede9fe,#dbeafe 60%,#cffafe); border-bottom: 0; }
+            body #movement-modal-header.bg-emerald-50 { background: linear-gradient(100deg,#d1fae5,#cffafe); border-bottom: 0; }
+            body #movement-modal-header.bg-rose-50 { background: linear-gradient(100deg,#ffe4e6,#ffedd5); border-bottom: 0; }
+            body .shrink-0 h3.text-blue-900 { color: #3b0764; }
+            body #label-chips > span { background: #ede9fe; border-color: #c4b5fd; color: #4c1d95; }
+
+            /* Barra de seleção e avisos */
+            body #label-bar { background: linear-gradient(120deg,#1e1b4b,#4c1d95); box-shadow: 0 20px 40px -16px rgba(46,16,101,.8); border: 1px solid rgba(255,255,255,.15); }
+            body #toast-container > div.bg-emerald-600 { background: linear-gradient(135deg,#059669,#14b8a6); }
+            body #toast-container > div.bg-rose-600 { background: linear-gradient(135deg,#e11d48,#f97316); }
+
+            /* Login */
+            .login-bg { background:
+                radial-gradient(900px 520px at 10% 6%, rgba(124,58,237,.65), transparent 60%),
+                radial-gradient(760px 520px at 92% 8%, rgba(6,182,212,.45), transparent 60%),
+                radial-gradient(800px 560px at 88% 96%, rgba(236,72,153,.45), transparent 60%),
+                radial-gradient(600px 420px at 8% 96%, rgba(245,158,11,.28), transparent 60%),
+                linear-gradient(135deg, #1a0f4a, #2e1a7a 60%, #1e3a8a); }
+            .login-bg > div { border-radius: 24px; border-image: none; border-top: 0; box-shadow: 0 40px 80px -24px rgba(0,0,0,.65); position: relative; overflow: hidden; }
+            .login-bg > div::before { content: ''; position: absolute; left: 0; right: 0; top: 0; height: 5px; background: linear-gradient(90deg, #06b6d4, #6366f1, #a855f7, #ec4899, #f59e0b, #10b981); }
+            .login-bg h2 { font-weight: 800; background: linear-gradient(90deg,#4338ca,#a21caf); -webkit-background-clip: text; background-clip: text; color: transparent; }
+
+
+            /* Correção: o emblema fica sempre no seu separador (Entidades / Alertas) */
+            body .tabs-container button { position: relative; }
+            body #badge-entidades, body #badge-alertas { top: 6px; right: 8px; line-height: 1.5; }
+
+            /* Barras de deslocamento */
+            .custom-scrollbar::-webkit-scrollbar-track { background: #f1eefe; }
+            .custom-scrollbar::-webkit-scrollbar-thumb { background: linear-gradient(180deg,#a78bfa,#818cf8); border-radius: 3px; }
+            .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: linear-gradient(180deg,#8b5cf6,#6366f1); }
+        }
+        @media screen and (prefers-reduced-motion: reduce) {
+            body button, body a, body tbody tr { transition: none !important; transform: none !important; }
+        }
+    </style>
+</head>
+<body class="bg-slate-50 text-slate-800 antialiased min-h-screen flex flex-col">
+
+    <!-- ÁREA EXCLUSIVA DE IMPRESSÃO DE ETIQUETA -->
+    <div id="printable-label-area" class="p-4 bg-white"></div>
+
+    <!-- ECRÃ DE LOGIN (PROTEÇÃO SUPABASE) -->
+    <div id="login-screen" class="login-bg fixed inset-0 z-50 flex items-center justify-center p-4">
+        <div class="bg-white rounded-2xl shadow-xl max-w-sm w-full p-6 border border-slate-200 space-y-6">
+            <div class="text-center space-y-2">
+                <div class="inline-flex items-center justify-center mb-2">
+                    <img src="logo.png" alt="Oliveira & Gonçalves" class="h-12 w-auto object-contain" onerror="this.style.display='none'; document.getElementById('login-icon-fallback').style.display='inline-flex';">
+                    <div id="login-icon-fallback" class="hidden bg-blue-600 p-3 rounded-2xl text-white shadow-lg shadow-blue-200">
+                        <i data-lucide="building-2" class="w-8 h-8"></i>
+                    </div>
+                </div>
+                <h2 class="text-xl font-bold text-slate-900">Oliveira & Gonçalves</h2>
+                <p class="text-xs text-slate-500">Introduza as credenciais para aceder ao armazém</p>
+            </div>
+
+            <form onsubmit="handleLogin(event)" class="space-y-4">
+                <div>
+                    <label class="block text-xs font-medium text-slate-700 mb-1">Email</label>
+                    <input type="email" id="login-email" required placeholder="armazem@empresa.pt" class="w-full px-3 py-2 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/20">
+                </div>
+                <div>
+                    <label class="block text-xs font-medium text-slate-700 mb-1">Palavra-passe</label>
+                    <div class="relative">
+                        <input type="password" id="login-password" required placeholder="••••••••" class="w-full pl-3 pr-10 py-2 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/20">
+                        <button type="button" onclick="togglePasswordVisibility()" class="absolute inset-y-0 right-0 pr-3 flex items-center text-slate-400 hover:text-slate-600">
+                            <i data-lucide="eye" id="eye-icon" class="w-4 h-4"></i>
+                        </button>
+                    </div>
+                </div>
+                
+                <p id="login-error" class="text-xs text-rose-600 text-center hidden font-medium"></p>
+
+                <button type="submit" id="login-btn" class="w-full py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-medium text-sm rounded-xl transition shadow-md shadow-blue-200 flex items-center justify-center space-x-2">
+                    <span>Entrar no Sistema</span>
+                </button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Header visível apenas na aplicação -->
+    <header class="app-header sticky top-0 z-30 no-print">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+            <div class="flex items-center space-x-3">
+                <div class="bg-white rounded-xl px-2.5 py-1 shadow-md"><img src="logo.png" alt="Oliveira & Gonçalves" class="h-9 w-auto object-contain" onerror="this.style.display='none'; this.parentElement.style.display='none'; document.getElementById('header-icon-fallback').style.display='flex';"></div>
+                <div id="header-icon-fallback" class="hidden bg-white/15 p-2 rounded-xl text-white">
+                    <i data-lucide="building-2" class="w-6 h-6"></i>
+                </div>
+                <div>
+                    <h1 class="text-xl font-extrabold text-white tracking-tight">Oliveira & Gonçalves <span class="text-indigo-100 text-xs font-semibold px-2 py-0.5 bg-white/10 rounded-full border border-white/20 uppercase">Gestão de Armazém</span></h1>
+                    <p class="text-xs text-indigo-200 hidden sm:block">Gestão do armazém de fios e malhas (Cloud)</p>
+                </div>
+            </div>
+            
+            <div class="flex items-center space-x-1.5 sm:space-x-2">
+                <div id="header-user" title="Utilizador com sessão iniciada"><i data-lucide="user" class="w-3 h-3 shrink-0"></i><span id="header-user-name"></span></div>
+                <a href="malha.html" title="Abrir o Armazém de Malhas" class="inline-flex items-center space-x-1 bg-white/10 hover:bg-white/20 border border-white/25 text-white text-xs font-medium px-2 py-1.5 rounded-lg transition">
+                    <i data-lucide="layers" class="w-4 h-4"></i>
+                    <span>Malhas</span>
+                </a>
+                <button onclick="openScanner()" title="Ler código de barras / QR com a câmara" aria-label="Ler código" class="inline-flex items-center justify-center bg-white text-indigo-700 hover:bg-indigo-50 p-1.5 rounded-lg transition shadow-xs">
+                    <i data-lucide="qr-code" class="w-5 h-5"></i>
+                </button>
+                <button onclick="openMovementModal('entrada')" title="Registar entrada" class="inline-flex items-center space-x-1 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-medium px-2 py-1.5 rounded-lg transition shadow-xs">
+                    <i data-lucide="arrow-down-left" class="w-4 h-4"></i>
+                    <span>Entrada</span>
+                </button>
+                <button onclick="openMovementModal('saida')" title="Registar saída" class="inline-flex items-center space-x-1 bg-rose-600 hover:bg-rose-700 text-white text-xs font-medium px-2 py-1.5 rounded-lg transition shadow-xs">
+                    <i data-lucide="arrow-up-right" class="w-4 h-4"></i>
+                    <span>Saída</span>
+                </button>
+                <button onclick="handleLogout()" title="Sair da conta" class="flex items-center gap-1.5 px-3 py-1.5 text-sm font-semibold text-white bg-white/15 hover:bg-rose-500/80 border border-white/30 rounded-lg transition no-print">
+                    <i data-lucide="log-out" class="w-4 h-4"></i>
+                    <span>Sair</span>
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <div class="print-header">
+        <h1 class="text-xl font-bold" id="print-report-title">Oliveira & Gonçalves - Relatório de Armazém</h1>
+        <p class="text-xs text-gray-600" id="print-report-date"></p>
+    </div>
+    <div id="printable-list-area"></div>
+
+    <main class="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
+
+        <!-- Navigation Tabs -->
+        <div class="tabs-container flex overflow-x-auto space-x-1 bg-white p-1 rounded-xl border border-slate-200 shadow-xs no-print">
+            <button onclick="switchTab('dashboard')" id="tab-dashboard" class="flex-1 min-w-[110px] py-2.5 px-3 text-sm font-medium rounded-lg transition flex items-center justify-center space-x-2 bg-blue-600 text-white shadow-xs">
+                <i data-lucide="layout-dashboard" class="w-4 h-4"></i>
+                <span>Dashboard</span>
+            </button>
+            <button onclick="switchTab('produtos')" id="tab-produtos" class="flex-1 min-w-[110px] py-2.5 px-3 text-sm font-medium rounded-lg transition flex items-center justify-center space-x-2 text-slate-600 hover:text-slate-900 hover:bg-slate-50">
+                <i data-lucide="package" class="w-4 h-4"></i>
+                <span>Produtos</span>
+            </button>
+            <button onclick="switchTab('entidades')" id="tab-entidades" class="flex-1 min-w-[110px] py-2.5 px-3 text-sm font-medium rounded-lg transition flex items-center justify-center space-x-2 text-slate-600 hover:text-slate-900 hover:bg-slate-50 relative">
+                <i data-lucide="users" class="w-4 h-4"></i>
+                <span>Entidades</span>
+                <span id="badge-entidades" class="absolute top-2 right-2 bg-blue-500 text-white text-[10px] px-1.5 py-0.2 rounded-full font-bold">0</span>
+            </button>
+            <button onclick="switchTab('movimentos')" id="tab-movimentos" class="flex-1 min-w-[110px] py-2.5 px-3 text-sm font-medium rounded-lg transition flex items-center justify-center space-x-2 text-slate-600 hover:text-slate-900 hover:bg-slate-50">
+                <i data-lucide="history" class="w-4 h-4"></i>
+                <span>Movimentos</span>
+            </button>
+            <button onclick="switchTab('alertas')" id="tab-alertas" class="flex-1 min-w-[110px] py-2.5 px-3 text-sm font-medium rounded-lg transition flex items-center justify-center space-x-2 text-slate-600 hover:text-slate-900 hover:bg-slate-50 relative">
+                <i data-lucide="alert-triangle" class="w-4 h-4"></i>
+                <span>Alertas</span>
+                <span id="badge-alertas" class="absolute top-2 right-2 bg-rose-500 text-white text-[10px] px-1.5 py-0.2 rounded-full font-bold hidden">0</span>
+            </button>
+            <button onclick="switchTab('relatorios')" id="tab-relatorios" class="flex-1 min-w-[110px] py-2.5 px-3 text-sm font-medium rounded-lg transition flex items-center justify-center space-x-2 text-slate-600 hover:text-slate-900 hover:bg-slate-50">
+                <i data-lucide="bar-chart-3" class="w-4 h-4"></i>
+                <span>Relatórios</span>
+            </button>
+        </div>
+
+        <!-- TAB 1: DASHBOARD -->
+        <div id="content-dashboard" class="space-y-6">
+            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                <div class="stat-card bg-white p-5 rounded-2xl border border-slate-200 shadow-xs flex items-center justify-between">
+                    <div>
+                        <p class="text-xs font-medium text-slate-500 uppercase tracking-wider">Total de Produtos</p>
+                        <h3 id="stat-total-produtos" class="text-2xl font-bold text-slate-900 mt-1">0</h3>
+                    </div>
+                    <div class="w-12 h-12 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center border border-blue-100">
+                        <i data-lucide="package" class="w-6 h-6"></i>
+                    </div>
+                </div>
+
+                <div class="stat-card bg-white p-5 rounded-2xl border border-slate-200 shadow-xs flex items-center justify-between">
+                    <div>
+                        <p class="text-xs font-medium text-slate-500 uppercase tracking-wider">Stock Total em Peso</p>
+                        <h3 id="stat-peso-total" class="text-2xl font-bold text-slate-900 mt-1">0,00 kg</h3>
+                    </div>
+                    <div class="w-12 h-12 rounded-xl bg-purple-50 text-purple-600 flex items-center justify-center border border-purple-100">
+                        <i data-lucide="scale" class="w-6 h-6"></i>
+                    </div>
+                </div>
+
+                <div class="stat-card bg-white p-5 rounded-2xl border border-slate-200 shadow-xs flex items-center justify-between">
+                    <div>
+                        <p class="text-xs font-medium text-slate-500 uppercase tracking-wider">Valor do Inventário</p>
+                        <h3 id="stat-valor-inventario" class="text-2xl font-bold text-slate-900 mt-1">€0,00</h3>
+                    </div>
+                    <div class="w-12 h-12 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center border border-emerald-100">
+                        <i data-lucide="euro" class="w-6 h-6"></i>
+                    </div>
+                </div>
+
+                <div class="stat-card bg-white p-5 rounded-2xl border border-slate-200 shadow-xs flex items-center justify-between">
+                    <div>
+                        <p class="text-xs font-medium text-slate-500 uppercase tracking-wider">Stock Baixo / Esgotado</p>
+                        <h3 id="stat-stock-baixo" class="text-2xl font-bold text-rose-600 mt-1">0</h3>
+                    </div>
+                    <div class="w-12 h-12 rounded-xl bg-rose-50 text-rose-600 flex items-center justify-center border border-rose-100">
+                        <i data-lucide="alert-triangle" class="w-6 h-6"></i>
+                    </div>
+                </div>
+            </div>
+
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                <div class="bg-white p-6 rounded-2xl border border-slate-200 shadow-xs lg:col-span-3 space-y-4">
+                    <div class="flex items-center justify-between">
+                        <h2 class="font-bold text-slate-900 flex items-center"><i data-lucide="activity" class="w-4 h-4 mr-2 text-blue-600"></i> Últimos Movimentos</h2>
+                        <button onclick="switchTab('movimentos')" class="text-xs font-semibold text-blue-600 hover:text-blue-700">Ver todos</button>
+                    </div>
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-left border-collapse">
+                            <thead>
+                                <tr class="border-b border-slate-100 text-[11px] font-semibold text-slate-400 uppercase">
+                                    <th class="py-2 px-3">Data/Hora</th>
+                                    <th class="py-2 px-3">Tipo</th>
+                                    <th class="py-2 px-3">Produto</th>
+                                    <th class="py-2 px-3">Entidade</th>
+                                    <th class="py-2 px-3 text-right">Qtd (kg)</th>
+                                </tr>
+                            </thead>
+                            <tbody id="dashboard-recent-movements" class="text-xs divide-y divide-slate-50"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- TAB 2: PRODUTOS -->
+        <div id="content-produtos" class="space-y-6 hidden">
+            <div class="bg-white p-6 rounded-2xl border border-slate-200 shadow-xs space-y-4">
+                <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                    <div class="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 flex-1">
+                        <div class="relative flex-1 max-w-md">
+                            <span class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
+                                <i data-lucide="search" class="w-4 h-4"></i>
+                            </span>
+                            <input type="text" id="search-product" oninput="debouncedRenderProducts()" placeholder="Pesquisar produto, SKU, lote, fornecedor ou código barras..." class="w-full pl-9 pr-4 py-2 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/20">
+                        </div>
+                        <select id="filter-category" onchange="renderProductsTable()" class="py-2 px-3 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/20">
+                            <option value="">Todas as Categorias</option>
+                        </select>
+                        <label class="no-print inline-flex items-center gap-2 text-xs font-medium text-slate-600 cursor-pointer select-none whitespace-nowrap" title="A impressão sai igual ao que está no ecrã">
+                            <input type="checkbox" id="show-zero-stock" checked onchange="renderProductsTable()" class="w-4 h-4 rounded border-slate-300 text-blue-600">
+                            Mostrar esgotados
+                        </label>
+                    </div>
+                    <div class="flex items-center space-x-2">
+                        <button onclick="openScanner()" class="inline-flex items-center space-x-1.5 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-medium px-3.5 py-2.5 rounded-xl transition shadow-sm no-print">
+                            <i data-lucide="scan-barcode" class="w-4 h-4"></i><span>Ler código</span>
+                        </button>
+                        <button onclick="printProductsPDF()" class="bg-slate-800 hover:bg-slate-900 text-white text-xs font-medium px-3.5 py-2.5 rounded-xl transition flex items-center space-x-1.5 shadow-sm no-print">
+                            <i data-lucide="printer" class="w-4 h-4"></i> <span>Imprimir Tabela</span>
+                        </button>
+                        <button onclick="openProductModal()" class="inline-flex items-center justify-center space-x-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium px-4 py-2 rounded-xl transition shadow-sm">
+                            <i data-lucide="plus" class="w-4 h-4"></i>
+                            <span>Novo Produto</span>
+                        </button>
+                    </div>
+                </div>
+
+                <div class="overflow-x-auto rounded-xl border border-slate-200 custom-scrollbar">
+                    <table class="w-full text-left border-collapse min-w-[1200px]">
+                        <thead>
+                            <tr class="bg-slate-50 border-b border-slate-200 text-xs font-semibold text-slate-500 uppercase tracking-wider">
+                                <th class="py-3 px-3">SKU / Cód. Barras</th>
+                                <th class="py-3 px-3">Descrição do Produto</th>
+                                <th class="py-3 px-3">Lotes</th>
+                                <th class="py-3 px-3">Categoria</th>
+                                <th class="py-3 px-3">Localização</th>
+                                <th class="py-3 px-3 text-center">Stock (kg)</th>
+                                <th class="py-3 px-3 text-center">Est.</th>
+                                <th class="py-3 px-3 text-center">Mín (kg)</th>
+                                <th class="py-3 px-3 text-right">P. Custo/kg</th>
+                                <th class="py-3 px-3 text-right">P. Venda/kg</th>
+                                <th class="py-3 px-1 text-center no-print sticky-col-right bg-slate-100 shadow-md">Ações</th>
+                            </tr>
+                        </thead>
+                        <tbody id="products-table-body" class="text-sm divide-y divide-slate-100 bg-white"></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- TAB 3: ENTIDADES -->
+        <div id="content-entidades" class="space-y-6 hidden">
+            <div class="bg-white p-6 rounded-2xl border border-slate-200 shadow-xs space-y-4">
+                <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                    <div class="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 flex-1">
+                        <div class="relative flex-1 max-w-md">
+                            <span class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
+                                <i data-lucide="search" class="w-4 h-4"></i>
+                            </span>
+                            <input type="text" id="search-entity" oninput="debouncedRenderEntities()" placeholder="Pesquisar..." class="w-full pl-9 pr-4 py-2 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/20">
+                        </div>
+                    </div>
+                    <div class="flex items-center space-x-2">
+                        <button onclick="printEntitiesPDF()" class="bg-slate-800 hover:bg-slate-900 text-white text-xs font-medium px-3.5 py-2.5 rounded-xl transition flex items-center space-x-1.5 shadow-sm no-print">
+                            <i data-lucide="printer" class="w-4 h-4"></i> <span>Imprimir / PDF</span>
+                        </button>
+                        <button onclick="openEntityModal()" class="inline-flex items-center justify-center space-x-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium px-4 py-2 rounded-xl transition shadow-sm">
+                            <i data-lucide="user-plus" class="w-4 h-4"></i>
+                            <span>Nova Entidade</span>
+                        </button>
+                    </div>
+                </div>
+
+                <div class="overflow-x-auto rounded-xl border border-slate-200 custom-scrollbar">
+                    <table class="w-full text-left border-collapse min-w-[900px]">
+                        <thead>
+                            <tr class="bg-slate-50 border-b border-slate-200 text-xs font-semibold text-slate-500 uppercase tracking-wider">
+                                <th class="py-3 px-4">Nome da Entidade</th>
+                                <th class="py-3 px-4">Tipo</th>
+                                <th class="py-3 px-4">NIF</th>
+                                <th class="py-3 px-4">Email</th>
+                                <th class="py-3 px-4">Telefone</th>
+                                <th class="py-3 px-4">Morada</th>
+                                <th class="py-3 px-4 text-center no-print sticky-col-right bg-slate-100 shadow-md min-w-[120px]">Ações</th>
+                            </tr>
+                        </thead>
+                        <tbody id="entities-table-body" class="text-sm divide-y divide-slate-100 bg-white"></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- TAB 4: MOVIMENTOS -->
+        <div id="content-movimentos" class="space-y-6 hidden">
+            <div class="bg-white p-6 rounded-2xl border border-slate-200 shadow-xs space-y-4">
+                <div class="flex flex-col lg:flex-row lg:items-end justify-between gap-4 no-print">
+                    <div class="grid grid-cols-1 sm:grid-cols-3 md:grid-cols-5 gap-3 flex-1 items-end">
+                        <div class="sm:col-span-2">
+                            <span class="block text-[10px] font-semibold uppercase mb-0.5 ml-1 invisible" aria-hidden="true">.</span>
+                            <div class="relative">
+                                <span class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
+                                    <i data-lucide="search" class="w-4 h-4"></i>
+                                </span>
+                                <input type="text" id="search-movement" oninput="debouncedRenderMovements()" placeholder="Pesquisar produto, lote ou entidade..." class="w-full h-9 pl-9 pr-3 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/20">
+                            </div>
+                        </div>
+
+                        <div>
+                            <span class="block text-[10px] text-slate-400 font-semibold uppercase mb-0.5 ml-1">De</span>
+                            <input type="date" id="filter-movement-start-date" onchange="renderMovementsTable()" class="w-full h-9 px-3 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 text-slate-700">
+                        </div>
+
+                        <div>
+                            <span class="block text-[10px] text-slate-400 font-semibold uppercase mb-0.5 ml-1">Até</span>
+                            <input type="date" id="filter-movement-end-date" onchange="renderMovementsTable()" class="w-full h-9 px-3 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 text-slate-700">
+                        </div>
+
+                        <div>
+                            <span class="block text-[10px] font-semibold uppercase mb-0.5 ml-1 invisible" aria-hidden="true">.</span>
+                            <button onclick="clearDateFilter()" title="Limpar intervalo de datas" class="w-full h-9 px-3 text-xs bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-xl transition flex items-center justify-center space-x-1 font-medium">
+                                <i data-lucide="x-circle" class="w-3.5 h-3.5"></i>
+                                <span>Limpar Datas</span>
+                            </button>
+                        </div>
+                    </div>
+
+                    <div>
+                        <span class="block text-[10px] font-semibold uppercase mb-0.5 ml-1 invisible" aria-hidden="true">.</span>
+                        <button onclick="printMovementsPDF()" class="h-9 w-full lg:w-auto bg-slate-800 hover:bg-slate-900 text-white text-xs font-medium px-3.5 rounded-xl transition flex items-center justify-center space-x-1.5 shadow-sm whitespace-nowrap">
+                            <i data-lucide="printer" class="w-4 h-4"></i> <span>Imprimir / PDF</span>
+                        </button>
+                    </div>
+                </div>
+
+                <div class="overflow-x-auto rounded-xl border border-slate-200 custom-scrollbar">
+                    <table class="w-full text-left border-collapse min-w-[950px]">
+                        <thead>
+                            <tr class="bg-slate-50 border-b border-slate-200 text-xs font-semibold text-slate-500 uppercase tracking-wider">
+                                <th class="py-3 px-4">Data/Hora</th>
+                                <th class="py-3 px-4">Tipo</th>
+                                <th class="py-3 px-4">Produto</th>
+                                <th class="py-3 px-4">Lote</th>
+                                <th class="py-3 px-4 text-center">Qtd (kg)</th>
+                                <th class="py-3 px-4">Entidade</th>
+                                <th class="py-3 px-4">Observações</th>
+                                <th class="py-3 px-4">Utilizador</th>
+                                <th class="py-3 px-4 text-center no-print sticky-col-right bg-slate-100 shadow-md min-w-[120px]">Ações</th>
+                            </tr>
+                        </thead>
+                        <tbody id="movements-table-body" class="text-sm divide-y divide-slate-100 bg-white"></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- TAB 5: ALERTAS -->
+        <div id="content-alertas" class="space-y-6 hidden">
+            <div class="bg-white p-6 rounded-2xl border border-slate-200 shadow-xs space-y-4">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <h2 class="font-bold text-slate-900 text-lg flex items-center"><i data-lucide="alert-triangle" class="w-5 h-5 text-rose-500 mr-2"></i> Alertas de Stock Mínimo</h2>
+                    </div>
+                </div>
+                <div id="alerts-container" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4"></div>
+            </div>
+        </div>
+
+        <!-- TAB 6: RELATÓRIOS -->
+        <div id="content-relatorios" class="space-y-6 hidden">
+            <div class="bg-blue-50 border border-blue-200 p-6 rounded-2xl shadow-xs flex flex-col md:flex-row items-center justify-between gap-4">
+                <div>
+                    <h3 class="font-bold text-blue-900 text-base flex items-center"><i data-lucide="database" class="w-5 h-5 mr-2 text-blue-600"></i> Exportar Dados</h3>
+                    <p class="text-xs text-blue-700 mt-0.5">Faça o download do inventário em CSV ou JSON.</p>
+                </div>
+                <div class="flex flex-wrap items-center gap-3">
+                    <button onclick="exportBackupJSON()" class="inline-flex items-center space-x-2 bg-blue-600 hover:bg-blue-700 text-white text-xs sm:text-sm font-medium px-4 py-2.5 rounded-xl transition shadow-xs">
+                        <i data-lucide="download" class="w-4 h-4"></i>
+                        <span>Exportar Backup (.json)</span>
+                    </button>
+                    <button onclick="exportCSV()" class="inline-flex items-center space-x-2 bg-slate-800 hover:bg-slate-900 text-white text-xs sm:text-sm font-medium px-4 py-2.5 rounded-xl transition shadow-xs">
+                        <i data-lucide="file-spreadsheet" class="w-4 h-4"></i>
+                        <span>Exportar CSV</span>
+                    </button>
+                    <button onclick="exportMovementsCSV()" class="inline-flex items-center space-x-2 bg-slate-800 hover:bg-slate-900 text-white text-xs sm:text-sm font-medium px-4 py-2.5 rounded-xl transition shadow-xs">
+                        <i data-lucide="file-spreadsheet" class="w-4 h-4"></i>
+                        <span>Exportar Movimentos (CSV)</span>
+                    </button>
+                </div>
+            </div>
+
+            <div class="bg-white p-6 rounded-2xl border border-slate-200 shadow-xs space-y-6">
+                <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                    <div class="bg-slate-50 p-5 rounded-2xl border border-slate-200">
+                        <p class="text-xs font-medium text-slate-500 uppercase">Peso Total em Stock</p>
+                        <h3 id="report-weight-value" class="text-2xl font-bold text-purple-600 mt-1">0,00 kg</h3>
+                    </div>
+                    <div class="bg-slate-50 p-5 rounded-2xl border border-slate-200">
+                        <p class="text-xs font-medium text-slate-500 uppercase">Valor Total Investido</p>
+                        <h3 id="report-cost-value" class="text-2xl font-bold text-slate-900 mt-1">€0,00</h3>
+                    </div>
+                    <div class="bg-slate-50 p-5 rounded-2xl border border-slate-200">
+                        <p class="text-xs font-medium text-slate-500 uppercase">Valor Potencial de Venda</p>
+                        <h3 id="report-sales-value" class="text-2xl font-bold text-blue-600 mt-1">€0,00</h3>
+                    </div>
+                </div>
+
+                <div class="space-y-3">
+                    <h3 class="font-bold text-slate-800 text-sm">Resumo por Categoria</h3>
+                    <div class="overflow-x-auto rounded-xl border border-slate-200">
+                        <table class="w-full text-left border-collapse">
+                            <thead>
+                                <tr class="bg-slate-50 border-b border-slate-200 text-xs font-semibold text-slate-500 uppercase">
+                                    <th class="py-3 px-4">Categoria</th>
+                                    <th class="py-3 px-4 text-center">Nº Produtos</th>
+                                    <th class="py-3 px-4 text-center">Stock Total (kg)</th>
+                                    <th class="py-3 px-4 text-right">Valor Custo Total</th>
+                                    <th class="py-3 px-4 text-right">Valor Venda Total</th>
+                                </tr>
+                            </thead>
+                            <tbody id="report-category-table" class="text-sm divide-y divide-slate-100 bg-white"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- MODAL ETIQUETAS: folha A4 com até 8 etiquetas -->
+    <div id="label-modal" class="fixed inset-0 bg-slate-900/50 backdrop-blur-xs z-50 flex items-center justify-center p-4 hidden no-print">
+        <div class="bg-white rounded-2xl shadow-xl max-w-3xl w-full max-h-[94vh] overflow-y-auto border border-slate-200 p-6 space-y-4">
+            <div class="flex items-start justify-between border-b border-slate-100 pb-3">
+                <div>
+                    <h3 class="font-bold text-slate-900 text-base">Etiquetas · folha A4</h3>
+                    <p id="label-sheet-info" class="text-xs text-slate-500 mt-0.5">---</p>
+                </div>
+                <button onclick="closeLabelModal()" class="text-slate-400 hover:text-slate-600 p-1"><i data-lucide="x" class="w-5 h-5"></i></button>
+            </div>
+            <div id="label-chips" class="flex flex-wrap gap-2"></div>
+            <div class="flex justify-center bg-slate-100 rounded-xl p-4 overflow-auto">
+                <div class="bg-white shadow ring-1 ring-slate-200 overflow-hidden shrink-0" style="--ls:.55; width: calc(198mm * var(--ls)); height: calc(285mm * var(--ls));">
+                    <div id="label-sheet-preview" style="transform: scale(var(--ls)); transform-origin: 0 0;"></div>
+                </div>
+            </div>
+            <p class="text-[11px] text-slate-500">Na janela de impressão escolha papel <strong>A4</strong>, orientação <strong>vertical</strong> e escala <strong>100%</strong> (sem “ajustar à página”).</p>
+            <div class="flex justify-end space-x-3 pt-2">
+                <button type="button" onclick="closeLabelModal()" class="px-4 py-2 text-sm rounded-xl hover:bg-slate-100 font-medium">Fechar</button>
+                <button type="button" onclick="printSelectedList(labelQueue)" class="px-4 py-2 text-sm rounded-xl border border-slate-200 hover:bg-slate-100 font-medium flex items-center space-x-2">
+                    <i data-lucide="list" class="w-4 h-4"></i>
+                    <span>Imprimir listagem</span>
+                </button>
+                <button type="button" id="label-print-btn" onclick="executePrintLabel()" class="px-5 py-2 text-sm text-white bg-slate-900 rounded-xl hover:bg-slate-800 font-medium flex items-center space-x-2 disabled:opacity-40">
+                    <i data-lucide="printer" class="w-4 h-4"></i>
+                    <span id="label-print-text">Imprimir</span>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- BARRA DE SELEÇÃO DE ETIQUETAS -->
+    <div id="label-bar" class="fixed bottom-4 left-1/2 -translate-x-1/2 z-40 hidden items-center gap-3 bg-slate-900 text-white rounded-2xl shadow-xl px-4 py-2.5 text-sm no-print">
+        <span>🏷️ <b id="label-bar-count">0</b> selecionados</span>
+        <button onclick="openLabelSheet(labelSel)" class="bg-white text-slate-900 hover:bg-slate-100 font-semibold text-xs px-3 py-1.5 rounded-lg" title="Folha A4 com até 8 etiquetas">Imprimir etiquetas</button>
+        <button onclick="printSelectedList(labelSel)" class="bg-emerald-500 text-white hover:bg-emerald-400 font-semibold text-xs px-3 py-1.5 rounded-lg" title="Listagem só com os itens selecionados">Imprimir listagem</button>
+        <button onclick="clearLabelSel()" class="text-slate-300 hover:text-white text-xs">Limpar</button>
+    </div>
+
+    <!-- MODAL PRODUTO -->
+    <div id="product-modal" class="fixed inset-0 bg-slate-900/50 backdrop-blur-xs z-50 flex items-center justify-center p-4 hidden no-print">
+        <div class="bg-white rounded-2xl shadow-xl max-w-2xl w-full border border-slate-200 max-h-[92vh] flex flex-col my-auto">
+            <div class="px-6 py-4 border-b border-slate-100 flex items-center justify-between bg-blue-50 shrink-0">
+                <h3 id="product-modal-title" class="font-bold text-blue-900 text-base">Novo Produto</h3>
+                <button onclick="closeProductModal()" class="text-slate-400 hover:text-slate-600 p-1"><i data-lucide="x" class="w-5 h-5"></i></button>
+            </div>
+            <form id="product-form" novalidate onsubmit="handleProductSubmit(event)" class="p-6 space-y-4 overflow-y-auto custom-scrollbar flex-1">
+                <input type="hidden" id="product-edit-id" value="">
+                
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                        <div class="flex items-center justify-between mb-1">
+                            <label class="block text-xs font-medium text-slate-700">SKU *</label>
+                            <button type="button" id="product-sku-generate" onclick="generateSkuIntoForm()" class="text-[11px] text-blue-600 font-medium hover:underline">Gerar automaticamente</button>
+                        </div>
+                        <input type="text" id="product-sku" required class="w-full px-3 py-2 text-sm border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500/20 outline-none" oninput="this.dataset.auto='';syncBarcodeWithSku();renderModalCodes()">
+                    </div>
+                    <div><label class="block text-xs font-medium text-slate-700 mb-1">Cód. Barras / EAN</label><input type="text" id="product-barcode" placeholder="Ex: 5601234567890" class="w-full px-3 py-2 text-sm border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500/20 outline-none" oninput="this.dataset.auto='';renderModalCodes()">
+                        <p class="text-[10px] text-slate-400 mt-1">Gerado automaticamente a partir do SKU. Pode substituir por um EAN real.</p></div>
+                </div>
+
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div><label class="block text-xs font-medium text-slate-700 mb-1">Categoria *</label><input type="text" id="product-category" required class="w-full px-3 py-2 text-sm border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500/20 outline-none"></div>
+                    <div><label class="block text-xs font-medium text-slate-700 mb-1">Descrição *</label><input type="text" id="product-name" required class="w-full px-3 py-2 text-sm border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500/20 outline-none"></div>
+                </div>
+
+                <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                    <div><label class="block text-xs font-medium text-slate-700 mb-1">Stock Mín (kg) *</label><input type="number" step="0.01" id="product-min" required class="w-full px-3 py-2 text-sm border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500/20 outline-none"></div>
+                    <p class="sm:col-span-2 text-[11px] text-slate-500 self-end pb-2">O stock e os lotes registam-se em <strong>Entradas</strong> e <strong>Saídas</strong>. Cada entrada pode criar um lote novo.</p>
+                </div>
+
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div><label class="block text-xs font-medium text-slate-700 mb-1">Preço Custo/kg *</label><input type="number" step="0.01" id="product-cost" required class="w-full px-3 py-2 text-sm border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500/20 outline-none"></div>
+                    <div><label class="block text-xs font-medium text-slate-700 mb-1">Preço Venda/kg *</label><input type="number" step="0.01" id="product-price" required class="w-full px-3 py-2 text-sm border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500/20 outline-none"></div>
+                </div>
+
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-xs font-medium text-slate-700 mb-1">Localização</label>
+                        <input type="text" id="product-location" placeholder="Ex: Armazém A, Prat. 3" class="w-full px-3 py-2 text-sm border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500/20 outline-none">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-medium text-slate-700 mb-1">Observações</label>
+                        <input type="text" id="product-notes" class="w-full px-3 py-2 text-sm border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500/20 outline-none">
+                    </div>
+                </div>
+
+                <div class="border-t border-slate-100 pt-3">
+                    <div class="flex items-center justify-between mb-2">
+                        <label class="block text-xs font-semibold text-slate-600">Identificação Visual</label>
+                        <button type="button" onclick="openLabelModalFromForm()" class="text-xs text-blue-600 font-medium hover:underline flex items-center space-x-1">
+                            <i data-lucide="printer" class="w-3.5 h-3.5"></i>
+                            <span>Ver Etiqueta de Impressão</span>
+                        </button>
+                    </div>
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 bg-slate-50 p-3 rounded-xl border border-slate-200 text-center">
+                        <div class="flex flex-col items-center justify-center">
+                            <span class="text-[10px] text-slate-400 font-bold uppercase mb-1">Código de Barras</span>
+                            <svg id="modal-barcode-svg" class="max-h-16 max-w-full"></svg>
+                            <span id="modal-barcode-none" class="text-xs text-slate-400 italic">Sem Código</span>
+                        </div>
+                        <div class="flex flex-col items-center justify-center">
+                            <span class="text-[10px] text-slate-400 font-bold uppercase mb-1">QR Code (SKU)</span>
+                            <div id="modal-qrcode-container" class="p-1 bg-white rounded border"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="pt-3 flex justify-end space-x-3 border-t shrink-0">
+                    <button type="button" onclick="closeProductModal()" class="px-4 py-2 text-sm rounded-xl hover:bg-slate-100 font-medium">Cancelar</button>
+                    <button type="submit" class="px-5 py-2 text-sm text-white bg-blue-600 rounded-xl hover:bg-blue-700 font-medium">Guardar</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- MODAL ENTIDADE -->
+    <div id="entity-modal" class="fixed inset-0 bg-slate-900/50 backdrop-blur-xs z-50 flex items-center justify-center p-4 hidden no-print">
+        <div class="bg-white rounded-2xl shadow-xl max-w-lg w-full border border-slate-200 max-h-[90vh] flex flex-col my-auto">
+            <div class="px-6 py-4 border-b border-slate-100 flex items-center justify-between bg-blue-50 shrink-0">
+                <h3 id="entity-modal-title" class="font-bold text-blue-900 text-base">Nova Entidade</h3>
+                <button onclick="closeEntityModal()" class="text-slate-400 hover:text-slate-600 p-1"><i data-lucide="x" class="w-5 h-5"></i></button>
+            </div>
+            <form id="entity-form" novalidate onsubmit="handleEntitySubmit(event)" class="p-6 space-y-4 overflow-y-auto custom-scrollbar flex-1">
+                <input type="hidden" id="entity-edit-id" value="">
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div><label class="block text-xs font-medium mb-1">Nome *</label><input type="text" id="entity-name" required class="w-full px-3 py-2 text-sm border rounded-xl"></div>
+                    <div><label class="block text-xs font-medium mb-1">Tipo *</label>
+                        <select id="entity-type" class="w-full px-3 py-2 text-sm border rounded-xl">
+                            <option value="Fornecedor">Fornecedor</option><option value="Cliente">Cliente</option><option value="Ambos">Ambos</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div><label class="block text-xs font-medium mb-1">NIF *</label><input type="text" id="entity-nif" required class="w-full px-3 py-2 text-sm border rounded-xl"></div>
+                    <div><label class="block text-xs font-medium mb-1">Telefone</label><input type="text" id="entity-phone" class="w-full px-3 py-2 text-sm border rounded-xl"></div>
+                </div>
+                <div><label class="block text-xs font-medium mb-1">Email</label><input type="email" id="entity-email" class="w-full px-3 py-2 text-sm border rounded-xl"></div>
+                <div><label class="block text-xs font-medium mb-1">Morada</label><textarea id="entity-address" rows="2" class="w-full px-3 py-2 text-sm border rounded-xl"></textarea></div>
+                <div class="pt-3 flex justify-end space-x-3 border-t shrink-0">
+                    <button type="button" onclick="closeEntityModal()" class="px-4 py-2 text-sm rounded-xl hover:bg-slate-100 font-medium">Cancelar</button>
+                    <button type="submit" class="px-5 py-2 text-sm text-white bg-blue-600 rounded-xl hover:bg-blue-700 font-medium">Guardar</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- MODAL MOVIMENTO -->
+    <!-- LEITOR DE CÓDIGOS (câmara) -->
+    <div id="scanner-modal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-xs z-[60] flex items-center justify-center p-4 hidden no-print">
+        <div class="bg-white rounded-2xl shadow-xl max-w-md w-full border border-slate-200 max-h-[95vh] flex flex-col my-auto overflow-hidden">
+            <div class="px-5 py-3 border-b border-slate-100 flex items-center justify-between bg-indigo-50 shrink-0">
+                <h3 class="font-bold text-indigo-900 text-base flex items-center"><i data-lucide="scan-barcode" class="w-5 h-5 mr-2"></i>Ler código do produto</h3>
+                <button type="button" onclick="closeScanner()" class="text-slate-400 hover:text-slate-600 p-1" aria-label="Fechar"><i data-lucide="x" class="w-5 h-5"></i></button>
+            </div>
+            <div class="p-4 space-y-3 overflow-y-auto">
+                <div id="scanner-reader" class="w-full rounded-xl overflow-hidden bg-slate-900 min-h-[220px]"></div>
+                <p id="scanner-status" class="text-xs text-slate-500 text-center">A iniciar a câmara…</p>
+                <div class="flex items-center gap-2">
+                    <input type="text" id="scanner-manual" autocomplete="off" autocapitalize="characters" placeholder="Ou escreva / leia o código (Enter)" onkeydown="if(event.key==='Enter'){event.preventDefault();scannerManual();}" class="flex-1 px-3 py-2 text-sm border border-slate-200 rounded-xl outline-none">
+                    <button type="button" onclick="scannerManual()" class="px-4 py-2 text-sm text-white bg-indigo-600 hover:bg-indigo-700 rounded-xl font-medium">Abrir</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="movement-modal" class="fixed inset-0 bg-slate-900/50 backdrop-blur-xs z-50 flex items-center justify-center p-4 hidden no-print">
+        <div class="bg-white rounded-2xl shadow-xl max-w-lg w-full border border-slate-200 max-h-[90vh] flex flex-col my-auto">
+            <div id="movement-modal-header" class="px-6 py-4 border-b border-slate-100 flex items-center justify-between bg-emerald-50 shrink-0">
+                <h3 id="movement-modal-title" class="font-bold text-emerald-900 text-base">Registar Movimento</h3>
+                <button onclick="closeMovementModal()" class="text-slate-400 hover:text-slate-600 p-1"><i data-lucide="x" class="w-5 h-5"></i></button>
+            </div>
+            <form id="movement-form" novalidate onsubmit="handleMovementSubmit(event)" class="p-6 space-y-4 overflow-y-auto custom-scrollbar flex-1">
+                <input type="hidden" id="movement-edit-id" value="">
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-xs font-medium mb-1">Tipo *</label>
+                        <select id="movement-type" onchange="onMovementTypeChange()" class="w-full px-3 py-2 text-sm border rounded-xl">
+                            <option value="entrada">Entrada (+)</option><option value="saida">Saída (-)</option>
+                        </select>
+                    </div>
+                    <div><label class="block text-xs font-medium mb-1">Data/Hora *</label><input type="datetime-local" id="movement-date" required class="w-full px-3 py-2 text-sm border rounded-xl"></div>
+                </div>
+                <div>
+                    <label class="block text-xs font-medium mb-1">Produto *</label>
+                    <div class="flex gap-2 mb-2"><input type="text" id="search-movement-product" oninput="filterMovementProducts()" placeholder="🔍 Pesquisar por nome, SKU, lote, fornecedor ou código barras..." class="flex-1 min-w-0 px-3 py-2 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:bg-white outline-none focus:ring-2 focus:ring-blue-500/20"><button type="button" onclick="openScanner(scanParaMovimento)" title="Ler a etiqueta com a câmara" class="shrink-0 inline-flex items-center gap-1.5 px-3 py-2 text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 rounded-xl"><i data-lucide="scan-barcode" class="w-4 h-4"></i><span class="hidden sm:inline">Ler</span></button></div>
+                    <select id="movement-product-id" onchange="document.getElementById('movement-lote').value=''; onMovementProductChange()" required class="w-full px-3 py-2 text-sm border rounded-xl"></select>
+                </div>
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-xs font-medium mb-1">Lote *</label>
+                        <select id="movement-lote-select" onchange="onMovementLoteSelect()" class="w-full px-3 py-2 text-sm border rounded-xl"></select>
+                        <input type="text" id="movement-lote" placeholder="Código do novo lote" class="w-full px-3 py-2 mt-2 text-sm border rounded-xl hidden">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-medium mb-1">Qtd (kg) *</label>
+                        <input type="number" step="0.01" min="0.01" id="movement-qty" required class="w-full px-3 py-2 text-sm border rounded-xl">
+                        <p id="movement-stock-info" class="text-[11px] text-slate-500 mt-1 font-medium hidden"></p>
+                    </div>
+                </div>
+                <div>
+                    <label class="block text-xs font-medium mb-1">Entidade</label>
+                    <input type="text" id="search-movement-entity" oninput="filterMovementEntities(null, true)" onkeydown="if(event.key==='Enter'){event.preventDefault();}" autocomplete="off" placeholder="🔍 Pesquisar entidade (nome ou NIF)..." class="w-full px-3 py-2 mb-2 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:bg-white outline-none focus:ring-2 focus:ring-blue-500/20">
+                    <select id="movement-entity-id" size="4" required class="w-full px-2 py-1 text-sm border rounded-xl"></select>
+                </div>
+                <div><label class="block text-xs font-medium mb-1">Observações</label><textarea id="movement-notes" rows="2" class="w-full px-3 py-2 text-sm border rounded-xl"></textarea></div>
+                <div class="pt-3 flex justify-end space-x-3 border-t shrink-0">
+                    <button type="button" onclick="closeMovementModal()" class="px-4 py-2 text-sm rounded-xl hover:bg-slate-100 font-medium">Cancelar</button>
+                    <button type="submit" id="movement-submit-btn" class="px-5 py-2 text-sm text-white bg-emerald-600 rounded-xl hover:bg-emerald-700 font-medium">Confirmar</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div id="lot-modal" class="fixed inset-0 bg-slate-900/50 backdrop-blur-xs z-50 flex items-center justify-center p-4 hidden no-print">
+        <div class="bg-white rounded-2xl shadow-2xl max-w-md w-full max-h-[90vh] flex flex-col overflow-hidden">
+            <div class="px-6 py-4 flex items-center justify-between bg-blue-50 shrink-0">
+                <h3 class="font-bold text-blue-900 text-base">Editar Lote</h3>
+                <button type="button" onclick="closeLotModal()" class="text-slate-400 hover:text-slate-600 p-1"><i data-lucide="x" class="w-5 h-5"></i></button>
+            </div>
+            <form id="lot-form" novalidate onsubmit="handleLotSubmit(event)" class="p-6 space-y-4 overflow-y-auto custom-scrollbar flex-1">
+                <input type="hidden" id="lot-edit-id" value="">
+                <p class="text-xs text-slate-500">Produto: <strong id="lot-product-name" class="text-slate-800"></strong></p>
+                <div>
+                    <label class="block text-xs font-medium text-slate-700 mb-1">Código do lote *</label>
+                    <input type="text" id="lot-code" required class="w-full px-3 py-2 text-sm border border-slate-200 rounded-xl">
+                </div>
+                <div>
+                    <label class="block text-xs font-medium text-slate-700 mb-1">Stock do lote (kg) *</label>
+                    <input type="number" step="0.001" min="0" id="lot-qty" required class="w-full px-3 py-2 text-sm border border-slate-200 rounded-xl">
+                    <p class="text-[11px] text-slate-500 mt-1">Alterar aqui é um acerto de inventário e não fica registado nos movimentos.</p>
+                </div>
+                <div>
+                    <label class="block text-xs font-medium text-slate-700 mb-1">Localização do lote</label>
+                    <input type="text" id="lot-location" placeholder="Ex: Armazém A, Prat. 3" class="w-full px-3 py-2 text-sm border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500/20 outline-none">
+                    <p class="text-[11px] text-slate-500 mt-1">Se ficar vazio, é usada a localização do produto.</p>
+                </div>
+                <div>
+                    <label class="block text-xs font-medium text-slate-700 mb-1">Fornecedor (origem do lote)</label>
+                    <input type="text" id="lot-supplier-search" oninput="filterLotSuppliers(null, true)" onkeydown="if(event.key==='Enter'){event.preventDefault();}" autocomplete="off" placeholder="🔍 Pesquisar fornecedor (nome ou NIF)..." class="w-full px-3 py-2 mb-2 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:bg-white outline-none focus:ring-2 focus:ring-blue-500/20">
+                    <select id="lot-supplier" size="4" onchange="updateLotSupplierLabel()" class="w-full px-2 py-1 text-sm border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500/20 outline-none"></select>
+                    <p class="text-[11px] mt-1">Selecionado: <strong id="lot-supplier-label" class="text-blue-700">—</strong></p>
+                    <p class="text-[11px] text-slate-500 mt-1">Cada lote tem o seu fornecedor, mesmo que o produto seja comprado a vários.</p>
+                </div>
+                <div class="pt-3 border-t border-slate-100">
+                    <label class="block text-xs font-medium text-slate-700 mb-1">Mover para outro produto (opcional)</label>
+                    <input type="text" id="lot-move-search" oninput="filterLotMoveProducts()" placeholder="🔍 Pesquisar produto de destino..." class="w-full px-3 py-2 mb-2 text-sm bg-slate-50 border border-slate-200 rounded-xl">
+                    <select id="lot-move-product" class="w-full px-3 py-2 text-sm border border-slate-200 rounded-xl"></select>
+                    <p class="text-[11px] text-slate-500 mt-1">Os movimentos deste lote passam também para o produto de destino.</p>
+                </div>
+                <div class="pt-3 flex justify-end space-x-3 border-t shrink-0">
+                    <button type="button" onclick="closeLotModal()" class="px-4 py-2 text-sm rounded-xl hover:bg-slate-100 font-medium">Cancelar</button>
+                    <button type="submit" id="lot-submit-btn" class="px-5 py-2 text-sm text-white bg-blue-600 rounded-xl hover:bg-blue-700 font-medium">Guardar</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div id="toast-container" class="fixed bottom-5 right-5 z-50 flex flex-col space-y-2 pointer-events-none no-print"></div>
+
+    <!-- SUPABASE CLIENT -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4"></script>
+
+    <!-- SCRIPT PRINCIPAL -->
+    <script>
+        // 1. INICIALIZAR SUPABASE
+        const SUPABASE_URL = 'https://qlcpbrsbelmchjelbesx.supabase.co';
+        const SUPABASE_KEY = 'sb_publishable_VDFOaGUzbMu3MmOmhsgu0w_81FzMbqW';
+        const db = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+        let products = [];
+        let entities = [];
+        // Ordem alfabética (A-Z) por nome, ignorando maiúsculas e acentos — usada em todas as listagens de entidades
+        const compareByName = (a, b) => (a || '').localeCompare(b || '', 'pt', { sensitivity: 'base', numeric: true });
+        const sortedEntities = () => entities.slice().sort((a, b) => compareByName(a.name, b.name));
+        let movements = [];
+        const LABEL_MAX = 8;
+        let labelSel = [], labelQueue = [];   // etiquetas selecionadas nas listas / etiquetas no modal
+        let lots = [], lotsByProduct = {};
+        const expandedProducts = new Set(), showDepleted = new Set();
+        let entityLimit = 100, lastEntityKey = '', productLimit = 100, movementLimit = 100, lastProductKey = '', lastMovementKey = '';
+        let iconsQueued = false;
+        function scheduleIcons() {
+            if (iconsQueued) return;
+            iconsQueued = true;
+            requestAnimationFrame(() => { iconsQueued = false; if (window.lucide) lucide.createIcons(); });
+        }
+
+        // HELPERS: escape HTML (anti-XSS), CSV, downloads, erros, debounce
+        function esc(v) {
+            return String(v ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+        }
+        function csvCell(v) { return '"' + String(v ?? '').replace(/"/g, '""') + '"'; }
+        function downloadBlob(content, filename, mime) {
+            const blob = new Blob([content], { type: mime });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url; a.download = filename;
+            document.body.appendChild(a); a.click(); a.remove();
+            setTimeout(() => URL.revokeObjectURL(url), 1000);
+        }
+        function friendlyDbError(error) {
+            const msg = (error && error.message) || '';
+            if (msg.includes('products_qty_nonneg') || msg.includes('check constraint')) return 'Stock insuficiente para esta operação.';
+            return 'Erro: ' + (msg || 'operação falhou.');
+        }
+        // ===== Validação com mensagens a vermelho por baixo do campo =====
+        function clearFieldErrors(form) {
+            if (!form) return;
+            form.querySelectorAll('.field-error').forEach(n => n.remove());
+            form.querySelectorAll('.input-error').forEach(n => { n.classList.remove('input-error'); n._errEl = null; });
+        }
+        function setFieldError(target, msg) {
+            const el = typeof target === 'string' ? document.getElementById(target) : target;
+            if (!el) return;
+            if (el._errEl) el._errEl.remove();
+            const p = document.createElement('p');
+            p.className = 'field-error text-[11px] text-rose-600 font-medium mt-1';
+            p.setAttribute('role', 'alert');
+            p.textContent = msg;
+            el.insertAdjacentElement('afterend', p);
+            el._errEl = p;
+            el.classList.add('input-error');
+            const clear = () => { p.remove(); el.classList.remove('input-error'); if (el._errEl === p) el._errEl = null; };
+            el.addEventListener('input', clear, { once: true });
+            el.addEventListener('change', clear, { once: true });
+        }
+        function validateForm(form) {
+            clearFieldErrors(form);
+            let first = null;
+            form.querySelectorAll('input, select, textarea').forEach(el => {
+                if (el.type === 'hidden' || el.disabled || el.classList.contains('hidden')) return;
+                const v = (el.value || '').trim();
+                let msg = '';
+                if (el.required && !v) msg = 'Campo obrigatório.';
+                else if (v && el.type === 'email' && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v)) msg = 'Indique um email válido.';
+                else if (v && el.type === 'number') {
+                    const n = parseFloat(v);
+                    if (isNaN(n)) msg = 'Indique um número válido.';
+                    else if (el.min !== '' && n < parseFloat(el.min)) msg = parseFloat(el.min) > 0 ? 'Indique uma quantidade superior a 0.' : 'O valor não pode ser negativo.';
+                    else if (el.max !== '' && n > parseFloat(el.max)) msg = `Quantidade superior ao disponível (${formatKg(el.max)}).`;
+                }
+                if (msg) { setFieldError(el, msg); if (!first) first = el; }
+            });
+            if (first) first.focus();
+            return !first;
+        }
+        function showProductError(error, fallback) {
+            if (error && error.code === '23505') {
+                const d = ((error.details || '') + ' ' + (error.message || '')).toLowerCase();
+                if (d.includes('barcode')) setFieldError('product-barcode', 'Já existe um produto com este código de barras.');
+                else setFieldError('product-sku', 'Já existe um produto com este SKU.');
+                return;
+            }
+            showToast(fallback, 'error');
+        }
+        function showMovementError(error) {
+            const msg = (error && error.message) || '';
+            if (msg.includes('qty_nonneg') || msg.includes('check constraint')) setFieldError('movement-qty', 'Stock insuficiente para esta operação.');
+            else showToast(friendlyDbError(error), 'error');
+        }
+        function showLotError(error) {
+            const code = error && error.code, msg = (error && error.message) || '';
+            let field = null;
+            if (code === '23505') field = 'lot-code';
+            else if (code === '23514' || msg.includes('check constraint')) field = 'lot-qty';
+            else if (code === 'PGRST204' || msg.includes("'location' column")) field = 'lot-location';
+            if (field) setFieldError(field, friendlyLotError(error)); else showToast(friendlyLotError(error), 'error');
+        }
+
+        function debounce(fn, ms = 250) { let t; return (...a) => { clearTimeout(t); t = setTimeout(() => fn(...a), ms); }; }
+        const debouncedRenderProducts = debounce(() => renderProductsTable());
+        const debouncedRenderMovements = debounce(() => renderMovementsTable());
+        const debouncedRenderEntities = debounce(() => renderEntitiesTable());
+
+        // 2. FUNÇÃO PARA CARREGAR OS DADOS DA CLOUD (em paralelo, com cache local)
+        const CACHE_KEY = 'os_cache_v3';
+        const PRODUCT_COLS = 'id,sku,barcode,name,category,location,qty,min,cost,price,notes';
+
+        function buildLotIndex() {
+            lotsByProduct = {};
+            for (const l of lots) (lotsByProduct[l.product_id] = lotsByProduct[l.product_id] || []).push(l);
+            for (const k in lotsByProduct) {
+                lotsByProduct[k].sort((a, b) => ((b.qty > 0) - (a.qty > 0)) || String(b.created_at || '').localeCompare(String(a.created_at || '')));
+            }
+        }
+        function sortProducts() { products.sort((a, b) => (a.name || '').localeCompare(b.name || '', 'pt')); }
+        // Gravação diferida (não bloqueia o ecrã) e só com os 100 movimentos mais recentes
+        let cacheTimer = null;
+        function saveCache() {
+            clearTimeout(cacheTimer);
+            cacheTimer = setTimeout(() => {
+                try { localStorage.setItem(CACHE_KEY, JSON.stringify({ products, lots, entities, movements: movements.slice(0, 100) })); } catch (e) {}
+            }, 300);
+        }
+        function loadCache() {
+            try {
+                localStorage.removeItem('os_cache_v1'); localStorage.removeItem('os_cache_v2');
+                const c = JSON.parse(localStorage.getItem(CACHE_KEY) || 'null');
+                if (!c) return false;
+                products = c.products || []; lots = c.lots || []; entities = c.entities || []; movements = c.movements || [];
+                sortProducts(); buildLotIndex();
+                return true;
+            } catch (e) { return false; }
+        }
+
+        async function fetchAllRows(table, cols, orders) {
+            const pageSize = 1000;
+            const q = (from, to, opts) => {
+                let query = db.from(table).select(cols, opts);
+                orders.forEach(([col, asc]) => { query = query.order(col, { ascending: asc }); });
+                return query.range(from, to);
+            };
+            const first = await q(0, pageSize - 1, { count: 'exact' });
+            if (first.error) throw first.error;
+            let rows = first.data || [];
+            const total = first.count ?? rows.length;
+            if (total > pageSize) {
+                const extra = Math.ceil(total / pageSize) - 1;
+                const rest = await Promise.all(Array.from({ length: extra }, (_, i) => q((i + 1) * pageSize, (i + 2) * pageSize - 1)));
+                for (const r of rest) {
+                    if (r.error) throw r.error;
+                    rows = rows.concat(r.data || []);
+                }
+            }
+            return rows;
+        }
+
+        // Movimentos: no arranque só vêm os mais recentes; o histórico completo é carregado a pedido
+        // (pesquisa, filtro de datas, "Mostrar mais", exportações)
+        const MOVEMENT_RECENT = 500;
+        let movementsFull = false, movementsLoading = null, movementsLoadFailed = false;
+
+        async function fetchMovements(full) {
+            if (full) {
+                const rows = await fetchAllRows('movements', '*', [['date', false], ['id', false]]);
+                movementsFull = true;
+                return rows;
+            }
+            const { data, error } = await db.from('movements').select('*')
+                .order('date', { ascending: false }).order('id', { ascending: false })
+                .limit(MOVEMENT_RECENT);
+            if (error) throw error;
+            movementsFull = (data || []).length < MOVEMENT_RECENT;
+            return data || [];
+        }
+
+        function ensureAllMovements(auto) {
+            if (movementsFull) return Promise.resolve();
+            if (auto && movementsLoadFailed) return Promise.resolve();
+            if (!movementsLoading) {
+                movementsLoadFailed = false;
+                movementsLoading = fetchMovements(true)
+                    .then(rows => { movements = rows; saveCache(); })
+                    .catch(e => {
+                        movementsLoadFailed = true;
+                        console.error('Erro a carregar o histórico completo:', e);
+                        showToast('Erro a carregar o histórico completo de movimentos.', 'error');
+                    })
+                    .finally(() => { movementsLoading = null; renderMovementsTable(); });
+            }
+            return movementsLoading;
+        }
+
+        function sortMovements() {
+            movements.sort((a, b) => String(b.date || '').localeCompare(String(a.date || '')) ||
+                String(b.id).localeCompare(String(a.id), undefined, { numeric: true }));
+        }
+        // Atualiza um movimento na lista local, sem voltar a pedir tudo ao servidor
+        function upsertLocalMovement(m) {
+            const i = movements.findIndex(x => String(x.id) === String(m.id));
+            if (i >= 0) movements.splice(i, 1);
+            const oldest = movements.length ? movements[movements.length - 1].date : '';
+            // Se o histórico ainda não está todo carregado, ignora movimentos mais antigos que a janela atual
+            if (movementsFull || !oldest || String(m.date || '') >= String(oldest)) { movements.push(m); sortMovements(); }
+        }
+
+        // scope: omitido = tudo; ou { products, lots, entities, movements } com true nas tabelas a recarregar
+        async function loadData(scope) {
+            const all = !scope;
+            const want = t => all || !!scope[t];
+            const skip = Promise.resolve(null);
+            const [pRes, lRes, eRes, mRes] = await Promise.allSettled([
+                want('products') ? fetchAllRows('products', PRODUCT_COLS, [['id', true]]) : skip,
+                want('lots') ? fetchAllRows('lots', '*', [['id', true]]) : skip,
+                want('entities') ? db.from('entities').select('*').order('created_at', { ascending: true }) : skip,
+                want('movements') ? fetchMovements(movementsFull) : skip
+            ]);
+            if (want('products')) {
+                if (pRes.status === 'fulfilled') products = pRes.value;
+                else { console.error('Erro a carregar produtos:', pRes.reason); showToast('Erro a carregar produtos.', 'error'); }
+            }
+            if (want('lots')) {
+                if (lRes.status === 'fulfilled') lots = lRes.value;
+                else { console.error('Erro a carregar lotes:', lRes.reason); showToast('Erro a carregar lotes.', 'error'); }
+            }
+            if (want('entities') && eRes.status === 'fulfilled' && eRes.value && eRes.value.data) entities = eRes.value.data;
+            if (want('movements')) {
+                if (mRes.status === 'fulfilled') movements = mRes.value;
+                else console.error('Erro a carregar movimentos:', mRes.reason);
+            }
+            if (want('products')) sortProducts();
+            if (want('lots')) buildLotIndex();
+            saveCache();
+        }
+
+        // ===== LOTES: editar, mover, eliminar =====
+        function friendlyLotError(error) {
+            const code = error && error.code;
+            const msg = (error && error.message) || '';
+            if (code === '23505') return 'Já existe um lote com esse código neste produto.';
+            if (code === '23514' || msg.includes('check constraint')) return 'Stock insuficiente: a quantidade do lote não pode ficar negativa.';
+            if (code === '23503') return 'Este lote tem movimentos no histórico e não pode ser eliminado. Pode deixá-lo com stock 0.';
+            if (code === 'PGRST204' || msg.includes("'location' column")) return 'Falta a coluna "location" na tabela lots (executar o SQL indicado no Supabase).';
+            if (msg.includes("'supplier' column")) return 'Falta a coluna "supplier" na tabela lots (executar: alter table lots add column supplier text;).';
+            if (code === 'PGRST202' || msg.includes('Could not find the function')) return 'Faltam as funções SQL dos lotes (executar funcoes_lotes.sql no Supabase).';
+            return 'Erro: ' + (msg || 'operação falhou.');
+        }
+
+        function openLotModal(id) {
+            const lot = lots.find(l => l.id === id);
+            if (!lot) return;
+            const prod = products.find(p => p.id === lot.product_id);
+            document.getElementById('lot-form').reset();
+            clearFieldErrors(document.getElementById('lot-form'));
+            document.getElementById('lot-edit-id').value = id;
+            document.getElementById('lot-product-name').textContent = prod ? prod.name : '';
+            document.getElementById('lot-code').value = lot.lote;
+            document.getElementById('lot-qty').value = lot.qty;
+            document.getElementById('lot-location').value = lot.location || '';
+            document.getElementById('lot-supplier-search').value = '';
+            filterLotSuppliers(lot.supplier || '');
+            document.getElementById('lot-move-search').value = '';
+            filterLotMoveProducts();
+            document.getElementById('lot-modal').classList.remove('hidden');
+        }
+        function closeLotModal() { document.getElementById('lot-modal').classList.add('hidden'); }
+
+        function updateLotSupplierLabel() {
+            const v = document.getElementById('lot-supplier').value;
+            document.getElementById('lot-supplier-label').textContent = v || 'Sem fornecedor';
+        }
+
+        // keep: fornecedor a manter selecionado (string) | typing: true quando vem da caixa de pesquisa
+        function filterLotSuppliers(keep, typing) {
+            const sel = document.getElementById('lot-supplier');
+            const current = typeof keep === 'string' ? keep : sel.value;
+            const term = document.getElementById('lot-supplier-search').value.trim().toLowerCase();
+            const names = sortedEntities()
+                .filter(e => (e.type === 'Fornecedor' || e.type === 'Ambos') &&
+                    (!term || (e.name || '').toLowerCase().includes(term) || (e.nif || '').toLowerCase().includes(term)))
+                .map(e => e.name);
+            const matches = names.slice();
+            if (current && !names.includes(current)) { names.push(current); names.sort(compareByName); }
+            let html = '<option value="">— Sem fornecedor —</option>' + names.map(n => `<option value="${esc(n)}">${esc(n)}</option>`).join('');
+            if (term && !matches.length) html += '<option value="" disabled>Nenhum fornecedor encontrado</option>';
+            sel.innerHTML = html;
+            // ao escrever, o 1.º resultado fica logo selecionado
+            sel.value = (typing && term && matches.length) ? matches[0] : current;
+            updateLotSupplierLabel();
+        }
+
+        // keep: entidade a manter selecionada (string) | typing: true quando vem da caixa de pesquisa
+        function filterMovementEntities(keep, typing) {
+            const sel = document.getElementById('movement-entity-id');
+            const current = typeof keep === 'string' ? keep : sel.value;
+            const term = document.getElementById('search-movement-entity').value.trim().toLowerCase();
+            const names = sortedEntities()
+                .filter(e => !term || (e.name || '').toLowerCase().includes(term) || (e.nif || '').toLowerCase().includes(term))
+                .map(e => e.name);
+            const matches = names.slice();
+            if (current && !names.includes(current) && entities.some(e => e.name === current)) { names.push(current); names.sort(compareByName); }
+            let html = names.map(n => `<option value="${esc(n)}">${esc(n)}</option>`).join('');
+            if (term && !matches.length) html += '<option value="" disabled>Nenhuma entidade encontrada</option>';
+            sel.innerHTML = html;
+            // ao escrever, o 1.º resultado fica logo selecionado; sem pesquisa mantém a seleção (ou a 1.ª da lista)
+            if (typing && term && matches.length) sel.value = matches[0];
+            else if (current && names.includes(current)) sel.value = current;
+            else if (names.length && !term) sel.value = names[0];
+        }
+
+        function filterLotMoveProducts() {
+            const lot = lots.find(l => l.id === document.getElementById('lot-edit-id').value);
+            const term = document.getElementById('lot-move-search').value.toLowerCase();
+            const list = products.filter(p => (!lot || p.id !== lot.product_id) && (!term || productOwnMatch(p, term) || productLotMatch(p, term))).slice(0, 200);
+            document.getElementById('lot-move-product').innerHTML =
+                '<option value="">— Manter neste produto —</option>' +
+                list.map(p => `<option value="${esc(p.id)}">${esc(p.name)} (${formatKg(p.qty)})</option>`).join('');
+        }
+
+        async function handleLotSubmit(e) {
+            e.preventDefault();
+            if (!validateForm(e.currentTarget || document.getElementById('lot-form'))) return;
+            const id = document.getElementById('lot-edit-id').value;
+            const lot = lots.find(l => l.id === id);
+            if (!lot) return;
+            const code = document.getElementById('lot-code').value.trim().replace(/\s+/g, ' ');
+            const qty = Math.round(parseFloat(document.getElementById('lot-qty').value) * 1000) / 1000;
+            const dest = document.getElementById('lot-move-product').value;
+            const loc = document.getElementById('lot-location').value.trim().replace(/\s+/g, ' ');
+            if (!code) { setFieldError('lot-code', 'Indique o código do lote.'); return; }
+            if (!(qty >= 0)) { setFieldError('lot-qty', 'Indique uma quantidade válida.'); return; }
+
+            const btn = document.getElementById('lot-submit-btn');
+            btn.disabled = true;
+            let error = null;
+            if (code !== lot.lote) ({ error } = await db.rpc('rename_lot', { p_lot: id, p_name: code }));
+            const patch = {};
+            if (Math.abs(qty - Number(lot.qty)) > 0.0005) patch.qty = qty;
+            if (loc !== (lot.location || '')) patch.location = loc || null;
+            const sup = document.getElementById('lot-supplier').value;
+            if (sup !== (lot.supplier || '')) patch.supplier = sup || null;
+            if (!error && Object.keys(patch).length) ({ error } = await db.from('lots').update(patch).eq('id', id));
+            if (!error && dest) ({ error } = await db.rpc('move_lot', { p_lot: id, p_product: dest }));
+            btn.disabled = false;
+
+            const lotScope = { products: true, lots: true, movements: true };   // renomear/mover pode alterar movimentos
+            if (error) { showLotError(error); await loadData(lotScope); refreshAll(); return; }
+            showToast('Lote atualizado!');
+            await loadData(lotScope);
+            refreshAll();
+            closeLotModal();
+        }
+
+        async function deleteLot(id) {
+            const lot = lots.find(l => l.id === id);
+            if (!lot) return;
+            const aviso = Number(lot.qty) > 0 ? ` Tem ${formatKg(lot.qty)} em stock, que serão removidos do total.` : '';
+            if (!confirm(`Eliminar o lote "${lot.lote}"?${aviso} Esta ação não pode ser desfeita.`)) return;
+            const { error } = await db.from('lots').delete().eq('id', id);
+            if (error) { showToast(friendlyLotError(error), 'error'); return; }
+            showToast('Lote eliminado.');
+            await loadData({ products: true, lots: true });
+            refreshAll();
+        }
+
+        // Mostra no cabeçalho o utilizador que entrou (nome definido no Supabase, ou o email)
+        function setHeaderUser(user) {
+            const box = document.getElementById('header-user');
+            const name = document.getElementById('header-user-name');
+            if (!box || !name) return;
+            const m = (user && user.user_metadata) || {};
+            const label = m.full_name || m.name || m.display_name || (user && user.email) || '';
+            name.textContent = label;
+            box.title = user && user.email ? 'Sessão iniciada como ' + user.email : '';
+            box.classList.toggle('show', !!label);
+            scheduleIcons();
+        }
+
+        // VERIFICAR SESSÃO DE AUTENTICAÇÃO AO CARREGAR A PÁGINA
+
+        window.addEventListener('DOMContentLoaded', async () => {
+            const { data: { session } } = await db.auth.getSession();
+            
+            if (session) {
+                setHeaderUser(session.user);
+                document.getElementById('login-screen').classList.add('hidden');
+                if (loadCache()) { populateCategoryFilter(); refreshAll(); }
+                await loadData();
+                populateCategoryFilter();
+                refreshAll();
+            } else {
+                document.getElementById('login-screen').classList.remove('hidden');
+            }
+            scheduleIcons();
+        });
+
+        // AUTENTICAÇÃO (LOGIN & LOGOUT)
+        async function handleLogin(e) {
+            e.preventDefault();
+            const email = document.getElementById('login-email').value;
+            const password = document.getElementById('login-password').value;
+            const errorElem = document.getElementById('login-error');
+            const btn = document.getElementById('login-btn');
+
+            errorElem.classList.add('hidden');
+            btn.disabled = true;
+            btn.textContent = 'A verificar...';
+
+            const { data, error } = await db.auth.signInWithPassword({ email, password });
+
+            if (error) {
+                errorElem.textContent = 'Credenciais incorretas. Tente novamente.';
+                errorElem.classList.remove('hidden');
+                btn.disabled = false;
+                btn.textContent = 'Entrar no Sistema';
+            } else {
+                setHeaderUser(data && data.user);
+                document.getElementById('login-screen').classList.add('hidden');
+                btn.disabled = false;
+                btn.textContent = 'Entrar no Sistema';
+                
+                await loadData();
+                populateCategoryFilter();
+                refreshAll();
+            }
+        }
+
+        async function handleLogout() {
+            clearTimeout(cacheTimer);
+            try { localStorage.removeItem(CACHE_KEY); } catch (e) {}
+            try {
+                // Máx. 2 s à espera do servidor; se falhar, termina a sessão localmente na mesma
+                await Promise.race([
+                    db.auth.signOut({ scope: 'local' }),
+                    new Promise(resolve => setTimeout(resolve, 2000))
+                ]);
+            } catch (e) { console.error('Erro no logout:', e); }
+            try {
+                Object.keys(localStorage).filter(k => k.startsWith('sb-')).forEach(k => localStorage.removeItem(k));
+            } catch (e) {}
+            window.location.reload();
+        }
+
+        function togglePasswordVisibility() {
+            const input = document.getElementById('login-password');
+            const icon = document.getElementById('eye-icon');
+            if (input.type === 'password') {
+                input.type = 'text';
+                icon.setAttribute('data-lucide', 'eye-off');
+            } else {
+                input.type = 'password';
+                icon.setAttribute('data-lucide', 'eye');
+            }
+            scheduleIcons();
+        }
+
+        // 3. FUNÇÕES DE ESCRITA E ELIMINAÇÃO NO SUPABASE
+        async function handleProductSubmit(e) {
+            e.preventDefault();
+            if (!validateForm(document.getElementById('product-form'))) return;
+            const id = document.getElementById('product-edit-id').value;
+            const sku = document.getElementById('product-sku').value;
+            const barcodeEl = document.getElementById('product-barcode');
+            let barcode = barcodeEl.value;
+            const barcodeIsAuto = barcodeEl.dataset.auto === '1';
+            if (!id && !barcode.trim()) barcode = sku;   // novo produto sem código: usa o SKU
+            const name = document.getElementById('product-name').value;
+            const category = document.getElementById('product-category').value;
+            const min = parseFloat(document.getElementById('product-min').value) || 0;
+            const cost = parseFloat(document.getElementById('product-cost').value) || 0;
+            const price = parseFloat(document.getElementById('product-price').value) || 0;
+            const location = document.getElementById('product-location').value;
+            const notes = document.getElementById('product-notes').value;
+
+            const productData = { sku, barcode, name, category, min, cost, price, location, notes };
+
+            const oldProduct = id ? products.find(p => p.id === id) : null;
+            if (id) {
+                const { error } = await db.from('products').update(productData).eq('id', id);
+                if (error) { showProductError(error, 'Erro a atualizar produto'); return; }
+                showToast('Produto atualizado na Cloud!');
+            } else {
+                let { error } = await db.from('products').insert([{ ...productData, qty: 0, lote: '' }]);
+                const skuIsAuto = document.getElementById('product-sku').dataset.auto === '1';
+                if (error && error.code === '23505' && skuIsAuto && (barcodeIsAuto || !((error.details || '') + (error.message || '')).toLowerCase().includes('barcode'))) {
+                    // SKU automático já usado entretanto: atualiza a lista e tenta com o seguinte
+                    await loadData({ products: true });
+                    productData.sku = generateNextSku();
+                    document.getElementById('product-sku').value = productData.sku;
+                    if (barcodeIsAuto) { productData.barcode = productData.sku; barcodeEl.value = productData.sku; }
+                    ({ error } = await db.from('products').insert([{ ...productData, qty: 0, lote: '' }]));
+                }
+                if (error) { showProductError(error, 'Erro a adicionar produto'); return; }
+                showToast('Novo produto adicionado à Cloud!');
+            }
+
+            await loadData({ products: true, movements: !!(oldProduct && oldProduct.name !== name) });
+            populateCategoryFilter();
+            refreshAll();
+            closeProductModal();
+        }
+
+        async function deleteProduct(id) {
+            const name = (products.find(p => p.id === id) || {}).name || '';
+            if (!confirm(`Tem a certeza de que deseja eliminar o produto "${name}"? Esta ação não pode ser desfeita.`)) return;
+
+            const { error } = await db.from('products').delete().eq('id', id);
+            if (error) {
+                showToast(error.code === '23503' ? 'Este produto tem movimentos no histórico e não pode ser eliminado.' : 'Erro ao eliminar produto da Cloud.', 'error');
+                return;
+            }
+
+            showToast('Produto eliminado com sucesso!');
+            await loadData({ products: true, lots: true });
+            populateCategoryFilter();
+            refreshAll();
+        }
+
+        async function handleEntitySubmit(e) {
+            e.preventDefault();
+            if (!validateForm(document.getElementById('entity-form'))) return;
+            const id = document.getElementById('entity-edit-id').value;
+            const name = document.getElementById('entity-name').value;
+            const type = document.getElementById('entity-type').value;
+            const nif = document.getElementById('entity-nif').value;
+            const phone = document.getElementById('entity-phone').value;
+            const email = document.getElementById('entity-email').value;
+            const address = document.getElementById('entity-address').value;
+
+            const entityData = { name, type, nif, phone, email, address };
+
+            const oldEntity = id ? entities.find(x => x.id === id) : null;
+            const renamed = !!(oldEntity && oldEntity.name !== name);
+            if (id) {
+                const { error } = await db.from('entities').update(entityData).eq('id', id);
+                if (error) { showToast('Erro ao atualizar', 'error'); return; }
+                showToast('Entidade atualizada na Cloud!');
+            } else {
+                const { error } = await db.from('entities').insert([entityData]);
+                if (error) { showToast('Erro ao inserir', 'error'); return; }
+                showToast('Nova entidade adicionada à Cloud!');
+            }
+
+            await loadData({ entities: true, lots: renamed, movements: renamed });
+            refreshAll();
+            closeEntityModal();
+        }
+
+        async function deleteEntity(id) {
+            const name = (entities.find(e => e.id === id) || {}).name || '';
+            if (!confirm(`Tem a certeza de que deseja eliminar a entidade "${name}"?`)) return;
+
+            const { error } = await db.from('entities').delete().eq('id', id);
+            if (error) {
+                showToast('Erro ao eliminar entidade.', 'error');
+                return;
+            }
+
+            showToast('Entidade eliminada com sucesso!');
+            await loadData({ entities: true });
+            refreshAll();
+        }
+
+        async function handleMovementSubmit(e) {
+            e.preventDefault();
+            if (!validateForm(document.getElementById('movement-form'))) return;
+            const btn = document.getElementById('movement-submit-btn');
+            const editId = document.getElementById('movement-edit-id').value;
+            const type = document.getElementById('movement-type').value;
+            const date = document.getElementById('movement-date').value;
+            const product_id = document.getElementById('movement-product-id').value;
+            const lote = document.getElementById('movement-lote').value;
+            if (!lote.trim()) { setFieldError(document.getElementById('movement-lote').classList.contains('hidden') ? 'movement-lote-select' : 'movement-lote', 'Selecione ou indique um lote.'); return; }
+            const qty = Math.round(parseFloat(document.getElementById('movement-qty').value) * 1000) / 1000;
+            const entity_name = document.getElementById('movement-entity-id').value;
+            const notes = document.getElementById('movement-notes').value;
+
+            const targetProduct = products.find(p => p.id === product_id);
+            if (!targetProduct) { setFieldError('movement-product-id', 'Selecione um produto.'); return; }
+            if (!(qty > 0)) { setFieldError('movement-qty', 'Indique uma quantidade válida.'); return; }
+
+            // O stock do produto é atualizado pelo trigger na base de dados (ver supabase_setup.sql)
+            const row = { date, type, product_id, product_name: targetProduct.name, lote, qty, entity_name, notes };
+
+            btn.disabled = true;
+            const { data: savedRows, error } = editId
+                ? await db.from('movements').update(row).eq('id', editId).select()
+                : await db.from('movements').insert([row]).select();
+            btn.disabled = false;
+
+            if (error) { showMovementError(error); return; }
+
+            showToast(editId ? 'Movimento atualizado!' : 'Movimento registado!');
+            // O trigger da BD altera o stock: recarrega só produtos e lotes; o movimento guardado entra na lista local
+            const saved = savedRows && savedRows[0];
+            if (saved) upsertLocalMovement(saved);
+            await loadData({ products: true, lots: true, movements: !saved });
+            // Entrada: se o lote ainda não tem fornecedor, fica com a entidade desta entrada
+            if (!editId && type === 'entrada' && entity_name) {
+                const newLot = lots.find(l => l.product_id === product_id && String(l.lote).toLowerCase() === lote.trim().toLowerCase());
+                if (newLot && !newLot.supplier) {
+                    const { error: supErr } = await db.from('lots').update({ supplier: entity_name }).eq('id', newLot.id);
+                    if (!supErr) { newLot.supplier = entity_name; saveCache(); }
+                }
+            }
+            refreshAll();
+            closeMovementModal();
+        }
+
+        async function deleteMovement(id) {
+            if (!confirm('Tem a certeza de que deseja eliminar este movimento? O stock do produto será corrigido automaticamente.')) return;
+
+            const { error } = await db.from('movements').delete().eq('id', id);
+            if (error) { showToast(friendlyDbError(error), 'error'); return; }
+
+            showToast('Movimento eliminado e stock corrigido!');
+            movements = movements.filter(m => String(m.id) !== String(id));
+            await loadData({ products: true, lots: true });
+            refreshAll();
+        }
+
+        function filterMovementProducts() {
+            const term = document.getElementById('search-movement-product').value.toLowerCase();
+            const select = document.getElementById('movement-product-id');
+
+            const filtered = products.filter(p => !term || productOwnMatch(p, term) || productLotMatch(p, term));
+
+            select.innerHTML = filtered.map(p =>
+                `<option value="${esc(p.id)}">${esc(p.name)} (${formatKg(p.qty)})</option>`
+            ).join('');
+
+            onMovementProductChange();
+        }
+
+        // 4. FUNÇÕES DE APRESENTAÇÃO (UI)
+        function populateCategoryFilter() {
+            const select = document.getElementById('filter-category');
+            const categories = [...new Set(products.map(p => p.category))];
+            select.innerHTML = `<option value="">Todas</option>` + categories.map(c => `<option value="${esc(c)}">${esc(c)}</option>`).join('');
+        }
+
+        document.addEventListener('keydown', ev => {
+            if (ev.key === 'Escape') ['label-modal','product-modal','entity-modal','movement-modal','lot-modal'].forEach(id => document.getElementById(id)?.classList.add('hidden'));
+        });
+
+        function refreshAll() {
+            renderDashboard();
+            renderAlerts();
+            document.getElementById('badge-entidades').textContent = entities.length;
+            setTimeout(() => {
+                renderProductsTable();
+                renderEntitiesTable();
+                renderMovementsTable();
+                renderReports();
+            }, 0);
+            scheduleIcons();
+        }
+
+        function switchTab(tabId) {
+            ['dashboard', 'produtos', 'entidades', 'movimentos', 'alertas', 'relatorios'].forEach(t => {
+                document.getElementById(`content-${t}`).classList.toggle('hidden', t !== tabId);
+                document.getElementById(`tab-${t}`).className = t === tabId 
+                    ? "flex-1 min-w-[110px] py-2.5 px-3 text-sm font-medium rounded-lg transition flex items-center justify-center space-x-2 bg-blue-600 text-white shadow-xs"
+                    : "flex-1 min-w-[110px] py-2.5 px-3 text-sm font-medium rounded-lg transition flex items-center justify-center space-x-2 text-slate-600 hover:text-slate-900 hover:bg-slate-50";
+            });
+        }
+
+        function formatEuro(val) { return new Intl.NumberFormat('pt-PT', { style: 'currency', currency: 'EUR' }).format(val); }
+        function formatKg(val) { return Number(val).toLocaleString('pt-PT', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' kg'; }
+        function formatDateTime(str) { if (!str) return '-'; const p = str.split('T'); return p.length === 2 ? `${p[0].split('-').reverse().join('/')} ${p[1]}` : str; }
+
+        function renderDashboard() {
+            document.getElementById('stat-total-produtos').textContent = products.length;
+            document.getElementById('stat-peso-total').textContent = formatKg(products.reduce((a, b) => a + b.qty, 0));
+            document.getElementById('stat-valor-inventario').textContent = formatEuro(products.reduce((a, b) => a + (b.qty * b.cost), 0));
+            document.getElementById('stat-stock-baixo').textContent = products.filter(p => p.qty <= p.min).length;
+
+            document.getElementById('dashboard-recent-movements').innerHTML = movements.slice(0, 5).map(m => `
+                <tr class="hover:bg-slate-50/50">
+                    <td class="py-2.5 px-3 text-slate-500">${formatDateTime(m.date)}</td>
+                    <td class="py-2.5 px-3"><span class="px-2 py-0.5 rounded-full text-[10px] font-semibold ${m.type === 'entrada' ? 'bg-emerald-50 text-emerald-700' : 'bg-rose-50 text-rose-700'}">${m.type === 'entrada' ? 'Entrada' : 'Saída'}</span></td>
+                    <td class="py-2.5 px-3 font-medium text-slate-800">${productNameLink(m)}</td>
+                    <td class="py-2.5 px-3 text-slate-600 font-medium">${esc(m.entity_name || '-')}</td>
+                    <td class="py-2.5 px-3 text-right font-semibold ${m.type === 'entrada' ? 'text-emerald-600' : 'text-rose-600'}">${m.type === 'entrada' ? '+' : '-'}${formatKg(m.qty)}</td>
+                </tr>
+            `).join('') || `<tr><td colspan="5" class="text-center py-4 text-slate-400">Nenhum movimento.</td></tr>`;
+        }
+
+        function formatDate(str) { if (!str) return '-'; const d = new Date(str); return isNaN(d) ? '-' : d.toLocaleDateString('pt-PT'); }
+
+        function productOwnMatch(p, query, useSku = true) {
+            return (p.name && p.name.toLowerCase().includes(query)) ||
+                   (useSku && p.sku && p.sku.toLowerCase().includes(query)) ||
+                   (p.barcode && p.barcode.toLowerCase().includes(query));
+        }
+        function productLotMatch(p, query) {
+            return (lotsByProduct[p.id] || []).some(l => l.lote.toLowerCase().includes(query) || (l.supplier && l.supplier.toLowerCase().includes(query)));
+        }
+
+        function toggleLots(id) {
+            if (expandedProducts.has(id)) expandedProducts.delete(id); else expandedProducts.add(id);
+            renderProductsTable();
+        }
+        function toggleDepleted(id) {
+            if (showDepleted.has(id)) showDepleted.delete(id); else showDepleted.add(id);
+            renderProductsTable();
+        }
+
+        // Foco num só lote (vindo da leitura do código): só essa linha, enquanto a pesquisa não mudar
+        let focusLot = null, highlightLotId = null;
+        function clearFocusLot() { focusLot = null; renderProductsTable(); }
+
+        // Histórico de movimentos de um lote (com saldo a correr)
+        const openLotHistory = new Set();
+        function toggleLotHistory(id) {
+            id = String(id);
+            if (openLotHistory.has(id)) openLotHistory.delete(id);
+            else {
+                openLotHistory.add(id);
+                if (!movementsFull) ensureAllMovements().then(() => renderProductsTable());
+            }
+            renderProductsTable();
+        }
+        function lotMovements(l) {
+            const lote = String(l.lote || '').trim().toLowerCase();
+            return movements.filter(m => m.lot_id != null && m.lot_id !== ''
+                    ? String(m.lot_id) === String(l.id)
+                    : (String(m.product_id) === String(l.product_id) && String(m.lote || '').trim().toLowerCase() === lote))
+                .sort((a, b) => String(a.date || '').localeCompare(String(b.date || '')) ||
+                    String(a.id).localeCompare(String(b.id), undefined, { numeric: true }));
+        }
+        function renderLotHistory(l) {
+            const list = lotMovements(l);
+            let saldo = 0, entrado = 0, saido = 0;
+            const entradas = [];
+            const rows = list.map(m => {
+                const q = Number(m.qty) || 0, isIn = m.type === 'entrada';
+                if (isIn) { saldo += q; entrado += q; entradas.push(q); } else { saldo -= q; saido += q; }
+                return `<tr class="border-t border-slate-200/70">
+                    <td class="py-1.5 px-2 text-xs text-slate-500 whitespace-nowrap">${esc(formatDateTime(String(m.date || '').slice(0, 16)))}</td>
+                    <td class="py-1.5 px-2"><span class="px-2 py-0.5 rounded-full text-[10px] font-semibold ${isIn ? 'bg-emerald-50 text-emerald-700' : 'bg-rose-50 text-rose-700'}">${isIn ? 'Entrada' : 'Saída'}</span></td>
+                    <td class="py-1.5 px-2 text-right text-xs font-semibold ${isIn ? 'text-emerald-600' : 'text-rose-600'}">${isIn ? '+' : '-'}${formatKg(q)}</td>
+                    <td class="py-1.5 px-2 text-right text-xs font-bold text-slate-800">${formatKg(saldo)}</td>
+                    <td class="py-1.5 px-2 text-xs text-slate-600">${esc(m.entity_name || '-')}</td>
+                    <td class="py-1.5 px-2 text-xs text-slate-600">${esc(m.notes || '')}</td>
+                </tr>`;
+            }).join('');
+            const diff = Math.abs(saldo - Number(l.qty));
+            const warn = list.length && diff > 0.005
+                ? `<p class="text-[11px] text-amber-700 bg-amber-50 border border-amber-200 rounded-lg p-2 mt-2">O saldo dos movimentos (${formatKg(saldo)}) difere do stock do lote (${formatKg(l.qty)}). Pode haver ajustes ou movimentos antigos não registados.</p>` : '';
+            const loading = !movementsFull ? '<p class="text-[11px] text-slate-400 mt-1">A carregar o histórico completo…</p>' : '';
+            const resumo = entradas.length
+                ? `<p class="text-[11px] text-slate-500 mb-1"><strong>${entradas.length}</strong> entrada(s): ${entradas.map(q => formatKg(q)).join(' · ')} &nbsp;|&nbsp; Entrado ${formatKg(entrado)} · Saído ${formatKg(saido)} · <strong>Saldo ${formatKg(saldo)}</strong></p>` : '';
+            return `<tr class="bg-white"><td colspan="6" class="px-3 py-3 border-t border-slate-200">
+                <div class="text-xs font-semibold text-slate-600 mb-1">Movimentos do lote ${esc(l.lote)}</div>
+                ${resumo}
+                ${list.length ? `<div class="overflow-x-auto"><table class="w-full text-left"><thead><tr class="text-[11px] text-slate-400"><th class="py-1 px-2 font-semibold">Data</th><th class="py-1 px-2 font-semibold">Tipo</th><th class="py-1 px-2 font-semibold text-right">Peso</th><th class="py-1 px-2 font-semibold text-right">Saldo</th><th class="py-1 px-2 font-semibold">Entidade</th><th class="py-1 px-2 font-semibold">Notas</th></tr></thead><tbody>${rows}</tbody></table></div>`
+                    : '<p class="text-xs text-slate-400 py-1">Sem movimentos registados para este lote.</p>'}
+                ${warn}${loading}
+            </td></tr>`;
+        }
+        function renderLotsDetail(p, query) {
+            const all = lotsByProduct[p.id] || [];
+            const active = all.filter(l => l.qty > 0);
+            const focused = focusLot && focusLot.pid === p.id && focusLot.q === query ? all.find(l => l.id === focusLot.lid) : null;
+            const list = focused ? [focused] : ((showDepleted.has(p.id) || query) ? all : active);
+            const depleted = all.length - active.length;
+            const toggle = focused
+                ? `<button onclick="clearFocusLot()" class="text-xs font-semibold text-blue-600 hover:text-blue-700">Mostrar todos os lotes (${all.length})</button>`
+                : depleted > 0 && !query
+                ? `<button onclick="toggleDepleted('${esc(p.id)}')" class="text-xs font-semibold text-blue-600 hover:text-blue-700">${showDepleted.has(p.id) ? 'Ocultar esgotados' : 'Mostrar esgotados (' + depleted + ')'}</button>` : '';
+            const rows = list.map(l => `
+                <tr data-lid="${esc(l.id)}" class="border-t border-slate-200/70 ${l.id === highlightLotId ? 'row-flash' : ''}">
+                    <td class="py-2 px-3 font-mono text-xs font-semibold text-blue-700"><label class="inline-flex items-center gap-2 cursor-pointer"><input type="checkbox" class="lb-check no-print w-4 h-4 rounded border-slate-300 text-blue-600 cursor-pointer" data-key="l:${esc(l.id)}" ${labelChecked('l:' + l.id)} onchange="toggleLabelSel(this.dataset.key, this)" title="Selecionar para a folha de etiquetas">${esc(l.lote)}</label></td>
+                    <td class="py-2 px-3 text-right text-sm font-semibold ${l.qty <= 0 ? 'text-slate-400' : 'text-slate-800'}">${formatKg(l.qty)}</td>
+                    <td class="py-2 px-3 text-xs ${l.location ? 'text-slate-700 font-medium' : 'text-slate-400 italic'}">${esc(l.location || p.location || '-')}</td>
+                    <td class="py-2 px-3 text-xs ${l.supplier ? 'text-slate-700 font-medium' : 'text-slate-400'}">${esc(l.supplier || '-')}</td>
+                    <td class="py-2 px-3 text-xs text-slate-400">${formatDate(l.created_at)}</td>
+                    <td class="py-2 px-3 text-right no-print whitespace-nowrap">
+                        <button onclick="toggleLotHistory('${esc(l.id)}')" title="Ver movimentos do lote" class="p-1.5 transition ${openLotHistory.has(String(l.id)) ? 'text-blue-600' : 'text-slate-400 hover:text-blue-600'}"><i data-lucide="history" class="w-4 h-4"></i></button>
+                        <button onclick="openLabelModal('${esc(p.id)}', '${esc(l.id)}')" title="Imprimir Etiqueta do Lote" class="p-1.5 text-slate-400 hover:text-slate-900 transition"><i data-lucide="qr-code" class="w-4 h-4"></i></button>
+                        <button onclick="openLotModal('${esc(l.id)}')" title="Editar Lote" class="p-1.5 text-slate-400 hover:text-blue-600 transition"><i data-lucide="edit-3" class="w-4 h-4"></i></button>
+                        <button onclick="deleteLot('${esc(l.id)}')" title="Eliminar Lote" class="p-1.5 text-slate-400 hover:text-rose-600 transition"><i data-lucide="trash-2" class="w-4 h-4"></i></button>
+                    </td>
+                </tr>${openLotHistory.has(String(l.id)) ? renderLotHistory(l) : ''}`).join('');
+            return `
+                <tr><td colspan="11" class="bg-slate-50 px-4 py-3">
+                    <div class="max-w-4xl">
+                        <div class="flex items-center justify-between mb-1">
+                            <span class="text-xs font-semibold text-slate-500">Lotes de ${esc(p.name)}</span>
+                            ${toggle}
+                        </div>
+                        ${list.length ? `<table class="w-full text-left"><thead><tr class="text-[11px] text-slate-400"><th class="py-1 px-3 font-semibold">Lote</th><th class="py-1 px-3 font-semibold text-right">Stock</th><th class="py-1 px-3 font-semibold">Localização</th><th class="py-1 px-3 font-semibold">Fornecedor</th><th class="py-1 px-3 font-semibold">Criado</th><th></th></tr></thead><tbody>${rows}</tbody></table>`
+                                    : `<p class="text-xs text-slate-400 py-2">${all.length ? 'Todos os lotes estão esgotados.' : 'Sem lotes. Registe uma Entrada para criar o primeiro lote.'}</p>`}
+                    </div>
+                </td></tr>`;
+        }
+
+        function renderProductsTable() {
+            const query = (document.getElementById('search-product')?.value || '').toLowerCase();
+            const catFilter = document.getElementById('filter-category')?.value || '';
+
+            const filtered = products.filter(p => {
+                if (catFilter !== '' && p.category !== catFilter) return false;
+                if (!query) return true;
+                return productOwnMatch(p, query) || productLotMatch(p, query);
+            });
+
+            const tbody = document.getElementById('products-table-body');
+            const pKey = query + '|' + catFilter;
+            if (pKey !== lastProductKey) { lastProductKey = pKey; productLimit = 100; }
+            // Stock 0: a caixa "Mostrar esgotados" decide o que aparece no ecrã e, por isso, também na impressão
+            const showZero = !!document.getElementById('show-zero-stock')?.checked;
+            const isZero = p => Number(p.qty) <= 0;
+            const listed = showZero ? filtered : filtered.filter(p => !isZero(p));
+            const shownProducts = listed.slice(0, productLimit);
+            const visibleCount = shownProducts.length;
+            const visibleTotal = listed.length;
+            const moreProducts = visibleTotal > visibleCount
+                ? `<tr><td colspan="11" class="text-center py-4"><button onclick="productLimit += 200; renderProductsTable()" class="px-4 py-2 text-sm font-medium text-blue-600 hover:bg-blue-50 rounded-lg">Mostrar mais (${visibleCount} de ${visibleTotal})</button></td></tr>` : '';
+            const emptyRow = visibleCount === 0
+                ? `<tr><td colspan="11" class="text-center py-6 text-slate-400 no-print">Nenhum produto encontrado.</td></tr>` : '';
+
+            tbody.innerHTML = shownProducts.map(p => {
+                const pl = lotsByProduct[p.id] || [];
+                const active = pl.filter(l => l.qty > 0).length;
+                const open = expandedProducts.has(p.id) || (query && !productOwnMatch(p, query) && productLotMatch(p, query));
+                const zc = isZero(p) ? 'zero-stock' : '';
+                return `
+                <tr data-pid="${esc(p.id)}" class="${zc} hover:bg-slate-50/80 transition ${p.id === highlightProductId ? 'row-flash' : ''}">
+                    <td class="py-3 px-3 font-mono text-xs font-semibold text-slate-600">
+                        <div class="flex items-start gap-2">
+                            <input type="checkbox" class="lb-check no-print w-4 h-4 mt-0.5 rounded border-slate-300 text-blue-600 cursor-pointer" data-key="p:${esc(p.id)}" ${labelChecked('p:' + p.id)} onchange="toggleLabelSel(this.dataset.key, this)" title="Selecionar para a folha de etiquetas">
+                            <div>
+                                <div>${esc(p.sku || '-')}</div>
+                                ${p.barcode ? `<div class="text-[10px] text-slate-400"><i data-lucide="barcode" class="w-3 h-3 inline"></i> ${esc(p.barcode)}</div>` : ''}
+                            </div>
+                        </div>
+                    </td>
+                    <td class="py-3 px-3 font-medium text-slate-900">${esc(p.name || '-')}</td>
+                    <td class="py-3 px-3">
+                        <button onclick="toggleLots('${esc(p.id)}')" class="inline-flex items-center gap-1 text-xs font-semibold text-blue-700 hover:bg-blue-50 rounded-lg px-2 py-1 whitespace-nowrap">
+                            <i data-lucide="${open ? 'chevron-down' : 'chevron-right'}" class="w-3.5 h-3.5"></i>
+                            ${active} ${active === 1 ? 'lote' : 'lotes'}${pl.length > active ? ` <span class="text-slate-400 font-normal">(+${pl.length - active} esgot.)</span>` : ''}
+                        </button>
+                    </td>
+                    <td class="py-3 px-3"><span class="px-2.5 py-1 rounded-lg text-xs font-medium bg-slate-100 text-slate-700">${esc(p.category || '-')}</span></td>
+                    <td class="py-3 px-3 text-xs text-slate-600 font-medium">${esc(p.location || '-')}</td>
+                    <td class="py-3 px-3 text-center font-bold text-slate-800">${formatKg(p.qty)}</td>
+                    <td class="py-3 px-3 text-center">
+                        <span class="inline-block w-3.5 h-3.5 rounded-full align-middle ${p.qty <= 0 ? 'bg-rose-500' : p.qty <= p.min ? 'bg-amber-500' : 'bg-emerald-500'}" title="${p.qty <= 0 ? 'Esgotado' : p.qty <= p.min ? 'Stock Baixo' : 'Normal'}" aria-label="${p.qty <= 0 ? 'Esgotado' : p.qty <= p.min ? 'Stock Baixo' : 'Normal'}"></span>
+                    </td>
+                    <td class="py-3 px-3 text-center text-xs text-slate-500">${formatKg(p.min)}</td>
+                    <td class="py-3 px-3 text-right text-slate-600">${formatEuro(p.cost)}</td>
+                    <td class="py-3 px-3 text-right font-semibold text-slate-800">${formatEuro(p.price)}</td>
+                    <td class="py-3 px-1 text-center no-print sticky-col-right bg-white shadow-xs border-l border-slate-100">
+                        <div class="flex items-center justify-center">
+                            ${historyBtn(`toggleProductHistory('${esc(p.id)}')`, openProductHistory.has(String(p.id)), 'Ver histórico do produto', 'p-1')}
+                            <button onclick="openLabelModal('${esc(p.id)}')" title="Imprimir Etiqueta" class="p-1 text-slate-400 hover:text-slate-900 transition"><i data-lucide="qr-code" class="w-4 h-4"></i></button>
+                            <button onclick="openProductModal('${esc(p.id)}')" title="Editar Produto" class="p-1 text-slate-400 hover:text-blue-600 transition"><i data-lucide="edit-3" class="w-4 h-4"></i></button>
+                            <button onclick="deleteProduct('${esc(p.id)}')" title="Eliminar Produto" class="p-1 text-slate-400 hover:text-rose-600 transition"><i data-lucide="trash-2" class="w-4 h-4"></i></button>
+                        </div>
+                    </td>
+                </tr>${open ? renderLotsDetail(p, query).replace('<tr', `<tr class="${zc}"`) : ''}${openProductHistory.has(String(p.id)) ? productHistoryPanel(p.id, 11) : ''}`;
+            }).join('') + moreProducts + emptyRow;
+            scheduleIcons();
+        }
+
+        function renderEntitiesTable() {
+            const query = (document.getElementById('search-entity')?.value || '').toLowerCase();
+            const filtered = sortedEntities()
+                .filter(e => (e.name && e.name.toLowerCase().includes(query)) || (e.nif && e.nif.toLowerCase().includes(query)));
+            const tbody = document.getElementById('entities-table-body');
+            if (query !== lastEntityKey) { lastEntityKey = query; entityLimit = 100; }
+            const shownEntities = filtered.slice(0, entityLimit);
+            const moreEntities = filtered.length > shownEntities.length
+                ? `<tr><td colspan="7" class="text-center py-4"><button onclick="entityLimit += 200; renderEntitiesTable()" class="px-4 py-2 text-sm font-medium text-blue-600 hover:bg-blue-50 rounded-lg">Mostrar mais (${shownEntities.length} de ${filtered.length})</button></td></tr>` : '';
+
+            tbody.innerHTML = shownEntities.map(e => `
+                <tr class="hover:bg-slate-50/80 transition">
+                    <td class="py-3 px-4 font-medium text-slate-900">${esc(e.name)}</td>
+                    <td class="py-3 px-4"><span class="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-blue-50 text-blue-700 border border-blue-200">${esc(e.type)}</span></td>
+                    <td class="py-3 px-4 font-mono text-xs text-slate-700">${esc(e.nif)}</td>
+                    <td class="py-3 px-4 text-xs font-medium">
+                        ${e.email ? `<a href="mailto:${esc(e.email)}" class="text-blue-600 hover:underline"><i data-lucide="mail" class="w-3.5 h-3.5 inline"></i> ${esc(e.email)}</a>` : '-'}
+                    </td>
+                    <td class="py-3 px-4 text-xs text-slate-600">${esc(e.phone || '-')}</td>
+                    <td class="py-3 px-4 text-xs text-slate-500">${esc(e.address || '-')}</td>
+                    <td class="py-3 px-4 text-center sticky-col-right bg-white shadow-xs border-l border-slate-100">
+                        <div class="flex items-center justify-center space-x-1">
+                            ${historyBtn(`toggleEntityHistory('${esc(e.id)}')`, openEntityHistory.has(String(e.id)), 'Ver movimentos da entidade')}
+                            <button onclick="openEntityModal('${esc(e.id)}')" title="Editar Entidade" class="p-1.5 text-slate-400 hover:text-blue-600 transition"><i data-lucide="edit-3" class="w-4 h-4"></i></button>
+                            <button onclick="deleteEntity('${esc(e.id)}')" title="Eliminar Entidade" class="p-1.5 text-slate-400 hover:text-rose-600 transition"><i data-lucide="trash-2" class="w-4 h-4"></i></button>
+                        </div>
+                    </td>
+                </tr>${openEntityHistory.has(String(e.id)) ? entityHistoryPanel(e, 7) : ''}
+            `).join('') + moreEntities || `<tr><td colspan="7" class="text-center py-6 text-slate-400">Nenhuma entidade encontrada.</td></tr>`;
+            scheduleIcons();
+        }
+
+        // Utilizador que registou (created_by) e, se for diferente, quem alterou por último (updated_by)
+        function userCell(m) {
+            const c = m.created_by || '', u = m.updated_by || '';
+            if (!c && !u) return '<span class="text-slate-300">-</span>';
+            const short = e => esc(String(e).split('@')[0]);
+            let html = `<div class="font-medium text-slate-700" title="${esc(c || u)}">${short(c || u)}</div>`;
+            if (c && u && c !== u) html += `<div class="text-[10px] text-slate-400" title="${esc(u)}">alt.: ${short(u)}</div>`;
+            return html;
+        }
+
+        function renderMovementsTable() {
+            const search = (document.getElementById('search-movement')?.value || '').toLowerCase();
+            const startDate = document.getElementById('filter-movement-start-date')?.value || '';
+            const endDate = document.getElementById('filter-movement-end-date')?.value || '';
+
+            const filtered = movements.filter(m => {
+                const matchesSearch = (m.product_name && m.product_name.toLowerCase().includes(search)) || 
+                                      (m.lote && m.lote.toLowerCase().includes(search)) ||
+                                      (m.entity_name && m.entity_name.toLowerCase().includes(search));
+                
+                let matchesDate = true;
+                if (m.date) {
+                    const movementDateStr = m.date.slice(0, 10);
+                    if (startDate && movementDateStr < startDate) matchesDate = false;
+                    if (endDate && movementDateStr > endDate) matchesDate = false;
+                }
+
+                return matchesSearch && matchesDate;
+            });
+
+            const tbody = document.getElementById('movements-table-body');
+            const mKey = search + '|' + startDate + '|' + endDate;
+            if (mKey !== lastMovementKey) { lastMovementKey = mKey; movementLimit = 100; }
+            // Pesquisa, datas ou "Mostrar mais" para além do que está carregado: vai buscar o histórico completo
+            if (!movementsFull && !movementsLoading && (search || startDate || endDate || movementLimit > movements.length)) ensureAllMovements(true);
+            const shownMovements = filtered.slice(0, movementLimit);
+            const moreMovements = (filtered.length > shownMovements.length || !movementsFull)
+                ? `<tr><td colspan="9" class="text-center py-4"><button onclick="movementLimit += 200; renderMovementsTable()" class="px-4 py-2 text-sm font-medium text-blue-600 hover:bg-blue-50 rounded-lg">${movementsLoading ? 'A carregar histórico completo...' : `Mostrar mais (${shownMovements.length} de ${filtered.length}${movementsFull ? '' : '+'})`}</button></td></tr>` : '';
+            
+            tbody.innerHTML = shownMovements.map(m => `
+                <tr class="hover:bg-slate-50/80 transition">
+                    <td class="py-3 px-4 text-slate-500 text-xs">${formatDateTime(m.date)}</td>
+                    <td class="py-3 px-4">
+                        <span class="inline-flex items-center space-x-1 px-2.5 py-1 rounded-full text-xs font-semibold ${m.type === 'entrada' ? 'bg-emerald-50 text-emerald-700' : 'bg-rose-50 text-rose-700'}">
+                            <i data-lucide="${m.type === 'entrada' ? 'arrow-down-left' : 'arrow-up-right'}" class="w-3 h-3"></i>
+                            <span>${m.type === 'entrada' ? 'Entrada' : 'Saída'}</span>
+                        </span>
+                    </td>
+                    <td class="py-3 px-4 font-medium text-slate-900">${productNameLink(m)}</td>
+                    <td class="py-3 px-4 font-mono text-xs font-semibold text-blue-700">${esc(m.lote || '-')}</td>
+                    <td class="py-3 px-4 text-center font-bold ${m.type === 'entrada' ? 'text-emerald-600' : 'text-rose-600'}">
+                        ${m.type === 'entrada' ? '+' : '-'}${formatKg(m.qty)}
+                    </td>
+                    <td class="py-3 px-4 text-slate-700 text-xs font-medium">${esc(m.entity_name || '-')}</td>
+                    <td class="py-3 px-4 text-slate-500 text-xs">${esc(m.notes || '-')}</td>
+                    <td class="py-3 px-4 text-xs">${userCell(m)}</td>
+                    <td class="py-3 px-4 text-center no-print sticky-col-right bg-white shadow-xs border-l border-slate-100">
+                        <div class="flex items-center justify-center space-x-1">
+                            ${m.product_id ? historyBtn(`toggleMovHistory('${esc(m.id)}')`, openMovHistory.has(String(m.id)), 'Ver histórico deste produto') : ''}
+                            <button onclick="openMovementModal('${esc(m.type)}', '${esc(m.id)}')" title="Editar Movimento" class="p-1.5 text-slate-400 hover:text-blue-600 transition"><i data-lucide="edit-3" class="w-4 h-4"></i></button>
+                            <button onclick="deleteMovement('${esc(m.id)}')" title="Eliminar Movimento" class="p-1.5 text-slate-400 hover:text-rose-600 transition"><i data-lucide="trash-2" class="w-4 h-4"></i></button>
+                        </div>
+                    </td>
+                </tr>${m.product_id && openMovHistory.has(String(m.id)) ? productHistoryPanel(m.product_id, 9, m.id) : ''}
+            `).join('') + moreMovements || `<tr><td colspan="9" class="text-center py-8 text-slate-400">Nenhum movimento encontrado.</td></tr>`;
+            
+            scheduleIcons();
+        }
+
+        function clearDateFilter() {
+            const startDate = document.getElementById('filter-movement-start-date');
+            const endDate = document.getElementById('filter-movement-end-date');
+            if (startDate) startDate.value = '';
+            if (endDate) endDate.value = '';
+            renderMovementsTable();
+        }
+
+        // ===== ETIQUETAS =====
+        // Código único de cada lote (SKU do produto + lote): é o que vai no código de barras e no QR da etiqueta do lote
+        const lotCode = (p, l) => `${p.sku || p.id}-${l.lote}`;
+        function labelInfo(key) {
+            const kind = key.slice(0, 1), id = key.slice(2);
+            let p = null, lot = null;
+            if (kind === 'l') {
+                lot = lots.find(l => String(l.id) === id);
+                p = lot && products.find(x => String(x.id) === String(lot.product_id));
+            } else p = products.find(x => String(x.id) === id);
+            if (!p) return null;
+            return {
+                chip: lot ? `${p.sku || p.name} · ${lot.lote}` : (p.sku || p.name),
+                title: p.name, mono: false, sub: `SKU: ${p.sku}`, badge: `Lote: ${lot ? lot.lote : 'N/A'}`,
+                lines: [
+                    `Categoria: ${p.category || '-'} | Fornecedor: ${(lot && lot.supplier) || '-'}`,
+                    lot ? `Entrada: ${formatDate(lot.created_at)} | Stock total do produto: ${formatKg(p.qty)}`
+                        : `Lotes com stock: ${(lotsByProduct[p.id] || []).filter(l => l.qty > 0).length} | Stock mín.: ${formatKg(p.min)}`
+                ],
+                code: lot ? lotCode(p, lot) : (p.barcode || p.sku), qr: lot ? lotCode(p, lot) : p.sku,
+                footL: `Loc: ${(lot && lot.location) || p.location || 'Armazém'}`, footR: formatKg(lot ? lot.qty : p.qty)
+            };
+        }
+        // Botão da impressora numa linha: abre a folha só com essa etiqueta
+        function openLabelModal(productId, lotId = null) {
+            openLabelSheet([lotId ? 'l:' + lotId : 'p:' + productId]);
+        }
+
+        function openLabelModalFromForm() {
+            const id = document.getElementById('product-edit-id').value;
+            if (id) {
+                openLabelModal(id);
+            } else {
+                showToast('Guarde o produto antes de gerar a etiqueta.', 'error');
+            }
+        }
+
+        // ===== ETIQUETAS: folha A4 com até 8 (2 colunas × 4 linhas) =====
+        // As etiquetas identificam-se por chave: "p:<id>" (produto) ou "l:<id>" (lote).
+        function labelChecked(k) { return labelSel.includes(k) ? 'checked' : ''; }
+
+        function labelCardHtml(d) {
+            return `<div class="label-card">
+                <div class="lb-head">
+                    <div><div class="lb-title ${d.mono ? 'mono' : ''}">${esc(d.title)}</div><div class="lb-sub">${esc(d.sub)}</div></div>
+                    <span class="lb-badge">${esc(d.badge)}</span>
+                </div>
+                ${d.lines.length ? `<div class="lb-lines">${d.lines.map(t => `<div>${esc(t)}</div>`).join('')}</div>` : ''}
+                <div class="lb-codes">
+                    <div class="lb-bar"><svg class="lb-barcode" data-code="${esc(d.code)}"></svg></div>
+                    <div class="lb-qr" data-qr="${esc(d.qr)}"></div>
+                </div>
+                <div class="lb-foot"><span>${esc(d.footL)}</span><b>${esc(d.footR)}</b></div>
+            </div>`;
+        }
+        function fillLabelCodes(root) {
+            root.querySelectorAll('svg[data-code]').forEach(svg => {
+                try { JsBarcode(svg, svg.dataset.code, { format: 'CODE128', height: 40, width: 2, fontSize: 12, margin: 0 }); }
+                catch (e) { console.error(e); }
+            });
+            root.querySelectorAll('[data-qr]').forEach(el => {
+                el.innerHTML = '';
+                try { new QRCode(el, { text: el.dataset.qr, width: 160, height: 160 }); } catch (e) { console.error(e); }
+            });
+        }
+        function renderLabelSheet(box, keys, withEmpty) {
+            const cells = keys.map(k => { const d = labelInfo(k); return `<div class="label-cell">${d ? labelCardHtml(d) : ''}</div>`; });
+            if (withEmpty) while (cells.length < LABEL_MAX) cells.push('<div class="label-cell"><div class="label-empty"></div></div>');
+            box.innerHTML = `<div class="label-sheet">${cells.join('')}</div>`;
+            fillLabelCodes(box);
+        }
+
+        function refreshLabelModal() {
+            const n = labelQueue.length;
+            document.getElementById('label-sheet-info').textContent = `${n} de ${LABEL_MAX} etiquetas · 2 × 4 por folha (99 × 71 mm cada)`;
+            document.getElementById('label-chips').innerHTML = labelQueue.map(k => {
+                const d = labelInfo(k);
+                return `<span class="inline-flex items-center gap-1 text-xs bg-slate-100 border border-slate-200 rounded-lg pl-2 pr-1 py-1 font-mono">${esc(d ? d.chip : k)}<button type="button" data-key="${esc(k)}" onclick="removeFromLabelQueue(this.dataset.key)" title="Remover da folha" class="px-1 text-slate-400 hover:text-rose-600">✕</button></span>`;
+            }).join('');
+            renderLabelSheet(document.getElementById('label-sheet-preview'), labelQueue, true);
+            renderLabelSheet(document.getElementById('printable-label-area'), labelQueue, false);   // pronta antes de imprimir
+            const btn = document.getElementById('label-print-btn');
+            btn.disabled = n === 0;
+            document.getElementById('label-print-text').textContent = n === 1 ? 'Imprimir 1 etiqueta' : `Imprimir ${n} etiquetas`;
+            if (window.lucide) lucide.createIcons();
+        }
+        function openLabelSheet(keys) {
+            const valid = (keys || []).filter(k => labelInfo(k));
+            if (!valid.length) { showToast('Selecione pelo menos uma etiqueta.', 'error'); return; }
+            if (valid.length > LABEL_MAX) { showToast(`A folha A4 leva no máximo ${LABEL_MAX} etiquetas (selecionou ${valid.length}). Reduza a seleção ou use “Imprimir listagem”.`, 'error'); return; }
+            labelQueue = valid;
+            refreshLabelModal();
+            document.getElementById('label-modal').classList.remove('hidden');
+        }
+        function closeLabelModal() { document.getElementById('label-modal').classList.add('hidden'); }
+        function removeFromLabelQueue(key) {
+            labelQueue = labelQueue.filter(k => k !== key);
+            if (labelSel.includes(key)) {
+                labelSel = labelSel.filter(k => k !== key);
+                document.querySelectorAll('input.lb-check').forEach(cb => { if (cb.dataset.key === key) cb.checked = false; });
+                updateLabelBar();
+            }
+            if (!labelQueue.length) { closeLabelModal(); return; }
+            refreshLabelModal();
+        }
+
+        function toggleLabelSel(key, cb) {
+            if (cb.checked) {
+                if (!labelSel.includes(key)) labelSel.push(key);
+            } else labelSel = labelSel.filter(k => k !== key);
+            updateLabelBar();
+        }
+        function updateLabelBar() {
+            const bar = document.getElementById('label-bar');
+            document.getElementById('label-bar-count').textContent = labelSel.length;
+            bar.classList.toggle('hidden', labelSel.length === 0);
+            bar.classList.toggle('flex', labelSel.length > 0);
+        }
+        function clearLabelSel() {
+            labelSel = [];
+            document.querySelectorAll('input.lb-check').forEach(cb => { cb.checked = false; });
+            updateLabelBar();
+        }
+
+        // ===== LISTAGEM dos itens selecionados (ex.: artigos em promoção) =====
+        function printSelectedList(keys) {
+            const rows = (keys || []).map(k => {
+                const kind = k.slice(0, 1), id = k.slice(2);
+                const lot = kind === 'l' ? lots.find(l => String(l.id) === id) : null;
+                const p = lot ? products.find(x => String(x.id) === String(lot.product_id)) : products.find(x => String(x.id) === id);
+                return p ? { p, lot } : null;
+            }).filter(Boolean);
+            if (!rows.length) { showToast('Selecione pelo menos um artigo.', 'error'); return; }
+            const body = rows.map(({ p, lot }) => `<tr>
+                <td class="bar-cell"><svg class="lst-bar" data-code="${esc(p.barcode || p.sku || '-')}"></svg></td>
+                <td>${esc(p.name || '-')}</td>
+                <td>${esc(lot ? lot.lote : '-')}</td>
+                <td>${esc(p.category || '-')}</td>
+                <td>${esc((lot && lot.location) || p.location || '-')}</td>
+                <td class="num">${formatKg(lot ? lot.qty : p.qty)}</td>
+                <td class="num">${formatEuro(p.price)}</td>
+            </tr>`).join('');
+            document.getElementById('printable-list-area').innerHTML = `<table>
+                <thead><tr><th>Código de Barras</th><th>Artigo</th><th>Lote</th><th>Categoria</th><th>Localização</th><th class="num">Stock</th><th class="num">Preço Venda/kg</th></tr></thead>
+                <tbody>${body}</tbody></table>
+                <p style="margin-top:8px;font-size:11px;color:#475569;">${rows.length} ${rows.length === 1 ? 'artigo' : 'artigos'}</p>`;
+            document.querySelectorAll('#printable-list-area svg[data-code]').forEach(svg => {
+                try { JsBarcode(svg, svg.dataset.code, { format: 'CODE128', height: 38, width: 2, fontSize: 13, margin: 0 }); }
+                catch (e) { console.error(e); }
+            });
+            setPrintHeader('Oliveira & Gonçalves - Listagem de Artigos Selecionados');   // também limpa o modo etiquetas
+            document.body.classList.add('printing-list');
+            window.print();
+        }
+
+        function executePrintLabel() {
+            if (!labelQueue.length) return;
+            let st = document.getElementById('label-page-style');
+            if (!st) { st = document.createElement('style'); st.id = 'label-page-style'; document.head.appendChild(st); }
+            st.textContent = '@page { size: A4 portrait; margin: 0; }';   // só enquanto se imprimem etiquetas
+            document.body.classList.add('printing-label');
+            window.print();
+        }
+        function cleanupLabelPrint() {
+            document.body.classList.remove('printing-label', 'printing-list');
+            document.getElementById('label-page-style')?.remove();
+        }
+        window.addEventListener('afterprint', cleanupLabelPrint);
+
+        // RENDERIZAR CÓDIGO DE BARRAS E QR CODE NO MODAL DE EDIÇÃO DE PRODUTO
+        function renderModalCodes() {
+            const skuVal = document.getElementById('product-sku').value;
+            const barcodeVal = document.getElementById('product-barcode').value || skuVal;
+
+            const svgElem = document.getElementById('modal-barcode-svg');
+            const noneElem = document.getElementById('modal-barcode-none');
+            if (barcodeVal) {
+                try {
+                    JsBarcode("#modal-barcode-svg", barcodeVal, {
+                        format: "CODE128",
+                        height: 40,
+                        fontSize: 12,
+                        margin: 0
+                    });
+                    svgElem.classList.remove('hidden');
+                    noneElem.classList.add('hidden');
+                } catch (err) {
+                    svgElem.classList.add('hidden');
+                    noneElem.classList.remove('hidden');
+                }
+            } else {
+                svgElem.classList.add('hidden');
+                noneElem.classList.remove('hidden');
+            }
+
+            const qrContainer = document.getElementById('modal-qrcode-container');
+            qrContainer.innerHTML = '';
+            if (skuVal) {
+                new QRCode(qrContainer, {
+                    text: skuVal,
+                    width: 60,
+                    height: 60
+                });
+            }
+        }
+
+        // SKU AUTOMÁTICO: PRD-0001, PRD-0002, ... (continua a partir do maior número já existente)
+        const SKU_PREFIX = 'PRD-';
+        function generateNextSku() {
+            const re = new RegExp('^' + SKU_PREFIX + '(\\d+)$', 'i');
+            let max = 0;
+            products.forEach(p => {
+                const m = re.exec((p.sku || '').trim());
+                if (m) max = Math.max(max, parseInt(m[1], 10));
+            });
+            return SKU_PREFIX + String(max + 1).padStart(4, '0');
+        }
+        // Código de barras automático = SKU (enquanto o utilizador não o alterar manualmente)
+        function syncBarcodeWithSku() {
+            const bc = document.getElementById('product-barcode');
+            if (bc && bc.dataset.auto === '1') bc.value = document.getElementById('product-sku').value;
+        }
+        function generateSkuIntoForm() {
+            const el = document.getElementById('product-sku');
+            el.value = generateNextSku();
+            el.dataset.auto = '1';
+            syncBarcodeWithSku();
+            clearFieldErrors(document.getElementById('product-form'));
+            renderModalCodes();
+        }
+
+        function openProductModal(id = null) {
+            document.getElementById('product-form').reset();
+            clearFieldErrors(document.getElementById('product-form'));
+            document.getElementById('product-edit-id').value = id || '';
+            const skuEl = document.getElementById('product-sku');
+            const bcEl = document.getElementById('product-barcode');
+            skuEl.dataset.auto = '';
+            bcEl.dataset.auto = '';
+            document.getElementById('product-sku-generate').classList.toggle('hidden', !!id);
+            if (!id) {
+                skuEl.value = generateNextSku();
+                skuEl.dataset.auto = '1';
+                bcEl.value = skuEl.value;
+                bcEl.dataset.auto = '1';
+            }
+            if (id) {
+                const p = products.find(prod => prod.id === id);
+                if (p) {
+                    ['sku','barcode','name','category','min','cost','price','location','notes'].forEach(field => {
+                        document.getElementById(`product-${field}`).value = p[field] || '';
+                    });
+                }
+            }
+            renderModalCodes();
+            document.getElementById('product-modal').classList.remove('hidden');
+        }
+
+        function closeProductModal() { document.getElementById('product-modal').classList.add('hidden'); }
+
+        function openEntityModal(id = null) {
+            document.getElementById('entity-form').reset();
+            clearFieldErrors(document.getElementById('entity-form'));
+            document.getElementById('entity-edit-id').value = id || '';
+            if (id) {
+                const e = entities.find(ent => ent.id === id);
+                if (e) {
+                    ['name','type','nif','phone','email','address'].forEach(field => {
+                        document.getElementById(`entity-${field}`).value = e[field] || '';
+                    });
+                }
+            }
+            document.getElementById('entity-modal').classList.remove('hidden');
+        }
+        function closeEntityModal() { document.getElementById('entity-modal').classList.add('hidden'); }
+
+        function openMovementModal(type = 'entrada', id = null) {
+            document.getElementById('movement-form').reset();
+            clearFieldErrors(document.getElementById('movement-form'));
+            document.getElementById('movement-edit-id').value = id || '';
+            document.getElementById('movement-type').value = type;
+            
+            document.getElementById('search-movement-product').value = '';
+            filterMovementProducts();
+            document.getElementById('search-movement-entity').value = '';
+            filterMovementEntities('');
+
+            if (id) {
+                const m = movements.find(mov => mov.id === id);
+                if (m) {
+                    document.getElementById('movement-type').value = m.type;
+                    document.getElementById('movement-date').value = m.date ? m.date.slice(0, 16) : '';
+                    document.getElementById('movement-product-id').value = m.product_id;
+                    document.getElementById('movement-lote').value = m.lote || '';
+                    document.getElementById('movement-qty').value = m.qty;
+                    document.getElementById('movement-entity-id').value = m.entity_name || '';
+                    document.getElementById('movement-notes').value = m.notes || '';
+                }
+            } else {
+                const now = new Date();
+                const tzOffset = now.getTimezoneOffset() * 60000;
+                document.getElementById('movement-date').value = (new Date(now - tzOffset)).toISOString().slice(0, 16);
+                onMovementProductChange();
+            }
+            onMovementTypeChange();
+            document.getElementById('movement-modal').classList.remove('hidden');
+        }
+        
+        function closeMovementModal() { document.getElementById('movement-modal').classList.add('hidden'); }
+        
+        function onMovementProductChange() { refreshMovementLotOptions(); }
+
+        function refreshMovementLotOptions() {
+            const pId = document.getElementById('movement-product-id').value;
+            const type = document.getElementById('movement-type').value;
+            const sel = document.getElementById('movement-lote-select');
+            const input = document.getElementById('movement-lote');
+            const keep = (input.value || '').trim();
+
+            const list = (lotsByProduct[pId] || []).filter(l =>
+                type === 'entrada' || l.qty > 0 || (keep && l.lote.toLowerCase() === keep.toLowerCase()));
+            let html = list.map(l => `<option value="${esc(l.lote)}">${esc(l.lote)} — ${formatKg(l.qty)}</option>`).join('');
+            if (type === 'entrada') html += '<option value="__new__">➕ Novo lote…</option>';
+            sel.innerHTML = html || '<option value="">Sem lotes com stock</option>';
+
+            const match = keep ? Array.from(sel.options).find(o => o.value.toLowerCase() === keep.toLowerCase()) : null;
+            if (match) sel.value = match.value;
+            else if (type === 'entrada') sel.value = '__new__';
+            else sel.selectedIndex = 0;
+            onMovementLoteSelect(true);
+        }
+
+        function onMovementLoteSelect(fromRefresh) {
+            const sel = document.getElementById('movement-lote-select');
+            const input = document.getElementById('movement-lote');
+            const isNew = sel.value === '__new__';
+            input.classList.toggle('hidden', !isNew);
+            input.required = isNew;
+            if (!isNew) input.value = sel.value;
+            else if (fromRefresh !== true) { input.value = ''; input.focus(); }
+            updateMovementStockInfo();
+        }
+
+        function updateMovementStockInfo() {
+            const pId = document.getElementById('movement-product-id').value;
+            const prod = products.find(p => p.id === pId);
+            const type = document.getElementById('movement-type').value;
+            const qtyInput = document.getElementById('movement-qty');
+            const info = document.getElementById('movement-stock-info');
+            const loteName = document.getElementById('movement-lote').value.trim().toLowerCase();
+            const lot = (lotsByProduct[pId] || []).find(l => l.lote.toLowerCase() === loteName);
+
+            if (prod && type === 'saida' && lot) {
+                let avail = Number(lot.qty);
+                const editId = document.getElementById('movement-edit-id').value;
+                if (editId) {
+                    const m = movements.find(x => x.id === editId);
+                    if (m && m.type === 'saida' && m.lot_id === lot.id) avail += Number(m.qty);
+                }
+                qtyInput.max = avail;
+                info.textContent = `Disponível neste lote: ${formatKg(avail)} (total do produto: ${formatKg(prod.qty)})`;
+                info.classList.remove('hidden');
+            } else {
+                qtyInput.removeAttribute('max');
+                info.classList.add('hidden');
+            }
+        }
+
+        function onMovementTypeChange() {
+            const type = document.getElementById('movement-type').value;
+            const header = document.getElementById('movement-modal-header');
+            const title = document.getElementById('movement-modal-title');
+            const submitBtn = document.getElementById('movement-submit-btn');
+
+            if (type === 'entrada') {
+                header.className = "px-6 py-4 flex items-center justify-between bg-emerald-50 shrink-0";
+                title.className = "font-bold text-emerald-900";
+                submitBtn.className = "px-5 py-2 text-sm text-white rounded-xl bg-emerald-600 hover:bg-emerald-700 font-medium";
+            } else {
+                header.className = "px-6 py-4 flex items-center justify-between bg-rose-50 shrink-0";
+                title.className = "font-bold text-rose-900";
+                submitBtn.className = "px-5 py-2 text-sm text-white rounded-xl bg-rose-600 hover:bg-rose-700 font-medium";
+            }
+            onMovementProductChange();
+        }
+
+        function showToast(message, type = 'success') {
+            const container = document.getElementById('toast-container');
+            const toast = document.createElement('div');
+            toast.className = `flex items-center space-x-2 px-4 py-3 rounded-xl shadow-lg text-sm text-white ${type === 'success' ? 'bg-emerald-600' : 'bg-rose-600'}`;
+            const span = document.createElement('span'); span.textContent = message; toast.appendChild(span);
+            container.appendChild(toast);
+            setTimeout(() => toast.remove(), 3500);
+        }
+
+        // ===== LEITOR DE CÓDIGOS (câmara do telemóvel) =====
+        let scanner = null, scanLock = false, scanHandler = null;
+        function scanStatus(msg, bad) {
+            const el = document.getElementById('scanner-status');
+            if (!el) return;
+            el.textContent = msg;
+            el.className = 'text-xs text-center ' + (bad ? 'text-rose-600 font-medium' : 'text-slate-500');
+        }
+        // handler(code) → devolve null se tratou o código, ou uma mensagem de erro (a câmara continua a ler)
+        async function openScanner(handler) {
+            scanHandler = typeof handler === 'function' ? handler : null;
+            document.getElementById('scanner-modal').classList.remove('hidden');
+            document.getElementById('scanner-manual').value = '';
+            scanLock = false;
+            scheduleIcons();
+            if (!window.Html5Qrcode) { scanStatus('Leitor indisponível (sem ligação à biblioteca). Escreva o código abaixo.', true); return; }
+            if (!window.isSecureContext) { scanStatus('A câmara só funciona em HTTPS. Escreva o código abaixo.', true); return; }
+            scanStatus('A iniciar a câmara…');
+            try {
+                const F = window.Html5QrcodeSupportedFormats;
+                scanner = new Html5Qrcode('scanner-reader', {
+                    formatsToSupport: [F.CODE_128, F.EAN_13, F.EAN_8, F.UPC_A, F.CODE_39, F.QR_CODE],
+                    experimentalFeatures: { useBarCodeDetectorIfSupported: true }, verbose: false
+                });
+                await scanner.start(
+                    { facingMode: 'environment' },
+                    { fps: 10, qrbox: (w, h) => ({ width: Math.floor(Math.min(w * 0.9, 320)), height: Math.floor(Math.min(h * 0.6, 180)) }) },
+                    onScanSuccess, () => {}
+                );
+                scanStatus('Aponte a câmara ao código de barras ou QR da etiqueta.');
+            } catch (err) {
+                console.error(err);
+                const denied = /Permission|NotAllowed|denied/i.test(String(err));
+                scanStatus(denied ? 'Sem permissão para usar a câmara. Autorize-a no browser ou escreva o código abaixo.' : 'Não foi possível iniciar a câmara. Escreva o código abaixo.', true);
+                scanner = null;
+            }
+        }
+        async function closeScanner() {
+            document.getElementById('scanner-modal').classList.add('hidden');
+            scanHandler = null;
+            const sc = scanner; scanner = null;
+            if (sc) { try { await sc.stop(); } catch (e) {} try { sc.clear(); } catch (e) {} }
+        }
+        document.addEventListener('keydown', e => {
+            if (e.key === 'Escape' && !document.getElementById('scanner-modal').classList.contains('hidden')) closeScanner();
+        });
+        function scannerManual() {
+            const v = document.getElementById('scanner-manual').value;
+            if (v.trim()) handleCodigoLido(v);
+        }
+        function onScanSuccess(text) {
+            if (scanLock) return;
+            scanLock = true;
+            setTimeout(() => { scanLock = false; }, 1500);   // evita leituras repetidas do mesmo código
+            handleCodigoLido(text);
+        }
+        // Procura o produto pelo código de barras (ou SKU) e leva à respetiva linha em Produtos
+        function handleCodigoLido(text) {
+            const code = String(text || '').trim().toUpperCase();
+            if (scanHandler) {
+                const h = scanHandler;
+                const err = h(code);
+                if (err) { scanStatus(err, true); return; }
+                if (navigator.vibrate) try { navigator.vibrate(80); } catch (e) {}
+                closeScanner();
+                return;
+            }
+            // 1) código de lote (SKU-LOTE) → só a linha desse lote
+            for (const l of lots) {
+                const lp = products.find(x => String(x.id) === String(l.product_id));
+                if (lp && lotCode(lp, l).toUpperCase() === code) {
+                    if (navigator.vibrate) try { navigator.vibrate(80); } catch (e) {}
+                    closeScanner();
+                    mostrarLoteLido(lp, l);
+                    return;
+                }
+            }
+            // 2) código do produto (etiquetas antigas / do produto) → linha do produto
+            const p = products.find(x => String(x.barcode || '').trim().toUpperCase() === code || String(x.sku || '').trim().toUpperCase() === code);
+            if (!p) { scanStatus(`Código "${code}" não encontrado.`, true); return; }
+            if (navigator.vibrate) try { navigator.vibrate(80); } catch (e) {}
+            closeScanner();
+            mostrarProdutoLido(p);
+        }
+        // Leitura na Entrada / Saída: seleciona o produto e o lote no formulário do movimento
+        function scanParaMovimento(code) {
+            let prod = null, lot = null;
+            for (const l of lots) {
+                const lp = products.find(x => String(x.id) === String(l.product_id));
+                if (lp && lotCode(lp, l).toUpperCase() === code) { prod = lp; lot = l; break; }
+            }
+            if (!prod) prod = products.find(x => String(x.barcode || '').trim().toUpperCase() === code || String(x.sku || '').trim().toUpperCase() === code);
+            if (!prod) return `Código "${code}" não encontrado.`;
+            const type = document.getElementById('movement-type').value;
+            if (type === 'saida' && lot && !(lot.qty > 0)) return `O lote ${lot.lote} está esgotado (sem stock).`;
+            if (type === 'saida' && !lot && !(prod.qty > 0)) return `${prod.name} está esgotado (sem stock).`;
+            document.getElementById('search-movement-product').value = prod.barcode || prod.sku || prod.name || '';
+            filterMovementProducts();
+            document.getElementById('movement-product-id').value = prod.id;
+            document.getElementById('movement-lote').value = lot ? lot.lote : '';
+            onMovementProductChange();
+            showToast(lot ? `${prod.name} · lote ${lot.lote} selecionado.` : `${prod.name} selecionado.`);
+            return null;
+        }
+        function irParaProdutos(p) {
+            const cat = document.getElementById('filter-category'); if (cat) cat.value = '';
+            const zero = document.getElementById('show-zero-stock'); if (zero && Number(p.qty) <= 0) zero.checked = true;
+            const search = document.getElementById('search-product'); if (search) search.value = p.barcode || p.sku || p.name || '';
+            expandedProducts.add(p.id);
+            switchTab('produtos');
+        }
+        function mostrarLoteLido(p, l) {
+            irParaProdutos(p);
+            const q = (document.getElementById('search-product')?.value || '').toLowerCase();
+            focusLot = { pid: p.id, lid: l.id, q };
+            highlightProductId = null; highlightLotId = l.id;
+            renderProductsTable();
+            setTimeout(() => {
+                const row = document.querySelector(`tr[data-lid="${CSS.escape(String(l.id))}"]`);
+                if (row) row.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            }, 60);
+            setTimeout(() => { highlightLotId = null; }, 3000);
+            showToast(`Lote ${l.lote} de ${p.name || p.sku} encontrado.`);
+        }
+        function mostrarProdutoLido(p) {
+            irParaProdutos(p);
+            focusLot = null; highlightLotId = null; highlightProductId = p.id;
+            renderProductsTable();
+            setTimeout(() => {
+                const row = document.querySelector(`tr[data-pid="${CSS.escape(String(p.id))}"]`);
+                if (row) row.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            }, 60);
+            setTimeout(() => { highlightProductId = null; }, 3000);
+            showToast(`${p.name || p.sku} encontrado.`);
+        }
+
+        let highlightProductId = null;
+        // ===== Histórico (produto / entidade / movimento) =====
+        const openProductHistory = new Set(), openEntityHistory = new Set(), openMovHistory = new Set();
+        function toggleHistory(set, id, rerender) {
+            id = String(id);
+            if (set.has(id)) set.delete(id);
+            else { set.add(id); if (!movementsFull) ensureAllMovements().then(rerender); }
+            rerender();
+        }
+        const toggleProductHistory = id => toggleHistory(openProductHistory, id, renderProductsTable);
+        const toggleEntityHistory = id => toggleHistory(openEntityHistory, id, renderEntitiesTable);
+        const toggleMovHistory = id => toggleHistory(openMovHistory, id, renderMovementsTable);
+        function historyBtn(onclick, active, title, pad) {
+            return `<button onclick="${onclick}" title="${title}" class="${pad || 'p-1.5'} transition ${active ? 'text-blue-600' : 'text-slate-400 hover:text-blue-600'}"><i data-lucide="history" class="w-4 h-4"></i></button>`;
+        }
+        const movAsc = (a, b) => String(a.date || '').localeCompare(String(b.date || '')) ||
+            String(a.id).localeCompare(String(b.id), undefined, { numeric: true });
+        function historyDateCell(m) { return esc(formatDateTime(String(m.date || '').slice(0, 16))); }
+        function historyTypeCell(m) {
+            const isIn = m.type === 'entrada';
+            return `<span class="px-2 py-0.5 rounded-full text-[10px] font-semibold ${isIn ? 'bg-emerald-50 text-emerald-700' : 'bg-rose-50 text-rose-700'}">${isIn ? 'Entrada' : 'Saída'}</span>`;
+        }
+        // mode 'product': histórico de um produto (todos os lotes) com saldo; mode 'entity': movimentos de uma entidade
+        function renderHistoryPanel({ mode, title, list, colspan, product, hlId }) {
+            list = list.slice().sort(movAsc);
+            let saldo = 0, entrado = 0, saido = 0;
+            const th = (t, c) => `<th class="py-1 px-2 font-semibold ${c || ''}">${t}</th>`;
+            const rows = list.map(m => {
+                const q = Number(m.qty) || 0, isIn = m.type === 'entrada';
+                if (isIn) { saldo += q; entrado += q; } else { saldo -= q; saido += q; }
+                const hl = hlId != null && String(m.id) === String(hlId) ? 'bg-amber-50' : '';
+                const peso = `<td class="py-1.5 px-2 text-right text-xs font-semibold ${isIn ? 'text-emerald-600' : 'text-rose-600'}">${isIn ? '+' : '-'}${formatKg(q)}</td>`;
+                const lote = `<td class="py-1.5 px-2 font-mono text-xs font-semibold text-blue-700">${esc(m.lote || '-')}</td>`;
+                const notas = `<td class="py-1.5 px-2 text-xs text-slate-600">${esc(m.notes || '')}</td>`;
+                return mode === 'product'
+                    ? `<tr class="border-t border-slate-200/70 ${hl}"><td class="py-1.5 px-2 text-xs text-slate-500 whitespace-nowrap">${historyDateCell(m)}</td><td class="py-1.5 px-2">${historyTypeCell(m)}</td>${lote}${peso}<td class="py-1.5 px-2 text-right text-xs font-bold text-slate-800">${formatKg(saldo)}</td><td class="py-1.5 px-2 text-xs text-slate-600">${esc(m.entity_name || '-')}</td>${notas}</tr>`
+                    : `<tr class="border-t border-slate-200/70 ${hl}"><td class="py-1.5 px-2 text-xs text-slate-500 whitespace-nowrap">${historyDateCell(m)}</td><td class="py-1.5 px-2">${historyTypeCell(m)}</td><td class="py-1.5 px-2 text-xs font-medium text-slate-800">${productNameLink(m)}</td>${lote}${peso}${notas}</tr>`;
+            }).join('');
+            const head = mode === 'product'
+                ? th('Data') + th('Tipo') + th('Lote') + th('Peso', 'text-right') + th('Saldo', 'text-right') + th('Entidade') + th('Notas')
+                : th('Data') + th('Tipo') + th('Produto') + th('Lote') + th('Peso', 'text-right') + th('Notas');
+            const resumo = list.length
+                ? `<p class="text-[11px] text-slate-500 mb-1">${list.length} movimento(s) &nbsp;|&nbsp; Entrado ${formatKg(entrado)} · Saído ${formatKg(saido)}${mode === 'product' ? ` · <strong>Saldo ${formatKg(saldo)}</strong>` : ''}</p>` : '';
+            const warn = mode === 'product' && product && list.length && Math.abs(saldo - Number(product.qty)) > 0.005
+                ? `<p class="text-[11px] text-amber-700 bg-amber-50 border border-amber-200 rounded-lg p-2 mt-2">O saldo dos movimentos (${formatKg(saldo)}) difere do stock do produto (${formatKg(product.qty)}). Pode haver ajustes ou movimentos antigos não registados.</p>` : '';
+            const loading = !movementsFull ? '<p class="text-[11px] text-slate-400 mt-1">A carregar o histórico completo…</p>' : '';
+            return `<tr class="bg-white no-print"><td colspan="${colspan}" class="px-4 py-3 border-t border-slate-200">
+                <div class="max-w-5xl">
+                    <div class="text-xs font-semibold text-slate-600 mb-1">${esc(title)}</div>
+                    ${resumo}
+                    ${list.length ? `<div class="overflow-x-auto"><table class="w-full text-left"><thead><tr class="text-[11px] text-slate-400">${head}</tr></thead><tbody>${rows}</tbody></table></div>`
+                        : '<p class="text-xs text-slate-400 py-1">Sem movimentos registados.</p>'}
+                    ${warn}${loading}
+                </div></td></tr>`;
+        }
+        function productHistoryPanel(productId, colspan, hlId) {
+            const p = products.find(x => String(x.id) === String(productId));
+            const list = movements.filter(m => String(m.product_id) === String(productId));
+            return renderHistoryPanel({ mode: 'product', title: `Histórico de ${p ? p.name : (list[0] && list[0].product_name) || 'produto'}`, list, colspan, product: p, hlId });
+        }
+        function entityHistoryPanel(e, colspan) {
+            const name = String(e.name || '').trim().toLowerCase();
+            const list = movements.filter(m => String(m.entity_name || '').trim().toLowerCase() === name);
+            return renderHistoryPanel({ mode: 'entity', title: `Movimentos de ${e.name}`, list, colspan });
+        }
+
+        function productNameLink(m, cls) {
+            const name = esc(m.product_name);
+            if (!m.product_id || !products.some(p => String(p.id) === String(m.product_id))) return name;
+            return `<button type="button" onclick="goToProduct('${esc(m.product_id)}')" title="Ver na lista de produtos" class="text-left ${cls || ''} hover:text-blue-600 hover:underline underline-offset-2 transition">${name}</button>`;
+        }
+        function goToProduct(id) {
+            const p = products.find(x => String(x.id) === String(id));
+            if (!p) return;
+            const cat = document.getElementById('filter-category'); if (cat) cat.value = '';
+            const search = document.getElementById('search-product'); if (search) search.value = p.name || p.barcode || '';
+            highlightProductId = p.id;
+            switchTab('produtos');
+            renderProductsTable();
+            setTimeout(() => {
+                const row = document.querySelector(`tr[data-pid="${CSS.escape(String(p.id))}"]`);
+                if (row) row.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            }, 60);
+            setTimeout(() => { highlightProductId = null; }, 3000);
+        }
+
+        function renderAlerts() {
+            const low = products.filter(p => p.qty <= p.min);
+            const badge = document.getElementById('badge-alertas');
+            if (low.length > 0) { badge.textContent = low.length; badge.classList.remove('hidden'); } else badge.classList.add('hidden');
+            
+            document.getElementById('alerts-container').innerHTML = low.length === 0 
+                ? `<div class="col-span-full p-6 text-center text-emerald-600 font-medium bg-emerald-50 rounded-xl">Stock seguro!</div>` 
+                : low.map(p => `
+                <div class="bg-rose-50/50 p-4 rounded-xl border border-rose-200">
+                    <span class="font-mono text-xs font-semibold text-rose-700">${esc(p.sku)}</span>
+                    <h4 class="font-bold text-slate-900 mt-1">${esc(p.name)}</h4>
+                    <div class="mt-2 text-xs text-slate-600">Atual: <strong class="text-rose-700">${formatKg(p.qty)}</strong> | Mínimo: ${formatKg(p.min)}</div>
+                    <button onclick="goToProduct('${esc(p.id)}')" class="mt-3 inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-rose-700 bg-white border border-rose-200 rounded-lg hover:bg-rose-100 transition no-print">
+                        <i data-lucide="external-link" class="w-3.5 h-3.5"></i> Ver / editar produto
+                    </button>
+                </div>
+            `).join('');
+        }
+
+        function renderReports() {
+            const totalWeight = products.reduce((acc, p) => acc + p.qty, 0);
+            const totalCost = products.reduce((acc, p) => acc + (p.qty * p.cost), 0);
+            const totalSales = products.reduce((acc, p) => acc + (p.qty * p.price), 0);
+
+            document.getElementById('report-weight-value').textContent = formatKg(totalWeight);
+            document.getElementById('report-cost-value').textContent = formatEuro(totalCost);
+            document.getElementById('report-sales-value').textContent = formatEuro(totalSales);
+
+            const map = {};
+            products.forEach(p => {
+                if (!map[p.category]) map[p.category] = { c: 0, q: 0, cost: 0, sales: 0 };
+                map[p.category].c++; map[p.category].q += p.qty;
+                map[p.category].cost += p.qty * p.cost; map[p.category].sales += p.qty * p.price;
+            });
+
+            document.getElementById('report-category-table').innerHTML = Object.keys(map).map(cat => `
+                <tr class="hover:bg-slate-50"><td class="py-3 px-4">${esc(cat)}</td><td class="text-center">${map[cat].c}</td>
+                <td class="text-center">${formatKg(map[cat].q)}</td><td class="text-right">${formatEuro(map[cat].cost)}</td>
+                <td class="text-right">${formatEuro(map[cat].sales)}</td></tr>`).join('');
+        }
+
+        async function exportBackupJSON() {
+            await ensureAllMovements();
+            downloadBlob(JSON.stringify({ products, entities, movements }, null, 2), 'backup.json', 'application/json');
+        }
+
+        function exportCSV() {
+            const header = ['SKU','Barcode','Nome','Categoria','Lote','Localização','Stock lote (kg)','Stock produto (kg)','Mín (kg)','Custo/kg','Venda/kg'].map(csvCell).join(';');
+            const rows = [];
+            products.forEach(p => {
+                const act = (lotsByProduct[p.id] || []).filter(l => l.qty > 0);
+                if (!act.length) rows.push([p.sku, p.barcode, p.name, p.category, '', p.location, 0, p.qty, p.min, p.cost, p.price].map(csvCell).join(';'));
+                act.forEach(l => rows.push([p.sku, p.barcode, p.name, p.category, l.lote, l.location || p.location, l.qty, p.qty, p.min, p.cost, p.price].map(csvCell).join(';')));
+            });
+            downloadBlob('\uFEFF' + [header, ...rows].join('\r\n'), 'inventario.csv', 'text/csv;charset=utf-8');
+        }
+
+        async function exportMovementsCSV() {
+            await ensureAllMovements();
+            const header = ['Data','Tipo','Produto','Lote','Qtd (kg)','Entidade','Observações','Registado por'].map(csvCell).join(';');
+            const rows = movements.map(m => [m.date, m.type, m.product_name, m.lote, m.qty, m.entity_name, m.notes, m.created_by].map(csvCell).join(';'));
+            downloadBlob('\uFEFF' + [header, ...rows].join('\r\n'), 'movimentos.csv', 'text/csv;charset=utf-8');
+        }
+
+        function setPrintHeader(title) {
+            cleanupLabelPrint();
+            const t = document.getElementById('print-report-title');
+            const d = document.getElementById('print-report-date');
+            if (t) t.textContent = title;
+            if (d) d.textContent = `Emissão: ${new Date().toLocaleDateString('pt-PT')}`;
+        }
+        function printProductsPDF() { setPrintHeader('Oliveira & Gonçalves - Relatório de Produtos'); window.print(); }
+        function printEntitiesPDF() { setPrintHeader('Oliveira & Gonçalves - Relatório de Entidades'); window.print(); }
+
+        function printMovementsPDF() {
+            const startDate = document.getElementById('filter-movement-start-date')?.value;
+            const endDate = document.getElementById('filter-movement-end-date')?.value;
+            const titleElem = document.getElementById('print-report-title');
+            const dateElem = document.getElementById('print-report-date');
+
+            if (titleElem) titleElem.textContent = 'Oliveira & Gonçalves - Relatório de Movimentos de Armazém';
+            if (dateElem) {
+                if (startDate || endDate) {
+                    const formattedStart = startDate ? startDate.split('-').reverse().join('/') : 'Início';
+                    const formattedEnd = endDate ? endDate.split('-').reverse().join('/') : 'Atualidade';
+                    dateElem.textContent = `Movimentos do Período: ${formattedStart} a ${formattedEnd}`;
+                } else {
+                    dateElem.textContent = `Emissão: ${new Date().toLocaleDateString('pt-PT')}`;
+                }
+            }
+
+            window.print();
+        }
+    </script>
+</body>
+</html>
