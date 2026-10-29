@@ -2883,7 +2883,60 @@
             if (t) t.textContent = title;
             if (d) d.textContent = `Emissão: ${new Date().toLocaleDateString('pt-PT')}`;
         }
-        function printProductsPDF() { setPrintHeader('Oliveira & Gonçalves - Relatório de Produtos'); window.print(); }
+        // Impressão dos produtos: A4 horizontal, tabela própria (1 linha por produto + 1 linha por lote com stock).
+        // Respeita a pesquisa, a categoria e a caixa "Mostrar esgotados" do ecrã.
+        function printProductsPDF() {
+            const query = (document.getElementById('search-product')?.value || '').toLowerCase();
+            const catFilter = document.getElementById('filter-category')?.value || '';
+            const showZero = !!document.getElementById('show-zero-stock')?.checked;
+            const list = products.filter(p => {
+                if (catFilter !== '' && p.category !== catFilter) return false;
+                if (!showZero && Number(p.qty) <= 0) return false;
+                return !query || productOwnMatch(p, query) || productLotMatch(p, query);
+            });
+            if (!list.length) { showToast('Não há produtos para imprimir.', 'error'); return; }
+
+            const keep = '-webkit-print-color-adjust:exact;print-color-adjust:exact;';
+            const hd = `background:#e2e8f0;font-weight:700;${keep}`;
+            let totQty = 0, nLotes = 0;
+            const body = list.map(p => {
+                totQty += Number(p.qty) || 0;
+                let ls = (lotsByProduct[p.id] || []).filter(l => l.qty > 0);
+                if (query && !productOwnMatch(p, query)) ls = ls.filter(l => l.lote.toLowerCase().includes(query) || lotSupplier(l).toLowerCase().includes(query));
+                nLotes += ls.length;
+                const head = `<tr style="page-break-after:avoid">
+                    <td style="${hd}">${esc(p.sku || '-')}${p.barcode ? `<br><span style="font-weight:400">${esc(p.barcode)}</span>` : ''}</td>
+                    <td style="${hd}">${esc(p.name || '-')}</td>
+                    <td style="${hd}">${esc(p.category || '-')}</td>
+                    <td style="${hd}">${esc(p.location || '-')}</td>
+                    <td class="num" style="${hd}">${formatKg(p.qty)}</td>
+                    <td class="num" style="${hd}">${formatKg(p.min)}</td>
+                    <td class="num" style="${hd}">${formatEuro(p.cost)}</td>
+                    <td class="num" style="${hd}">${formatEuro(p.price)}</td>
+                </tr>`;
+                const rows = ls.map(l => `<tr>
+                    <td style="padding-left:14px !important;font-family:monospace"><b>${esc(l.lote)}</b></td>
+                    <td>${esc(lotSupplier(l) || '-')}</td>
+                    <td style="white-space:nowrap">${esc(formatDate(l.created_at))}</td>
+                    <td>${esc(l.location || p.location || '-')}</td>
+                    <td class="num">${formatKg(l.qty)}</td>
+                    <td colspan="3"></td>
+                </tr>`).join('');
+                return head + rows;
+            }).join('');
+            document.getElementById('printable-list-area').innerHTML = `<table style="table-layout:fixed;width:100%">
+                <colgroup><col style="width:14%"><col style="width:30%"><col style="width:13%"><col style="width:12%"><col style="width:11%"><col style="width:7%"><col style="width:6.5%"><col style="width:6.5%"></colgroup>
+                <thead><tr><th>SKU / Lote</th><th>Descrição / Fornecedor</th><th>Categoria / Criado</th><th>Localização</th><th class="num">Stock</th><th class="num">Mín.</th><th class="num">P. Custo</th><th class="num">P. Venda</th></tr></thead>
+                <tbody>${body}</tbody></table>
+                <p style="margin-top:8px;font-size:11px;color:#475569;"><b>Total:</b> ${list.length} ${list.length === 1 ? 'produto' : 'produtos'} · ${nLotes} ${nLotes === 1 ? 'lote' : 'lotes'} · ${formatKg(totQty)}</p>`;
+
+            setPrintHeader('Oliveira & Gonçalves - Relatório de Produtos');   // também limpa o modo etiquetas/lista
+            let st = document.getElementById('label-page-style');
+            if (!st) { st = document.createElement('style'); st.id = 'label-page-style'; document.head.appendChild(st); }
+            st.textContent = '@page { size: A4 landscape; margin: 10mm; }';
+            document.body.classList.add('printing-list');
+            window.print();
+        }
         function printEntitiesPDF() { setPrintHeader('Oliveira & Gonçalves - Relatório de Entidades'); window.print(); }
 
         // Impressão dos movimentos (respeita a pesquisa e as datas): Data | Produto | Lote | Peso | Entidade — A4 horizontal

@@ -719,6 +719,9 @@
                         <button onclick="openScanner()" class="inline-flex items-center space-x-1.5 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-medium px-3.5 py-2.5 rounded-xl transition shadow-sm no-print">
                             <i data-lucide="scan-barcode" class="w-4 h-4"></i><span>Ler código</span>
                         </button>
+                        <button onclick="openBulkSupplierModal()" title="Trocar o nome do fornecedor em todos os lotes e entradas de uma vez" class="inline-flex items-center space-x-1.5 bg-amber-500 hover:bg-amber-600 text-white text-xs font-medium px-3.5 py-2.5 rounded-xl transition shadow-sm no-print">
+                            <i data-lucide="replace" class="w-4 h-4"></i><span>Trocar fornecedor</span>
+                        </button>
                         <button onclick="printStock()" class="bg-slate-800 hover:bg-slate-900 text-white text-xs font-medium px-3.5 py-2.5 rounded-xl transition flex items-center space-x-1.5 shadow-sm no-print">
                             <i data-lucide="printer" class="w-4 h-4"></i> <span>Imprimir Tabela</span>
                         </button>
@@ -1044,6 +1047,33 @@
                 <div class="flex items-center gap-2">
                     <input type="text" id="scanner-manual" autocomplete="off" autocapitalize="characters" placeholder="Ou escreva / leia o código (Enter)" onkeydown="if(event.key==='Enter'){event.preventDefault();scannerManual();}" class="flex-1 px-3 py-2 text-sm border border-slate-200 rounded-xl outline-none">
                     <button type="button" onclick="scannerManual()" class="px-4 py-2 text-sm text-white bg-indigo-600 hover:bg-indigo-700 rounded-xl font-medium">Abrir</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL: trocar fornecedor em lote -->
+    <div id="bulk-supplier-modal" class="fixed inset-0 bg-slate-900/50 backdrop-blur-xs z-50 flex items-center justify-center p-4 hidden no-print">
+        <div class="bg-white rounded-2xl shadow-xl max-w-lg w-full border border-slate-200 max-h-[90vh] flex flex-col my-auto">
+            <div class="px-6 py-4 border-b border-slate-100 flex items-center justify-between bg-amber-50 shrink-0">
+                <h3 class="font-bold text-amber-900 text-base">Trocar fornecedor em lote</h3>
+                <button onclick="closeBulkSupplierModal()" class="text-slate-400 hover:text-slate-600 p-1"><i data-lucide="x" class="w-5 h-5"></i></button>
+            </div>
+            <div class="p-6 space-y-4 overflow-y-auto custom-scrollbar flex-1">
+                <div>
+                    <label class="block text-xs font-medium mb-1">Fornecedor a substituir (como está hoje)</label>
+                    <select id="bulk-from" onchange="updateBulkSupplierInfo()" class="w-full px-3 py-2 text-sm border rounded-xl bg-white"></select>
+                </div>
+                <div>
+                    <label class="block text-xs font-medium mb-1">Novo fornecedor (entidade)</label>
+                    <input type="text" id="bulk-to-search" oninput="fillEntitySelect('bulk-to', 'bulk-to-search', null, null, true); updateBulkSupplierInfo()" autocomplete="off" placeholder="🔍 Pesquisar entidade..." class="w-full px-3 py-2 mb-2 text-sm bg-slate-50 border border-slate-200 rounded-xl outline-none">
+                    <select id="bulk-to" size="5" onchange="updateBulkSupplierInfo()" class="w-full px-2 py-1 text-sm border border-slate-200 rounded-xl outline-none"></select>
+                </div>
+                <p id="bulk-info" class="text-xs text-slate-600 bg-slate-50 border border-slate-200 rounded-lg p-2.5"></p>
+                <p class="text-[11px] text-slate-500">Altera o fornecedor dos lotes e o nome da entidade nas <strong>entradas</strong> (as saídas e os ajustes não são tocados). Não altera quem fez o último movimento.</p>
+                <div class="flex justify-end gap-2 pt-1">
+                    <button type="button" onclick="closeBulkSupplierModal()" class="px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-100 rounded-xl">Cancelar</button>
+                    <button type="button" id="bulk-apply-btn" onclick="applyBulkSupplier()" class="px-4 py-2 text-sm font-medium text-white bg-amber-500 hover:bg-amber-600 rounded-xl disabled:opacity-50">Aplicar a tudo</button>
                 </div>
             </div>
         </div>
@@ -2569,6 +2599,55 @@
             outro.classList.toggle('hidden', !show);
             if (show && user) outro.focus();
         }
+        // ===== TROCAR FORNECEDOR EM LOTE =====
+        function bulkCounts(from) {
+            const nLotes = lotes.filter(l => String(fornecedorLote(l) || '').trim() === from).length;
+            const nEntradas = movimentos.filter(m => m.type === 'entrada' && String(m.entity_name || '').trim() === from).length;
+            return { nLotes, nEntradas };
+        }
+        function openBulkSupplierModal() {
+            const names = new Map();   // nome -> nº de ocorrências
+            for (const l of lotes) { const f = String(fornecedorLote(l) || '').trim(); if (f) names.set(f, (names.get(f) || 0) + 1); }
+            for (const m of movimentos) { const f = String(m.entity_name || '').trim(); if (m.type === 'entrada' && f && !names.has(f)) names.set(f, 0); }
+            const list = [...names.keys()].sort((a, b) => a.localeCompare(b, 'pt', { numeric: true }));
+            document.getElementById('bulk-from').innerHTML = '<option value="">— Selecione —</option>' + list.map(n => {
+                const c = bulkCounts(n);
+                return `<option value="${esc(n)}">${esc(n)}  (${c.nLotes} lotes · ${c.nEntradas} entradas)</option>`;
+            }).join('');
+            document.getElementById('bulk-to-search').value = '';
+            fillEntitySelect('bulk-to', 'bulk-to-search', null, '');
+            updateBulkSupplierInfo();
+            document.getElementById('bulk-supplier-modal').classList.remove('hidden');
+            scheduleIcons();
+        }
+        function closeBulkSupplierModal() { document.getElementById('bulk-supplier-modal').classList.add('hidden'); }
+        function updateBulkSupplierInfo() {
+            const from = document.getElementById('bulk-from').value, to = document.getElementById('bulk-to').value;
+            const info = document.getElementById('bulk-info'), btn = document.getElementById('bulk-apply-btn');
+            if (!from || !to) { info.textContent = 'Escolha o fornecedor a substituir e o novo fornecedor.'; btn.disabled = true; return; }
+            if (from === to) { info.textContent = 'Os dois nomes são iguais.'; btn.disabled = true; return; }
+            const c = bulkCounts(from);
+            info.innerHTML = `<strong>${esc(from)}</strong> → <strong>${esc(to)}</strong><br>Vão ser alterados ${c.nLotes} lote(s) e ${c.nEntradas} entrada(s).`;
+            btn.disabled = !(c.nLotes || c.nEntradas);
+        }
+        async function applyBulkSupplier() {
+            const from = document.getElementById('bulk-from').value, to = document.getElementById('bulk-to').value;
+            if (!from || !to || from === to) return;
+            const c = bulkCounts(from);
+            if (!confirm(`Trocar "${from}" por "${to}" em ${c.nLotes} lote(s) e ${c.nEntradas} entrada(s)?`)) return;
+            const btn = document.getElementById('bulk-apply-btn');
+            btn.disabled = true;
+            // sem updated_by/updated_at: não passa a constar como "último utilizador" de todos os lotes
+            let { error } = await db.from('malha').update({ fornecedor: to }).eq('fornecedor', from);
+            if (!error) ({ error } = await db.from('malha_movimentos').update({ entity_name: to }).eq('type', 'entrada').eq('entity_name', from));
+            btn.disabled = false;
+            if (error) { console.error(error); showToast('Erro ao trocar o fornecedor: ' + (error.message || ''), 'error'); await loadData(); refreshAll(); return; }
+            showToast('Fornecedor trocado em ' + c.nLotes + ' lote(s) e ' + c.nEntradas + ' entrada(s).');
+            await loadData();
+            refreshAll();
+            closeBulkSupplierModal();
+        }
+
         function closeEditMovModal() { document.getElementById('edit-mov-modal').classList.add('hidden'); }
 
         async function handleEditMovSubmit(e) {
@@ -2754,28 +2833,105 @@
             document.getElementById('print-report-title').textContent = title;
             document.getElementById('print-report-date').textContent = `Emissão: ${new Date().toLocaleDateString('pt-PT')}`;
         }
-        function printStock() { setPrintHeader('Oliveira & Gonçalves - Stock de Malha em Cru'); window.print(); }
-        function printEntities() { setPrintHeader('Oliveira & Gonçalves - Relatório de Entidades'); window.print(); }
-        function printReport() { setPrintHeader('Oliveira & Gonçalves - Relatório de Malha em Cru'); window.print(); }
-        let movPrintRestore = false;
-        function printMovimentos() {
-            setPrintHeader('Oliveira & Gonçalves - Movimentos de Malha em Cru');
-            const s = document.getElementById('filter-mov-start').value, f = document.getElementById('filter-mov-end').value;
-            if (s || f) document.getElementById('print-report-date').textContent =
-                `Movimentos do Período: ${s ? s.split('-').reverse().join('/') : 'Início'} a ${f ? f.split('-').reverse().join('/') : 'Atualidade'}`;
-            // imprime TODOS os movimentos filtrados (não só os 100 visíveis no ecrã)
-            movLimit = Infinity; movPrintRestore = true;
-            renderMovimentos();
+        // Impressão do stock atual: A4 horizontal, tabela própria (agrupada por designação, até 2 linhas por lote).
+        // Respeita a pesquisa e os filtros de tear / fornecedor do ecrã.
+        function printStock() {
+            const q = (document.getElementById('search-stock')?.value || '').toLowerCase();
+            const fl = fillStockFilters();
+            const base = (fl.tear || fl.forn)
+                ? lotes.filter(l => (!fl.tear || String(l.tear || '').trim() === fl.tear) && (!fl.forn || String(fornecedorLote(l) || '').trim() === fl.forn))
+                : lotes;
+            const mapa = mapaUltimoMov();
+            const has = vals => vals.some(v => String(v || '').toLowerCase().includes(q));
+            const grupos = new Map();
+            for (const l of base) {
+                const k = malhaKey(l);
+                if (!grupos.has(k)) grupos.set(k, { nome: malhaNome(l), lotes: [] });
+                grupos.get(k).lotes.push(l);
+            }
+            const lista = [];
+            for (const g of grupos.values()) {
+                let ls = g.lotes.filter(l => l.rolos > 0);                 // só lotes com stock
+                if (q && !has([g.nome])) ls = ls.filter(l => has(loteSearchFields(l, mapa)));
+                if (!ls.length) continue;
+                ls.sort((a, b) => String(b.created_at).localeCompare(String(a.created_at)));
+                lista.push({ nome: g.nome, lotes: ls });
+            }
+            lista.sort((a, b) => a.nome.localeCompare(b.nome, 'pt'));
+            if (!lista.length) { showToast('Não há stock para imprimir.', 'error'); return; }
+
+            const QC = { '1a': '1.ª Qualidade', '2a': '2.ª Qualidade', 'Hold': 'Aguardar QC' };
+            const sum = (arr, f) => arr.reduce((a, l) => a + (Number(l[f]) || 0), 0);
+            const keep = '-webkit-print-color-adjust:exact;print-color-adjust:exact;';
+            let nLotes = 0, totR = 0, totP = 0;
+            const body = lista.map(g => {
+                const r = sum(g.lotes, 'rolos'), p = sum(g.lotes, 'peso');
+                nLotes += g.lotes.length; totR += r; totP += p;
+                const head = `<tr style="page-break-after:avoid"><td colspan="6" style="background:#e2e8f0;font-weight:700;${keep}">${esc(g.nome)} <span style="font-weight:400">· ${g.lotes.length} ${g.lotes.length === 1 ? 'lote' : 'lotes'}</span></td>
+                    <td class="num" style="background:#e2e8f0;font-weight:700;${keep}">${r}</td>
+                    <td class="num" style="background:#e2e8f0;font-weight:700;${keep}">${esc(formatKg(p))}</td></tr>`;
+                const rows = g.lotes.map(l => `<tr>
+                    <td><b style="font-family:monospace">${esc(l.sku || '-')}</b><br>OF: ${esc(l.of_num || '-')}</td>
+                    <td>${esc(l.tear || '-')}<br>${esc(l.ne_fio || '-')}</td>
+                    <td><b>${esc(l.jogo || '-')}</b><br>${esc(l.lote_fio || '-')}</td>
+                    <td>${esc(fornecedorLote(l) || '-')}</td>
+                    <td>${esc(l.localizacao || '-')}<br>${esc(QC[l.classificacao] || l.classificacao || '-')}</td>
+                    <td style="white-space:nowrap">${esc(fmtData(l.created_at))}</td>
+                    <td class="num"><b>${esc(l.rolos)}</b><br>/ ${esc(l.rolos_inicial)}</td>
+                    <td class="num"><b>${esc(formatKg(l.peso))}</b></td>
+                </tr>`).join('');
+                return head + rows;
+            }).join('');
+            document.getElementById('printable-list-area').innerHTML = `<table style="table-layout:fixed;width:100%">
+                <colgroup><col style="width:11%"><col style="width:9%"><col style="width:11%"><col style="width:26%"><col style="width:14%"><col style="width:9%"><col style="width:7%"><col style="width:13%"></colgroup>
+                <thead><tr><th>SKU / OF</th><th>Tear / NE</th><th>Jogo / Lote Fio</th><th>Fornecedor</th><th>Local / Qualidade</th><th>Entrada</th><th class="num">Rolos</th><th class="num">Peso Líq.</th></tr></thead>
+                <tbody>${body}</tbody></table>
+                <p style="margin-top:8px;font-size:11px;color:#475569;"><b>Total:</b> ${nLotes} ${nLotes === 1 ? 'lote' : 'lotes'} · ${totR} rolos · ${esc(formatKg(totP))}</p>`;
+
+            setPrintHeader('Oliveira & Gonçalves - Stock de Malha em Cru');   // também limpa o modo etiquetas/lista
             let st = document.getElementById('label-page-style');
             if (!st) { st = document.createElement('style'); st.id = 'label-page-style'; document.head.appendChild(st); }
             st.textContent = '@page { size: A4 landscape; margin: 10mm; }';
-            document.body.classList.add('printing-mov');
+            document.body.classList.add('printing-list');
             window.print();
         }
-        window.addEventListener('afterprint', () => {
-            document.body.classList.remove('printing-mov');
-            if (movPrintRestore) { movPrintRestore = false; movLimit = 100; renderMovimentos(); }
-        });
+        function printEntities() { setPrintHeader('Oliveira & Gonçalves - Relatório de Entidades'); window.print(); }
+        function printReport() { setPrintHeader('Oliveira & Gonçalves - Relatório de Malha em Cru'); window.print(); }
+        // Impressão dos movimentos (igual ao index): Data | Artigo | Lote | Peso | Entidade — A4 horizontal.
+        // Respeita a pesquisa e as datas e imprime TODOS os movimentos filtrados.
+        function printMovimentos() {
+            const list = filteredMovimentos().slice().sort((a, b) =>
+                String(a.date || '').localeCompare(String(b.date || '')) ||
+                String(a.id).localeCompare(String(b.id), undefined, { numeric: true }));
+            if (!list.length) { showToast('Não há movimentos para imprimir.', 'error'); return; }
+
+            const body = list.map(m => {
+                const hora = fmtHora(m.date).slice(0, 5);
+                return `<tr>
+                    <td style="white-space:nowrap">${esc(fmtData(m.date))}${hora ? ' ' + esc(hora) : ''}</td>
+                    <td>${esc(artigoDoMov(m))}</td>
+                    <td style="word-break:break-all">${esc(loteDoMov(m))}</td>
+                    <td class="num">${movPositivo(m) ? '+' : '-'}${esc(formatKg(m.peso))}</td>
+                    <td>${esc(m.entity_name || '-')}</td>
+                </tr>`;
+            }).join('');
+            document.getElementById('printable-list-area').innerHTML = `<table style="table-layout:fixed;width:100%">
+                <colgroup><col style="width:14%"><col style="width:34%"><col style="width:16%"><col style="width:14%"><col style="width:22%"></colgroup>
+                <thead><tr><th>Data</th><th>Artigo</th><th>Lote</th><th class="num">Peso</th><th>Entidade</th></tr></thead>
+                <tbody>${body}</tbody></table>
+                <p style="margin-top:8px;font-size:11px;color:#475569;">${list.length} ${list.length === 1 ? 'movimento' : 'movimentos'}</p>`;
+
+            setPrintHeader('Oliveira & Gonçalves - Movimentos de Malha em Cru');   // também limpa o modo etiquetas/lista
+            const s = document.getElementById('filter-mov-start').value, f = document.getElementById('filter-mov-end').value;
+            if (s || f) document.getElementById('print-report-date').textContent =
+                `Movimentos do Período: ${s ? s.split('-').reverse().join('/') : 'Início'} a ${f ? f.split('-').reverse().join('/') : 'Atualidade'}`;
+            // A4 horizontal (o estilo é removido no afterprint, tal como o das etiquetas)
+            let st = document.getElementById('label-page-style');
+            if (!st) { st = document.createElement('style'); st.id = 'label-page-style'; document.head.appendChild(st); }
+            st.textContent = '@page { size: A4 landscape; margin: 10mm; }';
+            document.body.classList.add('printing-list');
+            window.print();
+        }
 
         // ===== EXPORTAR =====
         function exportBackupJSON() {
