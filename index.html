@@ -1314,6 +1314,7 @@
             if (i >= 0) movements.splice(i, 1);
             const oldest = movements.length ? movements[movements.length - 1].date : '';
             // Se o histórico ainda não está todo carregado, ignora movimentos mais antigos que a janela atual
+            movVersion++;
             if (movementsFull || !oldest || String(m.date || '') >= String(oldest)) { movements.push(m); sortMovements(); }
         }
 
@@ -1699,6 +1700,8 @@
             if (palete) row.palete = palete;
             else if (editId) { const old = movements.find(x => String(x.id) === String(editId)); if (old && old.palete) row.palete = null; }
 
+            const loteKey = lote.trim().toLowerCase();
+            const lotExisted = lots.some(l => String(l.product_id) === String(product_id) && String(l.lote).toLowerCase() === loteKey);
             btn.disabled = true;
             const { data: savedRows, error } = editId
                 ? await db.from('movements').update(row).eq('id', editId).select()
@@ -1712,8 +1715,8 @@
             const saved = savedRows && savedRows[0];
             if (saved) upsertLocalMovement(saved);
             await loadData({ products: true, lots: true, movements: !saved });
-            // Entrada: se o lote ainda não tem fornecedor, fica com a entidade desta entrada
-            if (!editId && type === 'entrada' && entity_name) {
+            // Entrada que cria um lote novo: o fornecedor do lote é a entidade desta 1.ª entrada (entradas seguintes não o alteram)
+            if (!editId && type === 'entrada' && entity_name && !lotExisted) {
                 const newLot = lots.find(l => l.product_id === product_id && String(l.lote).toLowerCase() === lote.trim().toLowerCase());
                 if (newLot && !newLot.supplier) {
                     const { error: supErr } = await db.from('lots').update({ supplier: entity_name }).eq('id', newLot.id);
@@ -1811,7 +1814,7 @@
                    (p.barcode && p.barcode.toLowerCase().includes(query));
         }
         function productLotMatch(p, query) {
-            return (lotsByProduct[p.id] || []).some(l => l.lote.toLowerCase().includes(query) || (l.supplier && l.supplier.toLowerCase().includes(query)));
+            return (lotsByProduct[p.id] || []).some(l => l.lote.toLowerCase().includes(query) || lotSupplier(l).toLowerCase().includes(query));
         }
 
         function toggleLots(id) {
@@ -1837,6 +1840,36 @@
                 if (!movementsFull) ensureAllMovements().then(() => renderProductsTable());
             }
             renderProductsTable();
+        }
+        // Fornecedor do lote = entidade da PRIMEIRA entrada desse lote (nunca a do último movimento)
+        let movVersion = 0, supCache = null, supCacheKey = '', supRefreshQueued = false;
+        function firstEntrySuppliers() {
+            const key = movVersion + '|' + movements.length + '|' + (movements[0] ? movements[0].id : '');
+            if (supCache && supCacheKey === key) return supCache;
+            const first = new Map();   // chave -> movimento de entrada mais antigo
+            for (const m of movements) {
+                if (m.type !== 'entrada' || !String(m.entity_name || '').trim()) continue;
+                const k = (m.lot_id != null && m.lot_id !== '') ? 'id:' + m.lot_id
+                    : 'pl:' + m.product_id + '|' + String(m.lote || '').trim().toLowerCase();
+                const cur = first.get(k);
+                if (!cur || movAsc(m, cur) < 0) first.set(k, m);
+            }
+            supCache = new Map([...first].map(([k, m]) => [k, m.entity_name]));
+            supCacheKey = key;
+            return supCache;
+        }
+        // O fornecedor gravado no lote (editável) manda; só se estiver vazio se usa a entidade da 1.ª entrada
+        function lotSupplier(l) {
+            if (!l) return '';
+            if (l.supplier) return l.supplier;
+            if (!movementsFull && !movementsLoadFailed && !supRefreshQueued) {
+                supRefreshQueued = true;
+                ensureAllMovements(true).then(() => { supRefreshQueued = false; if (movementsFull) renderProductsTable(); });
+            }
+            const map = firstEntrySuppliers();
+            return map.get('id:' + l.id)
+                || map.get('pl:' + l.product_id + '|' + String(l.lote || '').trim().toLowerCase())
+                || '';
         }
         function lotMovements(l) {
             const lote = String(l.lote || '').trim().toLowerCase();
@@ -1905,7 +1938,7 @@
                     <td class="py-2 px-3 font-mono text-xs font-semibold text-blue-700"><label class="inline-flex items-center gap-2 cursor-pointer"><input type="checkbox" class="lb-check no-print w-4 h-4 rounded border-slate-300 text-blue-600 cursor-pointer" data-key="l:${esc(l.id)}" ${labelChecked('l:' + l.id)} onchange="toggleLabelSel(this.dataset.key, this)" title="Selecionar para a folha de etiquetas">${esc(l.lote)}</label></td>
                     <td class="py-2 px-3 text-right text-sm font-semibold ${l.qty <= 0 ? 'text-slate-400' : 'text-slate-800'}">${formatKg(l.qty)}</td>
                     <td class="py-2 px-3 text-xs ${l.location ? 'text-slate-700 font-medium' : 'text-slate-400 italic'}">${esc(l.location || p.location || '-')}</td>
-                    <td class="py-2 px-3 text-xs ${l.supplier ? 'text-slate-700 font-medium' : 'text-slate-400'}">${esc(l.supplier || '-')}</td>
+                    <td class="py-2 px-3 text-xs ${lotSupplier(l) ? 'text-slate-700 font-medium' : 'text-slate-400'}">${esc(lotSupplier(l) || '-')}</td>
                     <td class="py-2 px-3 text-xs text-slate-400">${formatDate(l.created_at)}</td>
                     <td class="py-2 px-3 text-right no-print whitespace-nowrap">
                         <button onclick="toggleLotHistory('${esc(l.id)}')" title="Ver movimentos do lote" class="p-1.5 transition ${openLotHistory.has(String(l.id)) ? 'text-blue-600' : 'text-slate-400 hover:text-blue-600'}"><i data-lucide="history" class="w-4 h-4"></i></button>
@@ -2039,25 +2072,27 @@
             return html;
         }
 
-        function renderMovementsTable() {
-            const search = (document.getElementById('search-movement')?.value || '').toLowerCase();
-            const startDate = document.getElementById('filter-movement-start-date')?.value || '';
-            const endDate = document.getElementById('filter-movement-end-date')?.value || '';
-
-            const filtered = movements.filter(m => {
-                const matchesSearch = (m.product_name && m.product_name.toLowerCase().includes(search)) || 
+        function filterMovements(search, startDate, endDate) {
+            return movements.filter(m => {
+                const matchesSearch = (m.product_name && m.product_name.toLowerCase().includes(search)) ||
                                       (m.lote && m.lote.toLowerCase().includes(search)) ||
                                       (m.entity_name && m.entity_name.toLowerCase().includes(search));
-                
                 let matchesDate = true;
                 if (m.date) {
                     const movementDateStr = m.date.slice(0, 10);
                     if (startDate && movementDateStr < startDate) matchesDate = false;
                     if (endDate && movementDateStr > endDate) matchesDate = false;
                 }
-
                 return matchesSearch && matchesDate;
             });
+        }
+
+        function renderMovementsTable() {
+            const search = (document.getElementById('search-movement')?.value || '').toLowerCase();
+            const startDate = document.getElementById('filter-movement-start-date')?.value || '';
+            const endDate = document.getElementById('filter-movement-end-date')?.value || '';
+
+            const filtered = filterMovements(search, startDate, endDate);
 
             const tbody = document.getElementById('movements-table-body');
             const mKey = search + '|' + startDate + '|' + endDate;
@@ -2121,7 +2156,7 @@
                 chip: lot ? `${p.sku || p.name} · ${lot.lote}` : (p.sku || p.name),
                 title: p.name, mono: false, sub: `SKU: ${p.sku}`, badge: `Lote: ${lot ? lot.lote : 'N/A'}`,
                 lines: [
-                    `Categoria: ${p.category || '-'} | Fornecedor: ${(lot && lot.supplier) || '-'}`,
+                    `Categoria: ${p.category || '-'} | Fornecedor: ${(lot && lotSupplier(lot)) || '-'}`,
                     lot ? `Entrada: ${formatDate(lot.created_at)} | Stock total do produto: ${formatKg(p.qty)}`
                         : `Lotes com stock: ${(lotsByProduct[p.id] || []).filter(l => l.qty > 0).length} | Stock mín.: ${formatKg(p.min)}`
                 ],
@@ -2851,23 +2886,43 @@
         function printProductsPDF() { setPrintHeader('Oliveira & Gonçalves - Relatório de Produtos'); window.print(); }
         function printEntitiesPDF() { setPrintHeader('Oliveira & Gonçalves - Relatório de Entidades'); window.print(); }
 
-        function printMovementsPDF() {
-            const startDate = document.getElementById('filter-movement-start-date')?.value;
-            const endDate = document.getElementById('filter-movement-end-date')?.value;
-            const titleElem = document.getElementById('print-report-title');
+        // Impressão dos movimentos (respeita a pesquisa e as datas): Data | Produto | Lote | Peso | Entidade — A4 horizontal
+        async function printMovementsPDF() {
+            const search = (document.getElementById('search-movement')?.value || '').toLowerCase();
+            const startDate = document.getElementById('filter-movement-start-date')?.value || '';
+            const endDate = document.getElementById('filter-movement-end-date')?.value || '';
+            try { await ensureAllMovements(); } catch (e) {}
+            const list = filterMovements(search, startDate, endDate).slice().sort(movAsc);
+            if (!list.length) { showToast('Não há movimentos para imprimir.', 'error'); return; }
+
+            const body = list.map(m => {
+                const isIn = m.type === 'entrada';
+                return `<tr>
+                    <td style="white-space:nowrap">${esc(formatDateTime(String(m.date || '').slice(0, 16)))}</td>
+                    <td>${esc(m.product_name || '-')}</td>
+                    <td style="word-break:break-all">${esc(m.lote || '-')}</td>
+                    <td class="num">${isIn ? '+' : '-'}${formatKg(m.qty)}</td>
+                    <td>${esc(m.entity_name || '-')}</td>
+                </tr>`;
+            }).join('');
+            document.getElementById('printable-list-area').innerHTML = `<table style="table-layout:fixed;width:100%">
+                <colgroup><col style="width:14%"><col style="width:34%"><col style="width:16%"><col style="width:14%"><col style="width:22%"></colgroup>
+                <thead><tr><th>Data</th><th>Produto</th><th>Lote</th><th class="num">Peso</th><th>Entidade</th></tr></thead>
+                <tbody>${body}</tbody></table>
+                <p style="margin-top:8px;font-size:11px;color:#475569;">${list.length} ${list.length === 1 ? 'movimento' : 'movimentos'}</p>`;
+
+            setPrintHeader('Oliveira & Gonçalves - Relatório de Movimentos de Armazém');   // também limpa o modo etiquetas
             const dateElem = document.getElementById('print-report-date');
-
-            if (titleElem) titleElem.textContent = 'Oliveira & Gonçalves - Relatório de Movimentos de Armazém';
-            if (dateElem) {
-                if (startDate || endDate) {
-                    const formattedStart = startDate ? startDate.split('-').reverse().join('/') : 'Início';
-                    const formattedEnd = endDate ? endDate.split('-').reverse().join('/') : 'Atualidade';
-                    dateElem.textContent = `Movimentos do Período: ${formattedStart} a ${formattedEnd}`;
-                } else {
-                    dateElem.textContent = `Emissão: ${new Date().toLocaleDateString('pt-PT')}`;
-                }
+            if (dateElem && (startDate || endDate)) {
+                const fs = startDate ? startDate.split('-').reverse().join('/') : 'Início';
+                const fe = endDate ? endDate.split('-').reverse().join('/') : 'Atualidade';
+                dateElem.textContent = `Movimentos do Período: ${fs} a ${fe}`;
             }
-
+            // A4 horizontal (o estilo é removido no afterprint, tal como o das etiquetas)
+            let st = document.getElementById('label-page-style');
+            if (!st) { st = document.createElement('style'); st.id = 'label-page-style'; document.head.appendChild(st); }
+            st.textContent = '@page { size: A4 landscape; margin: 10mm; }';
+            document.body.classList.add('printing-list');
             window.print();
         }
     </script>
