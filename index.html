@@ -31,6 +31,8 @@
     <script defer src="https://cdn.jsdelivr.net/npm/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
     <!-- QRCode.js para Gerar QR Codes -->
     <script defer src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+    <!-- SheetJS: leitura de ficheiros Excel (importar fornecedores dos lotes) -->
+    <script defer src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 
     <style>
         body { font-family: 'Inter', sans-serif; }
@@ -793,6 +795,10 @@
                         <i data-lucide="file-spreadsheet" class="w-4 h-4"></i>
                         <span>Exportar Movimentos (CSV)</span>
                     </button>
+                    <button onclick="openImportSupModal()" class="inline-flex items-center space-x-2 bg-amber-500 hover:bg-amber-600 text-white text-xs sm:text-sm font-medium px-4 py-2.5 rounded-xl transition shadow-xs">
+                        <i data-lucide="upload" class="w-4 h-4"></i>
+                        <span>Importar fornecedores (Excel)</span>
+                    </button>
                 </div>
             </div>
 
@@ -1050,6 +1056,25 @@
                     <button type="submit" id="movement-submit-btn" class="px-5 py-2 text-sm text-white bg-emerald-600 rounded-xl hover:bg-emerald-700 font-medium">Confirmar</button>
                 </div>
             </form>
+        </div>
+    </div>
+
+    <!-- MODAL: importar fornecedores dos lotes a partir de Excel -->
+    <div id="import-sup-modal" class="fixed inset-0 bg-slate-900/50 backdrop-blur-xs z-50 flex items-center justify-center p-4 hidden no-print">
+        <div class="bg-white rounded-2xl shadow-xl max-w-2xl w-full border border-slate-200 max-h-[90vh] flex flex-col my-auto">
+            <div class="px-6 py-4 border-b border-slate-100 flex items-center justify-between bg-amber-50 shrink-0">
+                <h3 class="font-bold text-amber-900 text-base">Importar fornecedores dos lotes (Excel)</h3>
+                <button onclick="closeImportSupModal()" class="text-slate-400 hover:text-slate-600 p-1"><i data-lucide="x" class="w-5 h-5"></i></button>
+            </div>
+            <div class="p-6 space-y-4 overflow-y-auto custom-scrollbar flex-1 text-sm">
+                <p class="text-xs text-slate-600">O ficheiro precisa das colunas <strong>Artigo</strong>, <strong>Lote</strong> e <strong>Fornecedor</strong>. Cada linha é ligada ao lote do produto com o mesmo nome e o mesmo lote. Nada é gravado antes de confirmar.</p>
+                <input type="file" id="import-sup-file" accept=".xlsx,.xls,.csv" onchange="handleImportSupFile(this.files[0])" class="block w-full text-xs text-slate-600 file:mr-3 file:py-2 file:px-3 file:rounded-xl file:border-0 file:bg-amber-100 file:text-amber-800 file:font-medium">
+                <div id="import-sup-result" class="space-y-3"></div>
+                <div class="flex justify-end gap-2 pt-1">
+                    <button type="button" onclick="closeImportSupModal()" class="px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-100 rounded-xl">Fechar</button>
+                    <button type="button" id="import-sup-apply" onclick="applyImportSup()" disabled class="px-4 py-2 text-sm font-medium text-white bg-amber-500 hover:bg-amber-600 rounded-xl disabled:opacity-40">Aplicar</button>
+                </div>
+            </div>
         </div>
     </div>
 
@@ -1377,6 +1402,155 @@
             filterLotMoveProducts();
             document.getElementById('lot-modal').classList.remove('hidden');
         }
+        // ===== IMPORTAR FORNECEDORES DOS LOTES (Excel: Artigo | Lote | Fornecedor) =====
+        let importSup = null;
+        const normTxt = v => String(v ?? '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/\s+/g, ' ').trim().toLowerCase();
+        const isBlankTxt = v => ['', '-', 'none', 'null', 'n/a'].includes(normTxt(v));
+        function openImportSupModal() {
+            importSup = null;
+            document.getElementById('import-sup-file').value = '';
+            document.getElementById('import-sup-result').innerHTML = '';
+            document.getElementById('import-sup-apply').disabled = true;
+            document.getElementById('import-sup-modal').classList.remove('hidden');
+            scheduleIcons();
+        }
+        function closeImportSupModal() { document.getElementById('import-sup-modal').classList.add('hidden'); }
+
+        async function handleImportSupFile(file) {
+            const out = document.getElementById('import-sup-result');
+            document.getElementById('import-sup-apply').disabled = true;
+            importSup = null;
+            if (!file) { out.innerHTML = ''; return; }
+            if (typeof XLSX === 'undefined') { out.innerHTML = '<p class="text-rose-600 text-xs">Não foi possível carregar o leitor de Excel (precisa de internet). Tente de novo.</p>'; return; }
+            let rows;
+            try {
+                const wb = XLSX.read(await file.arrayBuffer(), { type: 'array' });
+                rows = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { header: 1, defval: '', raw: false });
+            } catch (e) { console.error(e); out.innerHTML = '<p class="text-rose-600 text-xs">Não foi possível ler o ficheiro.</p>'; return; }
+
+            // cabeçalho: 1.ª linha que tem Artigo, Lote e Fornecedor
+            let hi = -1, cA = -1, cL = -1, cF = -1;
+            for (let i = 0; i < Math.min(rows.length, 30) && hi < 0; i++) {
+                const h = rows[i].map(normTxt);
+                const a = h.indexOf('artigo'), l = h.indexOf('lote'), f = h.indexOf('fornecedor');
+                if (a >= 0 && l >= 0 && f >= 0) { hi = i; cA = a; cL = l; cF = f; }
+            }
+            if (hi < 0) { out.innerHTML = '<p class="text-rose-600 text-xs">Não encontrei as colunas Artigo, Lote e Fornecedor.</p>'; return; }
+
+            // 1) agrega o Excel por artigo+lote (vários fornecedores diferentes para o mesmo par = conflito)
+            const excel = new Map();   // chave -> { artigo, lote, sups: Map(norm -> {nome, n}) }
+            let linhasSemForn = 0;
+            for (const r of rows.slice(hi + 1)) {
+                const artigo = String(r[cA] ?? '').trim();
+                if (!artigo) continue;
+                const forn = String(r[cF] ?? '').trim().replace(/\s+/g, ' ');
+                if (isBlankTxt(forn)) { linhasSemForn++; continue; }
+                const lote = isBlankTxt(r[cL]) ? '' : String(r[cL]).trim();
+                const key = normTxt(artigo) + '|' + normTxt(lote);
+                if (!excel.has(key)) excel.set(key, { artigo, lote, sups: new Map() });
+                const sups = excel.get(key).sups, nk = normTxt(forn);
+                if (!sups.has(nk)) sups.set(nk, { nome: forn, n: 0 });
+                sups.get(nk).n++;
+            }
+
+            // 2) lotes da app por artigo+lote
+            const prodName = new Map(products.map(p => [String(p.id), p.name]));
+            const byKey = new Map();
+            for (const l of lots) {
+                const nome = prodName.get(String(l.product_id));
+                if (!nome) continue;
+                const k = normTxt(nome) + '|' + (isBlankTxt(l.lote) ? '' : normTxt(l.lote));
+                if (!byKey.has(k)) byKey.set(k, []);
+                byKey.get(k).push(l);
+            }
+
+            // 3) nome oficial do fornecedor: entidade existente (sem diferenças de maiúsculas/acentos) ou novo
+            const entByNorm = new Map(entities.map(e => [normTxt(e.name), e.name]));
+            const novos = new Map();   // norm -> nome (grafia mais frequente)
+            const spell = new Map();   // norm -> Map(grafia -> n)
+            for (const x of excel.values()) for (const [nk, v] of x.sups) {
+                if (!spell.has(nk)) spell.set(nk, new Map());
+                spell.get(nk).set(v.nome, (spell.get(nk).get(v.nome) || 0) + v.n);
+            }
+            const officialName = nk => {
+                if (entByNorm.has(nk)) return entByNorm.get(nk);
+                if (!novos.has(nk)) novos.set(nk, [...spell.get(nk).entries()].sort((a, b) => b[1] - a[1])[0][0]);
+                return novos.get(nk);
+            };
+
+            const plan = [], conflitos = [], naoEncontrados = [];
+            let iguais = 0, jaTem = 0;
+            for (const [key, x] of excel) {
+                if (x.sups.size > 1) { conflitos.push({ ...x, txt: [...x.sups.values()].map(v => v.nome).join(' / ') }); continue; }
+                const nk = [...x.sups.keys()][0];
+                const ls = byKey.get(key);
+                if (!ls) { naoEncontrados.push({ ...x, txt: [...x.sups.values()][0].nome }); continue; }
+                const nome = officialName(nk);
+                for (const l of ls) {
+                    const atual = String(l.supplier || '').trim();
+                    if (normTxt(atual) === nk) iguais++;
+                    else plan.push({ lot: l, nome, atual, artigo: x.artigo });
+                }
+            }
+            importSup = { plan, novos, linhasSemForn };
+            const vazios = plan.filter(x => !x.atual), diferentes = plan.filter(x => x.atual);
+            const li = (t, n, cls) => `<li class="flex justify-between gap-3 ${cls || ''}"><span>${t}</span><strong>${n}</strong></li>`;
+            const lista = (arr, f) => arr.length ? `<details class="mt-1"><summary class="text-xs text-blue-600 cursor-pointer">Ver lista</summary><div class="max-h-40 overflow-y-auto custom-scrollbar mt-1 text-[11px] text-slate-600 border border-slate-200 rounded-lg p-2 space-y-0.5">${arr.slice(0, 200).map(f).join('')}${arr.length > 200 ? '<div>… (lista completa no ficheiro descarregável)</div>' : ''}</div></details>` : '';
+            out.innerHTML = `
+                <ul class="text-xs text-slate-700 bg-slate-50 border border-slate-200 rounded-xl p-3 space-y-1">
+                    ${li('Linhas do Excel com fornecedor (artigo+lote distintos)', excel.size)}
+                    ${li('Lotes a preencher (hoje sem fornecedor)', vazios.length, 'text-emerald-700')}
+                    ${li('Lotes com fornecedor <u>diferente</u> do Excel', diferentes.length, 'text-amber-700')}
+                    ${li('Lotes que já estão iguais ao Excel', iguais)}
+                    ${li('Linhas sem lote correspondente na app', naoEncontrados.length, 'text-slate-500')}
+                    ${li('Linhas em conflito (mesmo artigo+lote, fornecedores diferentes)', conflitos.length, 'text-rose-700')}
+                    ${li('Linhas do Excel sem fornecedor ("-" ou vazio, ignoradas)', linhasSemForn, 'text-slate-500')}
+                </ul>
+                ${diferentes.length ? `<div><label class="flex items-start gap-2 text-xs text-slate-700"><input type="checkbox" id="import-sup-overwrite" class="mt-0.5"> <span>Substituir também os ${diferentes.length} lotes que já têm outro fornecedor</span></label>${lista(diferentes, x => `<div>${esc(x.artigo)} · lote ${esc(x.lot.lote)}: <s>${esc(x.atual)}</s> → <b>${esc(x.nome)}</b></div>`)}</div>` : ''}
+                ${novos.size ? `<div><label class="flex items-start gap-2 text-xs text-slate-700"><input type="checkbox" id="import-sup-create" checked class="mt-0.5"> <span>Criar como Fornecedor as ${novos.size} entidades que ainda não existem</span></label>${lista([...novos.values()].sort(compareByName), n => `<div>${esc(n)}</div>`)}</div>` : ''}
+                ${naoEncontrados.length ? `<div class="text-xs text-slate-600">Sem correspondência: ${lista(naoEncontrados, x => `<div>${esc(x.artigo)} · lote ${esc(x.lote || '-')} (${esc(x.txt)})</div>`)}</div>` : ''}
+                ${conflitos.length ? `<div class="text-xs text-rose-700">Em conflito (não serão alterados): ${lista(conflitos, x => `<div>${esc(x.artigo)} · lote ${esc(x.lote || '-')}: ${esc(x.txt)}</div>`)}</div>` : ''}
+                ${(naoEncontrados.length || conflitos.length) ? `<button type="button" onclick="downloadImportSupIssues()" class="text-xs font-medium text-blue-600 hover:underline">Descarregar lista das linhas por resolver (CSV)</button>` : ''}`;
+            importSup.issues = [...naoEncontrados.map(x => ['Sem correspondência', x.artigo, x.lote, x.txt]), ...conflitos.map(x => ['Conflito', x.artigo, x.lote, x.txt])];
+            document.getElementById('import-sup-apply').disabled = !plan.length;
+            scheduleIcons();
+        }
+        function downloadImportSupIssues() {
+            if (!importSup) return;
+            const rows = [['Motivo', 'Artigo', 'Lote', 'Fornecedor (Excel)'], ...importSup.issues];
+            downloadBlob('\uFEFF' + rows.map(r => r.map(csvCell).join(';')).join('\r\n'), 'fornecedores_por_resolver.csv', 'text/csv;charset=utf-8');
+        }
+        async function applyImportSup() {
+            if (!importSup) return;
+            const overwrite = !!document.getElementById('import-sup-overwrite')?.checked;
+            const create = !!document.getElementById('import-sup-create')?.checked;
+            const todo = importSup.plan.filter(x => overwrite || !x.atual);
+            if (!todo.length) { showToast('Nada para alterar.', 'error'); return; }
+            if (!confirm(`Gravar o fornecedor em ${todo.length} lote(s)?`)) return;
+            const btn = document.getElementById('import-sup-apply');
+            btn.disabled = true;
+            let error = null;
+            // entidades novas (só as que vão ser usadas)
+            if (create) {
+                const usados = new Set(todo.map(x => x.nome));
+                const rowsNew = [...importSup.novos.values()].filter(n => usados.has(n)).map(name => ({ name, type: 'Fornecedor', nif: '', phone: '', email: '', address: '' }));
+                if (rowsNew.length) ({ error } = await db.from('entities').insert(rowsNew));
+            }
+            // um update por fornecedor, em blocos de 150 lotes
+            const porForn = new Map();
+            for (const x of todo) { if (!porForn.has(x.nome)) porForn.set(x.nome, []); porForn.get(x.nome).push(x.lot.id); }
+            for (const [nome, ids] of porForn) {
+                for (let i = 0; i < ids.length && !error; i += 150) ({ error } = await db.from('lots').update({ supplier: nome }).in('id', ids.slice(i, i + 150)));
+                if (error) break;
+            }
+            btn.disabled = false;
+            if (error) { console.error(error); showToast('Erro ao gravar: ' + (error.message || ''), 'error'); await loadData({ entities: true, lots: true }); refreshAll(); return; }
+            showToast(`Fornecedor gravado em ${todo.length} lote(s).`);
+            await loadData({ entities: true, lots: true });
+            refreshAll();
+            closeImportSupModal();
+        }
+
         function closeLotModal() { document.getElementById('lot-modal').classList.add('hidden'); }
 
         function updateLotSupplierLabel() {
@@ -1725,6 +1899,11 @@
             }
             refreshAll();
             closeMovementModal();
+            // Entrada com palete: oferece logo a etiqueta (QR/código de barras) para colar na palete e ler na saída
+            if (!editId && type === 'entrada' && palete) {
+                const lt = lots.find(l => String(l.product_id) === String(product_id) && String(l.lote).toLowerCase() === lote.trim().toLowerCase());
+                if (lt && confirm(`Imprimir a etiqueta da palete ${palete}?`)) openLabelSheet(['t:' + lt.id + '|' + palete]);
+            }
         }
 
         async function deleteMovement(id) {
@@ -1909,8 +2088,8 @@
             const palTable = temPaletes ? `
                 <div class="mb-3">
                     <div class="text-[11px] font-semibold text-slate-500 mb-1">Paletes${incompletas.length ? ` · <span class="text-amber-700">${incompletas.length} incompleta(s): ${incompletas.map(x => esc(x.name || 'sem palete') + ' ' + formatKg(x.saldo)).join(', ')}</span>` : ''}</div>
-                    <div class="overflow-x-auto"><table class="w-full text-left"><thead><tr class="text-[11px] text-slate-400"><th class="py-1 px-2 font-semibold">Palete</th><th class="py-1 px-2 font-semibold text-right">Inicial</th><th class="py-1 px-2 font-semibold text-right">Saído</th><th class="py-1 px-2 font-semibold text-right">Atual</th><th class="py-1 px-2 font-semibold">Estado</th></tr></thead><tbody>
-                    ${pals.map(x => `<tr class="border-t border-slate-200/70"><td class="py-1.5 px-2 text-xs font-semibold text-slate-800">${esc(x.name || '(sem palete)')}</td><td class="py-1.5 px-2 text-right text-xs text-slate-600">${formatKg(x.inicial)}</td><td class="py-1.5 px-2 text-right text-xs text-rose-600">${x.saido ? '-' + formatKg(x.saido) : '-'}</td><td class="py-1.5 px-2 text-right text-xs font-bold text-slate-800">${formatKg(x.saldo)}</td><td class="py-1.5 px-2"><span class="px-2 py-0.5 rounded-full text-[10px] font-semibold border ${badge[x.estado]}">${x.estado}</span></td></tr>`).join('')}
+                    <div class="overflow-x-auto"><table class="w-full text-left"><thead><tr class="text-[11px] text-slate-400"><th class="py-1 px-2 font-semibold">Palete</th><th class="py-1 px-2 font-semibold text-right">Inicial</th><th class="py-1 px-2 font-semibold text-right">Saído</th><th class="py-1 px-2 font-semibold text-right">Atual</th><th class="py-1 px-2 font-semibold">Estado</th><th class="py-1 px-2 font-semibold text-right">Etiqueta</th></tr></thead><tbody>
+                    ${pals.map(x => `<tr class="border-t border-slate-200/70"><td class="py-1.5 px-2 text-xs font-semibold text-slate-800">${esc(x.name || '(sem palete)')}</td><td class="py-1.5 px-2 text-right text-xs text-slate-600">${formatKg(x.inicial)}</td><td class="py-1.5 px-2 text-right text-xs text-rose-600">${x.saido ? '-' + formatKg(x.saido) : '-'}</td><td class="py-1.5 px-2 text-right text-xs font-bold text-slate-800">${formatKg(x.saldo)}</td><td class="py-1.5 px-2"><span class="px-2 py-0.5 rounded-full text-[10px] font-semibold border ${badge[x.estado]}">${x.estado}</span></td><td class="py-1.5 px-2 text-right">${x.name && x.saldo > 0.005 ? `<button type="button" data-key="${esc('t:' + l.id + '|' + x.name)}" onclick="openLabelSheet([this.dataset.key])" title="Imprimir etiqueta da palete ${esc(x.name)} (para a saída)" class="text-slate-400 hover:text-indigo-600 p-1"><i data-lucide="printer" class="w-4 h-4"></i></button>` : ''}</td></tr>`).join('')}
                     </tbody></table></div>
                 </div>` : '';
             return `<tr class="bg-white no-print"><td colspan="6" class="px-3 py-3 border-t border-slate-200">
@@ -2144,7 +2323,31 @@
         // ===== ETIQUETAS =====
         // Código único de cada lote (SKU do produto + lote): é o que vai no código de barras e no QR da etiqueta do lote
         const lotCode = (p, l) => `${p.sku || p.id}-${l.lote}`;
+        // Código da etiqueta de uma palete: código do lote + "#" + nome da palete (ex.: SKU-0138-2212900143#P1)
+        const paleteCode = (p, l, pal) => `${lotCode(p, l)}#${pal}`;
+        function paleteLabelInfo(key) {
+            const rest = key.slice(2), i = rest.indexOf('|');
+            if (i < 0) return null;
+            const lot = lots.find(l => String(l.id) === rest.slice(0, i)), palName = rest.slice(i + 1);
+            const p = lot && products.find(x => String(x.id) === String(lot.product_id));
+            if (!p || !palName) return null;
+            const pal = lotPallets(lot).find(x => x.name.toLowerCase() === palName.toLowerCase());
+            const nome = pal ? pal.name : palName;
+            const ent = lotMovements(lot).find(m => m.type === 'entrada' && String(m.palete || '').trim().toLowerCase() === nome.toLowerCase());
+            const peso = pal && pal.inicial != null ? pal.inicial : null;
+            return {
+                chip: `${p.sku || p.name} · ${lot.lote} · ${nome}`,
+                title: p.name, mono: false, sub: `SKU: ${p.sku} | Lote: ${lot.lote}`, badge: `Palete: ${nome}`,
+                lines: [
+                    `Fornecedor: ${lotSupplier(lot) || '-'}`,
+                    `Entrada: ${ent ? formatDate(ent.date) : formatDate(lot.created_at)}${peso != null ? ' | Peso da palete: ' + formatKg(peso) : ''}`
+                ],
+                code: paleteCode(p, lot, nome), qr: paleteCode(p, lot, nome),
+                footL: `Loc: ${lot.location || p.location || 'Armazém'}`, footR: peso != null ? formatKg(peso) : ''
+            };
+        }
         function labelInfo(key) {
+            if (key.startsWith('t:')) return paleteLabelInfo(key);
             const kind = key.slice(0, 1), id = key.slice(2);
             let p = null, lot = null;
             if (kind === 'l') {
@@ -2598,6 +2801,8 @@
         // Procura o produto pelo código de barras (ou SKU) e leva à respetiva linha em Produtos
         function handleCodigoLido(text) {
             const code = String(text || '').trim().toUpperCase();
+            const pc = parsePaleteCode(code);
+            if (pc) { handlePaleteLida(pc); return; }
             if (scanHandler) {
                 const h = scanHandler;
                 const err = h(code);
@@ -2622,6 +2827,39 @@
             if (navigator.vibrate) try { navigator.vibrate(80); } catch (e) {}
             closeScanner();
             mostrarProdutoLido(p);
+        }
+        // Etiqueta de palete: "<código do lote>#<palete>" → { p, l, palName } (ou null se não for desse tipo)
+        function parsePaleteCode(code) {
+            const i = code.lastIndexOf('#');
+            if (i < 1 || i === code.length - 1) return null;
+            const base = code.slice(0, i), palName = code.slice(i + 1).trim();
+            for (const l of lots) {
+                const lp = products.find(x => String(x.id) === String(l.product_id));
+                if (lp && lotCode(lp, l).toUpperCase() === base) return { p: lp, l, palName };
+            }
+            return null;
+        }
+        // Lida a etiqueta de uma palete: abre a Saída já com produto, lote, palete e o peso que lá está (ajustável)
+        async function handlePaleteLida({ p, l, palName }) {
+            const modalOpen = !document.getElementById('movement-modal').classList.contains('hidden');
+            if (modalOpen && document.getElementById('movement-type').value !== 'saida') { scanStatus('Esta etiqueta é de uma palete: leia-a numa Saída.', true); return; }
+            if (!movementsFull) { try { await ensureAllMovements(true); } catch (e) {} }
+            const pal = lotPallets(l).find(x => x.name && x.name.toLowerCase() === palName.toLowerCase());
+            if (!pal) { scanStatus(`Palete "${palName}" não encontrada no lote ${l.lote}.`, true); return; }
+            if (!(pal.saldo > 0.005)) { scanStatus(`A palete ${pal.name} (lote ${l.lote}) já não tem stock.`, true); return; }
+            if (navigator.vibrate) try { navigator.vibrate(80); } catch (e) {}
+            await closeScanner();
+            if (!modalOpen) openMovementModal('saida');
+            document.getElementById('search-movement-product').value = p.barcode || p.sku || p.name || '';
+            filterMovementProducts();
+            document.getElementById('movement-product-id').value = p.id;
+            document.getElementById('movement-lote').value = l.lote;
+            onMovementProductChange();
+            document.getElementById('movement-palete').value = pal.name;
+            refreshPaleteOptions();
+            updateMovementStockInfo();
+            document.getElementById('movement-qty').value = pal.saldo;
+            showToast(`Palete ${pal.name} · ${p.name} · lote ${l.lote}: ${formatKg(pal.saldo)}. Confirme o peso e a entidade e registe a saída.`);
         }
         // Leitura na Entrada / Saída: seleciona o produto e o lote no formulário do movimento
         function scanParaMovimento(code) {
