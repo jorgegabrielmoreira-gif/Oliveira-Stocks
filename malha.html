@@ -208,7 +208,18 @@
         .print-header { display: none; }
         #printable-label-area { display: none; }
         #printable-list-area { display: none; }
-    </style>
+    
+        /* ===== Vista móvel: lotes do stock e movimentos em cartões ===== */
+        @media screen and (max-width: 767px) {
+            .lote-tbl, .mov-tbl { min-width: 0 !important; width: 100% !important; display: block; }
+            .lote-tbl thead, .mov-tbl thead { display: none; }
+            .lote-tbl tbody, .mov-tbl tbody { display: block; }
+            .lote-tbl tbody tr, .mov-tbl tbody tr { display: block; background: #fff; border: 1px solid #e2e8f0 !important; border-radius: 12px; margin: 8px 0; padding: 6px 4px; box-sizing: border-box; }
+            .lote-tbl td, .mov-tbl td { display: flex !important; justify-content: space-between; align-items: flex-start; gap: 12px; padding: 4px 10px !important; text-align: right !important; border: 0 !important; position: static !important; box-shadow: none !important; box-sizing: border-box; min-width: 0; }
+            .lote-tbl td[data-label]::before, .mov-tbl td[data-label]::before { content: attr(data-label); flex-shrink: 0; font-size: 11px; font-weight: 600; color: #94a3b8; text-align: left; }
+            .lote-tbl td[data-m="actions"], .mov-tbl td[data-m="actions"] { justify-content: flex-end; border-top: 1px solid #f1f5f9 !important; margin-top: 4px; padding-top: 6px !important; }
+        }
+        </style>
     <style>
         /* Modais da malha com o mesmo arranjo dos do index */
         body #saida-modal > div, body #edit-mov-modal > div { border-radius: 20px; box-shadow: 0 30px 60px -20px rgba(27,31,74,.55); }
@@ -563,8 +574,8 @@
                 <button onclick="migrateLocalStorage()" id="legacy-btn" class="shrink-0 bg-amber-600 hover:bg-amber-700 text-white text-xs font-medium px-4 py-2 rounded-xl transition">Migrar para a Cloud</button>
             </div>
 
-            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                <div class="stat-card bg-white p-5 rounded-2xl border border-slate-200 shadow-xs flex items-center justify-between">
+            <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                <div class="stat-card bg-white p-5 rounded-2xl border border-slate-200 shadow-xs flex items-center justify-between cursor-pointer hover:border-blue-300 transition" role="button" tabindex="0" onclick="irParaStock()" onkeydown="if(event.key==='Enter')this.click()" title="Ver no Stock">
                     <div>
                         <p class="text-xs font-medium text-slate-500 uppercase tracking-wider">Lotes em Stock</p>
                         <h3 id="stat-lotes" class="text-2xl font-bold text-slate-900 mt-1">0</h3>
@@ -584,13 +595,6 @@
                         <h3 id="stat-peso" class="text-2xl font-bold text-slate-900 mt-1">0,00 kg</h3>
                     </div>
                     <div class="w-12 h-12 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center border border-emerald-100"><i data-lucide="scale" class="w-6 h-6"></i></div>
-                </div>
-                <div class="stat-card bg-white p-5 rounded-2xl border border-slate-200 shadow-xs flex items-center justify-between">
-                    <div>
-                        <p class="text-xs font-medium text-slate-500 uppercase tracking-wider">Aguardar QC</p>
-                        <h3 id="stat-hold" class="text-2xl font-bold text-rose-600 mt-1">0</h3>
-                    </div>
-                    <div class="w-12 h-12 rounded-xl bg-rose-50 text-rose-600 flex items-center justify-center border border-rose-100"><i data-lucide="alert-triangle" class="w-6 h-6"></i></div>
                 </div>
             </div>
 
@@ -692,6 +696,15 @@
                         <p class="text-[11px] text-slate-500 mt-1">Quantidade em rolos e peso líquido total (kg).</p>
                     </div>
 
+                    <div>
+                        <label class="block text-xs font-medium text-slate-700 mb-1">Localização <span class="text-slate-400 font-normal">(opcional)</span></label>
+                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                            <div><select id="entrada-arm-sel" onchange="onLocSel('entrada','arm')" class="w-full px-3 py-2 text-sm border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500/20 outline-none"></select><input type="text" id="entrada-arm" list="dl-arm" autocomplete="off" placeholder="Escreva o armazém" class="hidden mt-2 w-full px-3 py-2 text-sm border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500/20 outline-none"></div>
+                            <div><select id="entrada-fila-sel" onchange="onLocSel('entrada','fila')" class="w-full px-3 py-2 text-sm border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500/20 outline-none"></select><input type="text" id="entrada-fila" list="dl-fila" autocomplete="off" placeholder="Escreva a posição (ex: Corredor B)" class="hidden mt-2 w-full px-3 py-2 text-sm border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500/20 outline-none"></div>
+                        </div>
+                        <datalist id="dl-arm"></datalist><datalist id="dl-fila"></datalist>
+                    </div>
+
                     <div><label class="block text-xs font-medium text-slate-700 mb-1">Observações</label><textarea id="observacoes" rows="3" placeholder="Notas sobre este lote (opcional)" class="w-full px-3 py-2 text-sm border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500/20 outline-none"></textarea></div>
 
                     <div class="pt-3 flex justify-end border-t border-slate-100">
@@ -707,31 +720,37 @@
         <div id="content-stock" class="space-y-6 hidden">
             <div class="bg-white p-6 rounded-2xl border border-slate-200 shadow-xs space-y-4">
                 <div class="flex flex-col gap-3">
-                    <div class="relative w-full">
-                        <span class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400"><i data-lucide="search" class="w-4 h-4"></i></span>
-                        <input type="text" id="search-stock" oninput="debouncedRenderStock()" placeholder="Pesquisar designação, SKU, OF, tear, NE, jogo, lote, fornecedor, local (fila)..." class="w-full pl-9 pr-4 py-2 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:outline-none">
-                    </div>
-                    <div class="flex flex-wrap items-center justify-between gap-3">
-                    <div class="flex flex-wrap items-center gap-2 min-w-0">
-                    <select id="filter-stock-tear" onchange="renderStock()" title="Filtrar por tear" class="px-3 py-2 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:outline-none sm:w-40"></select>
-                    <select id="filter-stock-forn" onchange="renderStock()" title="Filtrar por fornecedor" class="px-3 py-2 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:outline-none sm:w-52"></select>
-                    <select id="filter-stock-fila" onchange="renderStock()" title="Filtrar pela localização (fila)" class="px-3 py-2 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:outline-none sm:w-44"></select>
-                    <span id="stock-fila-summary" class="no-print text-xs font-medium text-slate-500 whitespace-nowrap"></span>
-                    </div>
-                    <div class="flex flex-wrap items-center gap-2">
+                    <div class="flex flex-wrap items-center gap-2 no-print">
+                        <button onclick="switchTab('entrada')" class="inline-flex items-center justify-center space-x-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium px-4 py-2 rounded-xl transition shadow-sm">
+                            <i data-lucide="plus" class="w-4 h-4"></i><span>Nova Entrada</span>
+                        </button>
                         <button onclick="openScanner()" class="inline-flex items-center space-x-1.5 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-medium px-3.5 py-2.5 rounded-xl transition shadow-sm no-print">
                             <i data-lucide="scan-barcode" class="w-4 h-4"></i><span>Ler código</span>
                         </button>
-                        <button onclick="openBulkSupplierModal()" title="Trocar o nome do fornecedor em todos os lotes e entradas de uma vez" class="inline-flex items-center space-x-1.5 bg-amber-500 hover:bg-amber-600 text-white text-xs font-medium px-3.5 py-2.5 rounded-xl transition shadow-sm no-print">
-                            <i data-lucide="replace" class="w-4 h-4"></i><span>Trocar fornecedor</span>
+                        <button onclick="exportStockFiltrado()" title="Exportar CSV do que está filtrado" class="bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-medium px-3.5 py-2.5 rounded-xl transition flex items-center space-x-1.5 border border-slate-200 no-print">
+                            <i data-lucide="download" class="w-4 h-4"></i> <span>Exportar CSV</span>
                         </button>
                         <button onclick="printStock()" class="bg-slate-800 hover:bg-slate-900 text-white text-xs font-medium px-3.5 py-2.5 rounded-xl transition flex items-center space-x-1.5 shadow-sm no-print">
                             <i data-lucide="printer" class="w-4 h-4"></i> <span>Imprimir Tabela</span>
                         </button>
-                        <button onclick="switchTab('entrada')" class="inline-flex items-center justify-center space-x-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium px-4 py-2 rounded-xl transition shadow-sm">
-                            <i data-lucide="plus" class="w-4 h-4"></i><span>Nova Entrada</span>
+                        <span class="hidden sm:block flex-1"></span>
+                        <button onclick="openBulkSupplierModal()" title="Trocar o nome do fornecedor em todos os lotes e entradas de uma vez" class="inline-flex items-center gap-1 text-[11px] font-medium text-slate-500 hover:text-amber-700 hover:bg-amber-50 border border-slate-200 px-2 py-1 rounded-lg transition no-print">
+                            <i data-lucide="replace" class="w-3 h-3"></i><span>Trocar fornecedor</span>
                         </button>
                     </div>
+                    <div class="relative w-full">
+                        <span class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400"><i data-lucide="search" class="w-4 h-4"></i></span>
+                        <input type="text" id="search-stock" oninput="debouncedRenderStock()" placeholder="Pesquisar designação, SKU, OF, tear, NE, jogo, lote, fornecedor, local (fila)..." class="w-full pl-9 pr-4 py-2 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:outline-none">
+                    </div>
+                    <div class="flex flex-wrap items-center gap-2 min-w-0">
+                    <select id="filter-stock-tear" onchange="renderStock()" title="Filtrar por tear" class="px-3 py-2 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:outline-none sm:w-40"></select>
+                    <select id="filter-stock-forn" onchange="renderStock()" title="Filtrar por fornecedor" class="px-3 py-2 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:outline-none sm:w-52"></select>
+                    <select id="filter-stock-arm" onchange="renderStock()" title="Filtrar por armazém" class="px-3 py-2 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:outline-none sm:w-44"></select>
+                    <select id="filter-stock-fila" onchange="renderStock()" title="Filtrar pela fila" class="px-3 py-2 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:outline-none sm:w-36"></select>
+                    <button id="btn-limpar-stock" type="button" onclick="limparFiltrosStock()" class="hidden no-print text-xs font-medium text-slate-500 hover:text-slate-800 px-2 py-2">Limpar filtros</button>
+                    <label id="lbl-arquivados" class="hidden no-print inline-flex items-center gap-1.5 text-xs font-medium text-slate-600 cursor-pointer"><input type="checkbox" id="show-archived" onchange="renderStock()" class="w-4 h-4 rounded"> Mostrar arquivados</label>
+                    <span id="stock-arq-aviso" class="hidden no-print text-xs text-amber-700 whitespace-nowrap" title="Execute arquivar_malha.sql no Supabase para poder arquivar lotes esgotados">Arquivar indisponível (falta arquivar_malha.sql)</span>
+                    <span id="stock-fila-summary" class="no-print text-xs font-medium text-slate-500 whitespace-nowrap"></span>
                     </div>
                 </div>
                 <div class="overflow-x-auto rounded-xl border border-slate-200 custom-scrollbar">
@@ -742,7 +761,6 @@
                                 <th class="py-3 px-3">Lotes</th>
                                 <th class="py-3 px-3 text-center">Rolos</th>
                                 <th class="py-3 px-3 text-center">Peso Líq.</th>
-                                <th class="py-3 px-3 text-center">Estado</th>
                             </tr>
                         </thead>
                         <tbody id="stock-table-body" class="text-sm divide-y divide-slate-100 bg-white"></tbody>
@@ -755,10 +773,14 @@
         <div id="content-movimentos" class="space-y-6 hidden">
             <div class="bg-white p-6 rounded-2xl border border-slate-200 shadow-xs space-y-4">
                 <div class="flex flex-col lg:flex-row lg:items-center justify-between gap-4 no-print">
-                    <div class="grid grid-cols-1 sm:grid-cols-3 md:grid-cols-5 gap-3 flex-1 items-center">
+                    <div class="grid grid-cols-1 sm:grid-cols-3 md:grid-cols-6 gap-3 flex-1 items-center">
                         <div class="relative sm:col-span-2">
                             <span class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400"><i data-lucide="search" class="w-4 h-4"></i></span>
-                            <input type="text" id="search-mov" oninput="debouncedRenderMov()" placeholder="Pesquisar artigo, lote, OF, tear ou entidade..." class="w-full pl-9 pr-3 py-2 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:outline-none">
+                            <input type="text" id="search-mov" oninput="debouncedRenderMov()" placeholder="Pesquisar artigo, lote, OF, tear, entidade ou utilizador..." class="w-full pl-9 pr-3 py-2 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:outline-none">
+                        </div>
+                        <div>
+                            <span class="block text-[10px] text-slate-400 font-semibold uppercase mb-0.5 ml-1">Tipo</span>
+                            <select id="filter-mov-type" onchange="renderMovimentos()" class="w-full px-3 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:outline-none text-slate-700"><option value="">Todos</option><option value="entrada">Entradas</option><option value="saida">Saídas</option><option value="ajuste">Ajustes</option></select>
                         </div>
                         <div>
                             <span class="block text-[10px] text-slate-400 font-semibold uppercase mb-0.5 ml-1">De</span>
@@ -781,7 +803,7 @@
                     </div>
                 </div>
                 <div class="overflow-x-auto rounded-xl border border-slate-200 custom-scrollbar">
-                    <table class="w-full text-left border-collapse min-w-[1150px]">
+                    <table class="w-full text-left border-collapse min-w-[1150px] mov-tbl">
                         <thead>
                             <tr class="bg-slate-50 border-b border-slate-200 text-xs font-semibold text-slate-500 uppercase tracking-wider">
                                 <th class="py-3 px-4">Data/Hora</th>
@@ -866,13 +888,19 @@
             </div>
 
             <div class="bg-white p-6 rounded-2xl border border-slate-200 shadow-xs space-y-6">
-                <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 no-print">
+                <div class="grid grid-cols-1 sm:grid-cols-3 lg:grid-cols-4 gap-4 no-print">
                     <div><label class="block text-xs font-medium text-slate-500 uppercase mb-1">Tipo de Malha</label>
                         <select id="rep-malha" onchange="renderReport()" class="w-full px-3 py-2 text-sm bg-slate-50 border border-slate-200 rounded-xl"><option value="">Todos</option></select></div>
                     <div><label class="block text-xs font-medium text-slate-500 uppercase mb-1">N.º do Tear</label>
                         <input type="text" id="rep-tear" oninput="debouncedRenderReport()" placeholder="Todos os teares" class="w-full px-3 py-2 text-sm bg-slate-50 border border-slate-200 rounded-xl outline-none"></div>
                     <div><label class="block text-xs font-medium text-slate-500 uppercase mb-1">Jogo</label>
                         <input type="text" id="rep-jogo" oninput="debouncedRenderReport()" placeholder="Todos os jogos" class="w-full px-3 py-2 text-sm bg-slate-50 border border-slate-200 rounded-xl outline-none"></div>
+                    <div><label class="block text-xs font-medium text-slate-500 uppercase mb-1">Fornecedor</label>
+                        <select id="rep-forn" onchange="renderReport()" class="w-full px-3 py-2 text-sm bg-slate-50 border border-slate-200 rounded-xl"></select></div>
+                    <div><label class="block text-xs font-medium text-slate-500 uppercase mb-1">Armazém</label>
+                        <select id="rep-arm" onchange="renderReport()" class="w-full px-3 py-2 text-sm bg-slate-50 border border-slate-200 rounded-xl"></select></div>
+                    <div><label class="block text-xs font-medium text-slate-500 uppercase mb-1">Fila</label>
+                        <select id="rep-fila" onchange="renderReport()" class="w-full px-3 py-2 text-sm bg-slate-50 border border-slate-200 rounded-xl"></select></div>
                 </div>
 
                 <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
@@ -980,8 +1008,8 @@
                     <div><label class="block text-xs font-medium mb-1">Fornecedor</label><select id="edit-lote-fornecedor" class="w-full px-3 py-2 text-sm border rounded-xl bg-white"></select></div>
                     <div><label class="block text-xs font-medium mb-1">Rolos disponíveis *</label><input id="edit-lote-rolos" type="number" required min="0" step="1" class="w-full px-3 py-2 text-sm border rounded-xl"></div>
                     <div><label class="block text-xs font-medium mb-1">Peso líquido disponível (kg) *</label><input id="edit-lote-peso" type="number" required min="0" step="0.01" class="w-full px-3 py-2 text-sm border rounded-xl"></div>
-                    <div><label class="block text-xs font-medium mb-1">Localização *</label><input id="edit-lote-local" type="text" required class="w-full px-3 py-2 text-sm border rounded-xl"></div>
-                    <div><label class="block text-xs font-medium mb-1">Classificação QC *</label><select id="edit-lote-qc" required class="w-full px-3 py-2 text-sm border rounded-xl"><option value="1a">1.ª Qualidade</option><option value="2a">2.ª Qualidade</option><option value="Hold">Aguardar QC</option></select></div>
+                    <div><label class="block text-xs font-medium mb-1">Armazém</label><div><select id="edit-lote-arm-sel" onchange="onLocSel('edit-lote','arm')" class="w-full px-3 py-2 text-sm border rounded-xl"></select><input type="text" id="edit-lote-arm" list="dl-arm" autocomplete="off" placeholder="Escreva o armazém" class="hidden mt-2 w-full px-3 py-2 text-sm border rounded-xl"></div></div>
+                    <div><label class="block text-xs font-medium mb-1">Fila</label><div><select id="edit-lote-fila-sel" onchange="onLocSel('edit-lote','fila')" class="w-full px-3 py-2 text-sm border rounded-xl"></select><input type="text" id="edit-lote-fila" list="dl-fila" autocomplete="off" placeholder="Escreva a posição (ex: Corredor B)" class="hidden mt-2 w-full px-3 py-2 text-sm border rounded-xl"></div></div>
                 </div>
                 <div><label class="block text-xs font-medium mb-1">Observações</label><textarea id="edit-lote-obs" rows="2" class="w-full px-3 py-2 text-sm border rounded-xl"></textarea></div>
                 <p class="text-[11px] text-amber-700 bg-amber-50 border border-amber-200 rounded-lg p-2">Alterar rolos ou peso atualiza o stock e fica registado nos movimentos como "Ajuste" (com o utilizador).</p>
@@ -1005,6 +1033,46 @@
                 <p class="text-[11px] mt-1 text-slate-400">Só aparecem lotes com stock. Escreve o SKU completo e carrega em Enter para escolher diretamente.</p>
             </div>
             <div id="pick-saida-list" class="overflow-y-auto custom-scrollbar flex-1 divide-y divide-slate-100"></div>
+        </div>
+    </div>
+
+    <div id="del-lote-modal" class="fixed inset-0 bg-slate-900/50 backdrop-blur-xs z-50 flex items-center justify-center p-4 hidden no-print">
+        <div class="bg-white rounded-2xl shadow-xl w-full max-w-md p-6 space-y-4">
+            <h3 class="font-bold text-slate-900">Lote esgotado</h3>
+            <p id="del-lote-info" class="text-sm text-slate-600"></p>
+            <div class="grid gap-2">
+                <button type="button" id="del-lote-arq" class="w-full px-4 py-2.5 text-sm font-medium text-white bg-amber-500 hover:bg-amber-600 rounded-xl text-left">Arquivar <span class="font-normal opacity-90">— sai da lista, mantém o histórico e pode ser reposto</span></button>
+                <button type="button" id="del-lote-del" class="w-full px-4 py-2.5 text-sm font-medium text-rose-700 bg-rose-50 hover:bg-rose-100 border border-rose-200 rounded-xl text-left">Eliminar de vez <span class="font-normal opacity-90">— apaga o lote e os movimentos</span></button>
+                <button type="button" onclick="closeDelLoteModal()" class="w-full px-4 py-2 text-sm text-slate-600 hover:bg-slate-100 rounded-xl">Cancelar</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="entrada-lote-modal" class="fixed inset-0 bg-slate-900/50 backdrop-blur-xs z-50 flex items-center justify-center p-4 hidden no-print">
+        <div class="bg-white rounded-2xl shadow-xl max-w-lg w-full border border-slate-200 max-h-[90vh] flex flex-col my-auto">
+            <div class="px-6 py-4 border-b border-slate-100 flex items-center justify-between bg-emerald-50 shrink-0">
+                <h3 class="font-bold text-emerald-900 text-base">Dar Entrada neste Lote</h3>
+                <button onclick="closeEntradaLoteModal()" class="text-slate-400 hover:text-slate-600 p-1"><i data-lucide="x" class="w-5 h-5"></i></button>
+            </div>
+            <form id="entrada-lote-form" novalidate onsubmit="handleEntradaLoteSubmit(event)" class="p-6 space-y-4 overflow-y-auto custom-scrollbar flex-1">
+                <input type="hidden" id="el-lote-id">
+                <p id="el-info" class="text-xs text-slate-500"></p>
+                <div>
+                    <label class="block text-xs font-medium mb-1">Origem <span class="text-slate-400 font-normal">(opcional, ex.: cliente que devolveu)</span></label>
+                    <input type="text" id="el-search" oninput="filterEntidadesEntradaLote(null, true)" onkeydown="if(event.key==='Enter'){event.preventDefault();}" autocomplete="off" placeholder="🔍 Pesquisar entidade (nome ou NIF)..." class="w-full px-3 py-2 mb-2 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:border-blue-400 outline-none">
+                    <select id="el-origem" size="4" class="w-full px-2 py-1 text-sm border border-slate-200 rounded-xl outline-none"></select>
+                    <button type="button" onclick="document.getElementById('el-origem').selectedIndex=-1" class="text-[11px] text-blue-600 hover:underline mt-1">Limpar origem</button>
+                </div>
+                <div><label class="block text-xs font-medium mb-1">Data e hora da entrada *</label><input type="datetime-local" id="el-data" required class="w-full px-3 py-2 text-sm border rounded-xl"></div>
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div><label class="block text-xs font-medium mb-1">Rolos a juntar *</label><input type="number" id="el-rolos" required min="1" step="1" class="w-full px-3 py-2 text-sm border rounded-xl"></div>
+                    <div><label class="block text-xs font-medium mb-1">Peso líquido (kg) *</label><input type="number" id="el-peso" required min="0.01" step="0.01" class="w-full px-3 py-2 text-sm border rounded-xl"></div>
+                </div>
+                <div class="pt-3 flex justify-end space-x-3 border-t shrink-0">
+                    <button type="button" onclick="closeEntradaLoteModal()" class="px-4 py-2 text-sm rounded-xl hover:bg-slate-100 font-medium">Cancelar</button>
+                    <button type="submit" id="el-btn" class="px-5 py-2 text-sm text-white bg-emerald-600 rounded-xl hover:bg-emerald-700 font-medium">Confirmar Entrada</button>
+                </div>
+            </form>
         </div>
     </div>
 
@@ -1360,6 +1428,8 @@
         }
         // guard = {rolos, peso} que o utilizador viu: se outra pessoa mexeu entretanto no lote, não grava (evita perder saídas)
         async function updateLote(id, patch, guard) {
+            const atual = lotes.find(x => String(x.id) === String(id));
+            if (atual && atual.archived && Number(patch.rolos) > 0 && patch.archived === undefined) patch = { ...patch, archived: false };   // voltou a ter stock: deixa de estar arquivado
             const run = body => {
                 let q = db.from('malha').update(body).eq('id', id);
                 if (guard) q = q.eq('rolos', guard.rolos).eq('peso', guard.peso).select('id');
@@ -1496,6 +1566,7 @@
         }
 
         function refreshAll() {
+            refreshLocLists();
             renderDashboard();
             document.getElementById('badge-entidades').textContent = entities.length;
             renderStock();
@@ -1525,12 +1596,11 @@
             document.getElementById('stat-lotes').textContent = ativos.length;
             document.getElementById('stat-rolos').textContent = ativos.reduce((a, l) => a + l.rolos, 0).toLocaleString('pt-PT');
             document.getElementById('stat-peso').textContent = formatKg(ativos.reduce((a, l) => a + l.peso, 0));
-            document.getElementById('stat-hold').textContent = ativos.filter(l => l.classificacao === 'Hold').length;
 
             document.getElementById('dashboard-recent-movements').innerHTML = movimentos.slice(0, 5).map(m => `
                 <tr class="hover:bg-slate-50/50">
                     <td class="py-2.5 px-3">${dataHoraHtml(m.date)}</td>
-                    <td class="py-2.5 px-3">${tipoBadge(m.type)}</td>
+                    <td class="py-2.5 px-3">${tipoBadge(tipoMov(m))}</td>
                     <td class="py-2.5 px-3 font-mono font-medium text-slate-800">${esc(m.sku)}</td>
                     <td class="py-2.5 px-3 text-slate-600 font-medium">${esc(m.entity_name || '-')}</td>
                     <td class="py-2.5 px-3 text-right font-bold">${m.rolos}</td>
@@ -1863,7 +1933,7 @@
                     peso_inicial: liquido, peso: liquido,
                     falhas: 0,
                     classificacao: 'Hold',
-                    localizacao: '-',
+                    localizacao: composeLoc(val('entrada-arm'), val('entrada-fila')) || '-',
                     observacoes: val('observacoes') || null,
                     created_at: agora.toISOString()
                 };
@@ -1887,6 +1957,8 @@
             showToast('Lote registado com sucesso!');
             form.reset();
             setDataEntradaHoje();
+            setLocInputs('entrada', '');
+            refreshLocLists();
             document.getElementById('lote-search').value = '';
             document.getElementById('ne-search').value = '';
             document.getElementById('tipo-search').value = '';
@@ -1927,67 +1999,123 @@
             return [l.sku, l.of_num, l.tear, l.ne_fio, l.jogo, l.lote_fio, l.localizacao, fornecedorLote(l), (ultimoUtilizador(l, mapa) || {}).user];
         }
 
-        // Fila = localização do lote (sem diferenciar maiúsculas/minúsculas nem espaços a mais)
-        const filaKey = l => String(l.localizacao || '').trim().replace(/\s+/g, ' ').toLowerCase();
-        const filaLabel = l => String(l.localizacao || '').trim().replace(/\s+/g, ' ');
-        const stockFiltrosAtivos = fl => !!(fl.tear || fl.forn || fl.fila);
-        const lotePassaFiltros = (l, fl) => (!fl.tear || String(l.tear || '').trim() === fl.tear)
-            && (!fl.forn || String(fornecedorLote(l) || '').trim() === fl.forn)
-            && (!fl.fila || filaKey(l) === fl.fila);
+        // ===== LOCALIZAÇÃO: armazém › fila =====
+        // Guardada no mesmo campo de texto (localizacao): "Armazém 1 › Fila 3". Valores antigos continuam a funcionar
+        // ("Fila 3" = só fila; "Armazém A, Prat. 3" é separado se o 1.º bloco tiver "armaz"; "-" = sem localização).
+        const LOC_SEP = ' › ';
+        const normLoc = x => String(x ?? '').normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/\s+/g, ' ').trim().toLowerCase();
+        function parseLoc(v) {
+            const t = String(v ?? '').trim().replace(/\s+/g, ' ');
+            if (!t || t === '-') return { arm: '', fila: '' };
+            const i = t.indexOf(LOC_SEP);
+            if (i >= 0) return { arm: t.slice(0, i).trim(), fila: t.slice(i + LOC_SEP.length).trim() };
+            const m = t.match(/^(.*?)\s*(?:,|\s-\s|\s\/\s|\s·\s)\s*(.+)$/);
+            if (m && /armaz/.test(normLoc(m[1]))) return { arm: m[1].trim(), fila: m[2].trim() };
+            if (/^armaz/.test(normLoc(t))) return { arm: t, fila: '' };
+            return { arm: '', fila: t };
+        }
+        const composeLoc = (arm, fila) => [arm, fila].map(x => String(x || '').trim().replace(/\s+/g, ' ')).filter(Boolean).join(LOC_SEP);
+        const locOf = l => parseLoc(l.localizacao);
+        const locDisplay = l => { const q = locOf(l); return composeLoc(q.arm, q.fila) || '-'; };
+        // Armazém: 1, 2 ou escrita livre. Fila: 1 a 50 ou escrita livre (outra posição). O <input> escondido guarda o valor final.
+        const LOC_OPCOES = { arm: ['Armazém 1', 'Armazém 2'], fila: Array.from({ length: 50 }, (_, i) => 'Fila ' + (i + 1)) };
+        const LOC_VAZIO = { arm: '— Armazém —', fila: '— Fila —' };
+        function fillLocSelects(prefix) {
+            for (const kind of ['arm', 'fila']) {
+                const sel = document.getElementById(`${prefix}-${kind}-sel`);
+                if (!sel || sel.dataset.ok) continue;
+                sel.innerHTML = `<option value="">${LOC_VAZIO[kind]}</option>` + LOC_OPCOES[kind].map(v => `<option value="${v}">${v}</option>`).join('') + '<option value="__outro__">✏️ Outro (escrever)…</option>';
+                sel.dataset.ok = '1';
+            }
+        }
+        function onLocSel(prefix, kind) {
+            const sel = document.getElementById(`${prefix}-${kind}-sel`), inp = document.getElementById(`${prefix}-${kind}`);
+            if (!sel || !inp) return;
+            if (sel.value === '__outro__') { inp.classList.remove('hidden'); inp.value = ''; inp.focus(); }
+            else { inp.classList.add('hidden'); inp.value = sel.value; }
+        }
+        function setLocInputs(prefix, str) {
+            fillLocSelects(prefix);
+            const q = parseLoc(str);
+            for (const kind of ['arm', 'fila']) {
+                const sel = document.getElementById(`${prefix}-${kind}-sel`), inp = document.getElementById(`${prefix}-${kind}`);
+                if (!sel || !inp) continue;
+                const v = q[kind];
+                const op = LOC_OPCOES[kind].find(o => normLoc(o) === normLoc(v));
+                if (!v) { sel.value = ''; inp.value = ''; inp.classList.add('hidden'); }
+                else if (op) { sel.value = op; inp.value = op; inp.classList.add('hidden'); }
+                else { sel.value = '__outro__'; inp.value = v; inp.classList.remove('hidden'); }
+            }
+        }
+        // Sugestões (datalist) com os armazéns e filas já usados
+        function refreshLocLists() {
+            fillLocSelects('entrada'); fillLocSelects('edit-lote');
+            const arms = new Map(), filas = new Map();
+            for (const l of lotes) {
+                const q = locOf(l);
+                if (q.arm && !arms.has(normLoc(q.arm))) arms.set(normLoc(q.arm), q.arm);
+                if (q.fila && !filas.has(normLoc(q.fila))) filas.set(normLoc(q.fila), q.fila);
+            }
+            const opts = m => [...m.values()].sort((x, y) => x.localeCompare(y, 'pt', { numeric: true, sensitivity: 'base' })).map(v => `<option value="${esc(v)}">`).join('');
+            const da = document.getElementById('dl-arm'), df = document.getElementById('dl-fila');
+            if (da) da.innerHTML = opts(arms);
+            if (df) df.innerHTML = opts(filas);
+        }
 
-        // Preenche os filtros de tear, fornecedor e fila com os valores existentes nos lotes em stock
+        // ===== FILTROS DO STOCK (ligados entre si): tear, fornecedor, armazém, fila =====
+                const STOCK_DIMS = [
+            { f: 'tear', id: 'filter-stock-tear', todos: 'Todos os teares', key: l => String(l.tear || '').trim(), label: l => String(l.tear || '').trim() },
+            { f: 'forn', id: 'filter-stock-forn', todos: 'Todos os fornecedores', key: l => String(fornecedorLote(l) || '').trim(), label: l => String(fornecedorLote(l) || '').trim() },
+            { f: 'arm', id: 'filter-stock-arm', todos: 'Todos os armazéns', key: l => { const q = locOf(l); return q.arm ? normLoc(q.arm) : (q.fila ? '__none__' : ''); }, label: l => locOf(l).arm || 'Sem armazém' },
+            { f: 'fila', id: 'filter-stock-fila', todos: 'Todas as filas', key: l => normLoc(locOf(l).fila), label: l => locOf(l).fila }
+        ];
+        const stockFiltrosAtivos = fl => STOCK_DIMS.some(d => fl[d.f]);
+        const lotePassaFiltros = (l, fl) => STOCK_DIMS.every(d => !fl[d.f] || d.key(l) === fl[d.f]);
         function fillStockFilters() {
-            const fill = (id, label, vals) => {
-                const sel = document.getElementById(id);
-                if (!sel) return '';
-                const cur = sel.value;
-                const list = [...new Set(vals.filter(Boolean))].sort(compareByName);
-                const html = `<option value="">${label}</option>` + list.map(v => `<option value="${esc(v)}">${esc(v)}</option>`).join('');
-                if (sel.dataset.sig !== html) { sel.innerHTML = html; sel.dataset.sig = html; }
-                sel.value = list.includes(cur) ? cur : '';
-                return sel.value;
-            };
-            const fillFila = (lotesFila, cur) => {
-                const sel = document.getElementById('filter-stock-fila');
-                if (!sel) return '';
-                const map = new Map();
-                lotesFila.forEach(l => { const k = filaKey(l); if (k && !map.has(k)) map.set(k, filaLabel(l)); });
-                const items = [...map.entries()].sort((x, y) => x[1].localeCompare(y[1], 'pt', { numeric: true, sensitivity: 'base' }));
-                const html = '<option value="">Todas as filas</option>' + items.map(([k, lb]) => `<option value="${esc(k)}">${esc(lb)}</option>`).join('');
-                if (sel.dataset.sig !== html) { sel.innerHTML = html; sel.dataset.sig = html; }
-                sel.value = map.has(cur) ? cur : '';
-                return sel.value;
-            };
             const ativos = lotes.filter(l => l.rolos > 0);
-            const tearDe = l => String(l.tear || '').trim();
-            const fornDe = l => String(fornecedorLote(l) || '').trim();
-            const selT = document.getElementById('filter-stock-tear');
-            const selF = document.getElementById('filter-stock-forn');
-            const selL = document.getElementById('filter-stock-fila');
-            let curT = selT ? selT.value : '';
-            let curF = selF ? selF.value : '';
-            let curL = selL ? selL.value : '';
-            // Filtros ligados: cada lista só mostra o que existe para a seleção dos outros filtros
-            const ok = (l, t, f, k) => (!t || tearDe(l) === t) && (!f || fornDe(l) === f) && (!k || filaKey(l) === k);
-            const tearsDe = (f, k) => ativos.filter(l => ok(l, '', f, k)).map(tearDe);
-            const fornsDe = (t, k) => ativos.filter(l => ok(l, t, '', k)).map(fornDe);
-            const filasDe = (t, f) => ativos.filter(l => ok(l, t, f, ''));
-            if (curT && !tearsDe(curF, curL).includes(curT)) curT = '';
-            if (curF && !fornsDe(curT, curL).includes(curF)) curF = '';
-            if (curL && !filasDe(curT, curF).some(l => filaKey(l) === curL)) curL = '';
-            if (selT) selT.value = curT;
-            if (selF) selF.value = curF;
-            return {
-                tear: fill('filter-stock-tear', 'Todos os teares', tearsDe(curF, curL)),
-                forn: fill('filter-stock-forn', 'Todos os fornecedores', fornsDe(curT, curL)),
-                fila: fillFila(filasDe(curT, curF), curL)
-            };
+            const cur = {};
+            STOCK_DIMS.forEach(d => { const el = document.getElementById(d.id); cur[d.f] = el ? el.value : ''; });
+            const passa = (l, skip) => STOCK_DIMS.every(d => d.f === skip || !cur[d.f] || d.key(l) === cur[d.f]);
+            // um filtro escolhido que já não existe com os outros filtros é limpo
+            STOCK_DIMS.forEach(d => { if (cur[d.f] && !ativos.some(l => passa(l, d.f) && d.key(l) === cur[d.f])) cur[d.f] = ''; });
+            const out = {};
+            for (const d of STOCK_DIMS) {
+                const el = document.getElementById(d.id);
+                if (!el) { out[d.f] = ''; continue; }
+                const m = new Map();
+                ativos.forEach(l => { if (!passa(l, d.f)) return; const k = d.key(l); if (k && !m.has(k)) m.set(k, d.label(l)); });
+                const items = [...m.entries()].sort((x, y) => (x[0] === '__none__') - (y[0] === '__none__') || x[1].localeCompare(y[1], 'pt', { numeric: true, sensitivity: 'base' }));
+                const html = `<option value="">${d.todos}</option>` + items.map(([k, lb]) => `<option value="${esc(k)}">${esc(lb)}</option>`).join('');
+                if (el.dataset.sig !== html) { el.innerHTML = html; el.dataset.sig = html; }
+                el.value = m.has(cur[d.f]) ? cur[d.f] : '';
+                out[d.f] = el.value;
+            }
+            return out;
+        }
+        function nomeFiltroLoc(fl) {
+            const t = id => { const el = document.getElementById(id); return el && el.selectedIndex >= 0 ? el.options[el.selectedIndex].text : ''; };
+            const parts = [];
+            if (fl.arm) parts.push(t('filter-stock-arm'));
+            if (fl.fila) parts.push(t('filter-stock-fila'));
+            return parts.join(LOC_SEP);
+        }
+        function limparFiltrosStock() {
+            STOCK_DIMS.forEach(d => { const el = document.getElementById(d.id); if (el) el.value = ''; });
+            const q = document.getElementById('search-stock'); if (q) q.value = '';
+            renderStock();
         }
 
         function renderStock() {
             const q = (document.getElementById('search-stock')?.value || '').toLowerCase();
             const fl = fillStockFilters();
-            const lotesBase = stockFiltrosAtivos(fl) ? lotes.filter(l => lotePassaFiltros(l, fl)) : lotes;
+            const arqOk = archiveSupported();
+            const verArq = arqOk && !!document.getElementById('show-archived')?.checked;
+            const avisoArq = document.getElementById('stock-arq-aviso');
+            if (avisoArq) avisoArq.classList.toggle('hidden', arqOk || !lotes.some(l => !(l.rolos > 0)));
+            const lblArq = document.getElementById('lbl-arquivados'); if (lblArq) lblArq.classList.toggle('hidden', !arqOk);
+            const btnLimpar = document.getElementById('btn-limpar-stock'); if (btnLimpar) btnLimpar.classList.toggle('hidden', !(stockFiltrosAtivos(fl) || q));
+            const lotesFiltr = stockFiltrosAtivos(fl) ? lotes.filter(l => lotePassaFiltros(l, fl)) : lotes;
+            const lotesBase = arqOk && !verArq ? lotesFiltr.filter(l => !l.archived) : lotesFiltr;
             const mapa = mapaUltimoMov();
             const has = (vals) => vals.some(v => String(v || '').toLowerCase().includes(q));
 
@@ -2020,8 +2148,8 @@
                 return `<div class="font-medium text-slate-700" title="${esc(u.user)}">${esc(String(u.user).split('@')[0])}</div>` + (u.date ? `<div class="text-[10px] text-slate-400">${esc(formatDateTime(u.date))}</div>` : '');
             };
             const loteRow = l => `
-                <tr id="lote-row-${esc(l.id)}" class="hover:bg-white transition align-top border-t border-slate-200/70 ${l.rolos > 0 ? '' : 'opacity-60'}">
-                    <td class="py-2.5 px-3">
+                <tr id="lote-row-${esc(l.id)}" class="hover:bg-white transition align-top border-t border-slate-200/70 ${l.rolos > 0 ? '' : 'opacity-60'} ${l.archived ? 'italic' : ''}">
+                    <td class="py-2.5 px-3" data-label="Lote">
                         <div class="flex items-start gap-2">
                             <input type="checkbox" class="lb-check no-print w-4 h-4 mt-0.5 rounded border-slate-300 text-blue-600 cursor-pointer" data-key="l:${esc(l.id)}" ${labelChecked('l:' + l.id)} onchange="toggleLabelSel(this.dataset.key, this)" title="Selecionar para a folha de etiquetas">
                             <div>
@@ -2030,23 +2158,25 @@
                             </div>
                         </div>
                     </td>
-                    <td class="py-2.5 px-3">
+                    <td class="py-2.5 px-3" data-label="Tear / NE">
                         <div class="font-medium text-slate-900">${esc(l.tear)}</div>
                         <div class="text-[11px] text-slate-500 break-words">${esc(l.ne_fio)}</div>
                     </td>
-                    <td class="py-2.5 px-3 text-xs"><span class="font-semibold">${esc(l.jogo)}</span> / ${esc(l.lote_fio)}</td>
-                    <td class="py-2.5 px-3 text-xs font-medium break-words">${esc(fornecedorLote(l) || '-')}</td>
-                    <td class="py-2.5 px-3 text-center whitespace-nowrap"><b>${l.rolos}</b> <span class="text-slate-400 text-xs">/ ${l.rolos_inicial}</span></td>
-                    <td class="py-2.5 px-3 text-center font-bold text-slate-900 whitespace-nowrap">${esc(formatKg(l.peso))}</td>
-                    <td class="py-2.5 px-3">
-                        <code class="text-xs bg-slate-100 px-1.5 py-0.5 rounded">${esc(l.localizacao)}</code>
-                        <div class="mt-1">${qcBadge(l.classificacao)}</div>
+                    <td class="py-2.5 px-3 text-xs" data-label="Jogo / Lote fio"><span class="font-semibold">${esc(l.jogo)}</span> / ${esc(l.lote_fio)}</td>
+                    <td class="py-2.5 px-3 text-xs font-medium break-words" data-label="Fornecedor">${esc(fornecedorLote(l) || '-')}</td>
+                    <td class="py-2.5 px-3 text-center whitespace-nowrap" data-label="Rolos"><b>${l.rolos}</b> <span class="text-slate-400 text-xs">/ ${l.rolos_inicial}</span></td>
+                    <td class="py-2.5 px-3 text-center font-bold text-slate-900 whitespace-nowrap" data-label="Peso líq.">${esc(formatKg(l.peso))}</td>
+                    <td class="py-2.5 px-3" data-label="Local">
+                        <code class="text-xs bg-slate-100 px-1.5 py-0.5 rounded">${esc(locDisplay(l))}</code>
+                        
                     </td>
-                    <td class="py-2.5 px-3 text-xs whitespace-nowrap">${dataHoraHtml(l.created_at)}</td>
-                    <td class="py-2.5 px-3 text-xs">${userStockCell(l)}</td>
-                    <td class="py-2.5 px-2 text-center no-print whitespace-nowrap">
+                    <td class="py-2.5 px-3 text-xs whitespace-nowrap" data-label="Entrada">${dataHoraHtml(l.created_at)}</td>
+                    <td class="py-2.5 px-3 text-xs" data-label="Últ. utilizador">${userStockCell(l)}</td>
+                    <td class="py-2.5 px-2 text-center no-print whitespace-nowrap" data-m="actions">
                         <button onclick="openEditLoteModal('${esc(l.id)}')" title="Editar lote" class="p-1.5 text-slate-400 hover:text-blue-600 transition"><i data-lucide="edit-3" class="w-4 h-4"></i></button>
+                        <button onclick="openEntradaLoteModal('${esc(l.id)}')" title="Dar entrada (juntar rolos e peso a este lote, ex.: devolução)" aria-label="Dar entrada" class="inline-flex items-center justify-center w-7 h-7 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg shadow-sm transition"><i data-lucide="arrow-down-left" class="w-4 h-4"></i></button>
                         ${l.rolos > 0 ? `<button onclick="openSaidaModal('${esc(l.id)}')" title="Dar saída" aria-label="Dar saída" class="inline-flex items-center justify-center w-7 h-7 bg-rose-600 hover:bg-rose-700 text-white rounded-lg shadow-sm transition"><i data-lucide="arrow-up-right" class="w-4 h-4"></i></button>` : ''}
+                        ${arqOk && !(l.rolos > 0) ? `<button onclick="arquivarLotes(['${esc(l.id)}'], ${!l.archived})" title="${l.archived ? 'Repor (desarquivar)' : 'Arquivar lote esgotado'}" aria-label="Arquivar" class="p-1.5 text-slate-400 hover:text-amber-600 transition"><i data-lucide="${l.archived ? 'archive-restore' : 'archive'}" class="w-4 h-4"></i></button>` : ''}
                         <button onclick="openLabelModal('${esc(l.id)}')" title="Etiqueta" class="p-1.5 text-slate-400 hover:text-blue-600 transition"><i data-lucide="printer" class="w-4 h-4"></i></button>
                         <button onclick="deleteLote('${esc(l.id)}')" title="Eliminar lote" aria-label="Eliminar lote" class="p-1.5 text-slate-400 hover:text-rose-600 transition"><i data-lucide="trash-2" class="w-4 h-4"></i></button>
                     </td>
@@ -2060,16 +2190,19 @@
                     .sort((a, b) => String(b.created_at).localeCompare(String(a.created_at)));
                 const toggle = esg > 0 && !g.soPorLote
                     ? `<button onclick="toggleMalhaEsgotados('${k}')" class="text-xs font-semibold text-blue-600 hover:text-blue-700 no-print">${showDepletedMalha.has(g.key) ? 'Ocultar esgotados' : 'Mostrar esgotados (' + esg + ')'}</button>` : '';
+                const porArq = arqOk ? g.visiveis.filter(l => !(l.rolos > 0) && !l.archived) : [];
+                const btnArq = porArq.length
+                    ? `<button onclick="arquivarLotes([${porArq.map(l => `'${esc(l.id)}'`).join(',')}], true)" title="Esconder da lista os lotes esgotados deste artigo (não apaga nada)" class="text-xs font-semibold text-amber-700 hover:text-amber-800 no-print">Arquivar esgotados (${porArq.length})</button>` : '';
                 return `
-                <tr><td colspan="5" class="bg-slate-50 px-4 py-3">
-                    <div class="flex items-center justify-between mb-1">
+                <tr><td colspan="4" class="bg-slate-50 px-4 py-3">
+                    <div class="flex items-center justify-between mb-1 gap-3 flex-wrap">
                         <span class="text-xs font-semibold text-slate-500">Lotes de ${esc(g.nome)}</span>
-                        ${toggle}
+                        <span class="flex items-center gap-4">${btnArq}${toggle}</span>
                     </div>
                     <div class="overflow-x-auto custom-scrollbar">
-                        <table class="w-full text-left min-w-[900px]">
+                        <table class="w-full text-left min-w-[900px] lote-tbl">
                             <thead><tr class="text-[11px] text-slate-400">
-                                <th class="py-1 px-3 font-semibold">Lote / OF</th><th class="py-1 px-3 font-semibold">Tear / NE Fio</th><th class="py-1 px-3 font-semibold">Jogo / Lote Fio</th><th class="py-1 px-3 font-semibold">Fornecedor</th><th class="py-1 px-3 font-semibold text-center">Rolos</th><th class="py-1 px-3 font-semibold text-center">Peso Líq.</th><th class="py-1 px-3 font-semibold">Local / QC</th><th class="py-1 px-3 font-semibold">Criado em</th><th class="py-1 px-3 font-semibold">Últ. utilizador</th><th class="no-print"></th>
+                                <th class="py-1 px-3 font-semibold">Lote / OF</th><th class="py-1 px-3 font-semibold">Tear / NE Fio</th><th class="py-1 px-3 font-semibold">Jogo / Lote Fio</th><th class="py-1 px-3 font-semibold">Fornecedor</th><th class="py-1 px-3 font-semibold text-center">Rolos</th><th class="py-1 px-3 font-semibold text-center">Peso Líq.</th><th class="py-1 px-3 font-semibold">Local</th><th class="py-1 px-3 font-semibold">Criado em</th><th class="py-1 px-3 font-semibold">Últ. utilizador</th><th class="no-print"></th>
                             </tr></thead>
                             <tbody>${rows.map(loteRow).join('')}</tbody>
                         </table>
@@ -2077,18 +2210,18 @@
                 </td></tr>`;
             };
 
-            const stockKey = q + '|' + fl.tear + '|' + fl.forn + '|' + fl.fila;
+            const stockKey = [q, fl.tear, fl.forn, fl.arm, fl.fila, verArq].join('|');
             if (stockKey !== lastStockKey) { lastStockKey = stockKey; stockLimit = 100; }
             const filaSum = document.getElementById('stock-fila-summary');
             if (filaSum) {
-                if (fl.fila) {
+                if (stockFiltrosAtivos(fl)) {
                     const ls = lista.flatMap(g => g.ativos);
-                    filaSum.textContent = `${ls.length} ${ls.length === 1 ? 'lote' : 'lotes'} · ${ls.reduce((t, l) => t + l.rolos, 0)} rolos · ${formatKg(round2(ls.reduce((t, l) => t + l.peso, 0)))} nesta fila`;
+                    filaSum.textContent = `${ls.length} ${ls.length === 1 ? 'lote' : 'lotes'} · ${ls.reduce((t, l) => t + l.rolos, 0)} rolos · ${formatKg(round2(ls.reduce((t, l) => t + l.peso, 0)))} neste local`;
                 } else filaSum.textContent = '';
             }
             const listaShown = lista.slice(0, stockLimit);
             const moreStock = lista.length > listaShown.length
-                ? `<tr><td colspan="5" class="text-center py-4 no-print"><button onclick="stockLimit += 200; renderStock()" class="px-4 py-2 text-sm font-medium text-blue-600 hover:bg-blue-50 rounded-lg">Mostrar mais (${listaShown.length} de ${lista.length})</button></td></tr>` : '';
+                ? `<tr><td colspan="4" class="text-center py-4 no-print"><button onclick="stockLimit += 200; renderStock()" class="px-4 py-2 text-sm font-medium text-blue-600 hover:bg-blue-50 rounded-lg">Mostrar mais (${listaShown.length} de ${lista.length})</button></td></tr>` : '';
             document.getElementById('stock-table-body').innerHTML = (listaShown.map(g => {
                 const k = malhaKeyAttr(g.key);
                 const open = expandedMalha.has(g.key) || g.soPorLote;
@@ -2096,13 +2229,9 @@
                 const nEsg = g.lotes.length - nAt;
                 const rolos = g.ativos.reduce((t, l) => t + l.rolos, 0);
                 const peso = round2(g.ativos.reduce((t, l) => t + l.peso, 0));
-                const nHold = g.ativos.filter(l => l.classificacao === 'Hold').length;
-                const estado = nHold
-                    ? `<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border bg-amber-50 text-amber-700 border-amber-200">${nHold} ${nHold === 1 ? 'lote aguarda' : 'lotes aguardam'} QC</span>`
-                    : '<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border bg-emerald-50 text-emerald-700 border-emerald-200">Normal</span>';
                 return `
                 <tr class="hover:bg-slate-50/80 transition">
-                    <td class="py-3 px-3 font-medium text-slate-900"><div class="flex items-center gap-1.5"><span>${esc(g.nome)}</span><button onclick="deleteMalhaGrupo('${k}')" title="Eliminar o artigo e todos os seus lotes" aria-label="Eliminar artigo" class="no-print p-1 text-slate-300 hover:text-rose-600 transition"><i data-lucide="trash-2" class="w-3.5 h-3.5"></i></button></div></td>
+                    <td class="py-3 px-3 font-medium text-slate-900"><div class="flex items-center gap-1.5"><span>${esc(g.nome)}</span></div></td>
                     <td class="py-3 px-3">
                         <button onclick="toggleMalhaGrupo('${k}')" class="inline-flex items-center gap-1 text-xs font-semibold text-blue-700 hover:bg-blue-50 rounded-lg px-2 py-1 whitespace-nowrap">
                             <i data-lucide="${open ? 'chevron-down' : 'chevron-right'}" class="w-3.5 h-3.5"></i>
@@ -2111,10 +2240,28 @@
                     </td>
                     <td class="py-3 px-3 text-center font-bold text-slate-800 whitespace-nowrap">${rolos}</td>
                     <td class="py-3 px-3 text-center font-bold text-slate-800 whitespace-nowrap">${esc(formatKg(peso))}</td>
-                    <td class="py-3 px-3 text-center">${estado}</td>
                 </tr>${open ? detalhe(g) : ''}`;
-            }).join('') || '<tr><td colspan="5" class="text-center py-6 text-slate-400">Nenhum lote em stock.</td></tr>') + moreStock;
+            }).join('') || '<tr><td colspan="4" class="text-center py-6 text-slate-400">Nenhum lote em stock.</td></tr>') + moreStock;
             scheduleIcons();
+        }
+
+
+        // ===== arquivar =====
+        function archiveSupported() { return lotes.length > 0 && Object.prototype.hasOwnProperty.call(lotes[0], 'archived'); }
+        async function arquivarLotes(ids, flag) {
+            const alvo = ids.map(String).filter(i => { const l = lotes.find(x => String(x.id) === i); return l && (!flag || !(l.rolos > 0)); });
+            if (!alvo.length) return;
+            const { error } = await db.from('malha').update({ archived: !!flag }).in('id', alvo);
+            if (error) { showToast(/archived/.test(error.message || '') ? 'Falta a coluna "archived" na tabela malha (executar arquivar_malha.sql no Supabase).' : friendlyDbError(error), 'error'); return; }
+            showToast(flag ? `${alvo.length} ${alvo.length === 1 ? 'lote arquivado' : 'lotes arquivados'}.` : 'Lote reposto.');
+            await loadData();
+            refreshAll();
+        }
+        function irParaStock() {
+            switchTab('stock');
+            STOCK_DIMS.forEach(d => { const el = document.getElementById(d.id); if (el) el.value = ''; });
+            const q = document.getElementById('search-stock'); if (q) q.value = '';
+            renderStock();
         }
 
         // ===== ELIMINAR LOTE / ARTIGO (stock atual) =====
@@ -2137,36 +2284,25 @@
         }
         const descMov = n => n ? `${n} ${n === 1 ? 'movimento registado' : 'movimentos registados'}` : 'sem movimentos registados';
 
-        async function deleteLote(id) {
+        function closeDelLoteModal() { document.getElementById('del-lote-modal').classList.add('hidden'); }
+        function openDelLoteModal(l) {
+            document.getElementById('del-lote-info').textContent = `${l.sku || ''} · ${malhaNome(l)} está esgotado. Arquivar é o mais seguro; eliminar não pode ser desfeito.`;
+            document.getElementById('del-lote-arq').onclick = () => { closeDelLoteModal(); arquivarLotes([l.id], true); };
+            document.getElementById('del-lote-del').onclick = () => { closeDelLoteModal(); deleteLote(l.id, true); };
+            document.getElementById('del-lote-modal').classList.remove('hidden');
+        }
+        async function deleteLote(id, skipOferta) {
             const l = lotes.find(x => String(x.id) === String(id));
             if (!l) return;
             const nMov = movimentos.filter(m => String(m.malha_id) === String(l.id)).length;
             const stock = l.rolos > 0 ? `${l.rolos} ${l.rolos === 1 ? 'rolo' : 'rolos'} · ${formatKg(l.peso)} em stock` : 'sem stock (esgotado)';
+            if (!skipOferta && !(l.rolos > 0) && !l.archived && archiveSupported()) { openDelLoteModal(l); return; }
             if (!confirm(`Eliminar COMPLETAMENTE o lote ${l.sku || ''}?\n\n${malhaNome(l)}\n${stock}\n${descMov(nMov)} (também serão apagados).\n\nEsta ação não pode ser desfeita.`)) return;
             const error = await apagarLotes([l.id]);
             if (error) { showToast(friendlyDbError(error), 'error'); return; }
             await depoisDeEliminar([l.id], `Lote ${l.sku || ''} eliminado.`);
         }
 
-        async function deleteMalhaGrupo(k) {
-            k = decodeURIComponent(k);
-            const todos = lotes.filter(l => malhaKey(l) === k);
-            if (!todos.length) return;
-            const ids = todos.map(l => l.id);
-            const idSet = new Set(ids.map(String));
-            const nMov = movimentos.filter(m => idSet.has(String(m.malha_id))).length;
-            const comStock = todos.filter(l => l.rolos > 0);
-            const rolos = comStock.reduce((t, l) => t + l.rolos, 0), peso = round2(comStock.reduce((t, l) => t + l.peso, 0));
-            const fl = fillStockFilters();
-            const visiveis = stockFiltrosAtivos(fl) ? todos.filter(l => lotePassaFiltros(l, fl)).length : todos.length;
-            const nota = visiveis < todos.length ? `\nAtenção: inclui ${todos.length - visiveis} lote(s) que não estão visíveis com os filtros atuais.` : '';
-            const nome = malhaNome(todos[0]);
-            if (!confirm(`Eliminar COMPLETAMENTE o artigo "${nome}" e todos os seus lotes?\n\n${todos.length} ${todos.length === 1 ? 'lote' : 'lotes'} (${comStock.length} com stock: ${rolos} rolos · ${formatKg(peso)})\n${descMov(nMov)} (também serão apagados).${nota}\n\nEsta ação não pode ser desfeita.`)) return;
-            const error = await apagarLotes(ids);
-            if (error) { showToast(friendlyDbError(error), 'error'); return; }
-            expandedMalha.delete(k); showDepletedMalha.delete(k);
-            await depoisDeEliminar(ids.map(String), `Artigo "${nome}" eliminado (${todos.length} ${todos.length === 1 ? 'lote' : 'lotes'}).`);
-        }
 
         function openEditLoteModal(id) {
             const l = lotes.find(x => String(x.id) === String(id));
@@ -2178,12 +2314,12 @@
                 'edit-lote-fio': l.lote_fio || '', 'edit-lote-tipo': l.tipo_malha || '',
                 'edit-lote-cor': l.cor || '',
                 'edit-lote-rolos': l.rolos ?? 0, 'edit-lote-peso': l.peso ?? 0,
-                'edit-lote-local': l.localizacao || '', 'edit-lote-qc': l.classificacao || 'Hold',
-                'edit-lote-obs': l.observacoes || ''
+                                'edit-lote-obs': l.observacoes || ''
             };
             Object.entries(values).forEach(([field, value]) => { document.getElementById(field).value = value; });
             // Fornecedor: lista das entidades (Fornecedor/Ambos) do Supabase; mantém o valor atual do lote mesmo que já não exista na lista
             fillEntitySelect('edit-lote-fornecedor', null, ['Fornecedor', 'Ambos'], fornecedorLote(l));
+            setLocInputs('edit-lote', l.localizacao);
             clearFieldErrors(document.getElementById('edit-lote-form'));
             document.getElementById('edit-lote-modal').classList.remove('hidden');
             scheduleIcons();
@@ -2203,7 +2339,7 @@
                 tipo_malha: val('edit-lote-tipo'), cor: val('edit-lote-cor') || null,
                 fornecedor: val('edit-lote-fornecedor') || null,
                 rolos: parseInt(val('edit-lote-rolos'), 10), peso: round2(val('edit-lote-peso')),
-                localizacao: val('edit-lote-local'), classificacao: val('edit-lote-qc'),
+                localizacao: composeLoc(val('edit-lote-arm'), val('edit-lote-fila')) || '-',
                 observacoes: val('edit-lote-obs') || null
             };
             btn.disabled = true;
@@ -2240,8 +2376,8 @@
                 lines: [`OF: ${l.of_num || '-'} | Tear: ${l.tear} | Malha: ${l.tipo_malha}`,
                         `Lote Fio: ${l.lote_fio} | Rolos: ${l.rolos} | Peso Líq.: ${formatKg(l.peso)}`],
                 code: l.sku, qr: l.sku,
-                footL: `Loc: ${l.localizacao}`,
-                footR: ({ '1a': '1.ª Qualidade', '2a': '2.ª Qualidade', 'Hold': 'Aguardar QC' })[l.classificacao] || l.classificacao
+                footL: `Loc: ${locDisplay(l)}`,
+                footR: fornecedorLote(l) || ''
             };
         }
         // Botão da impressora numa linha (ou após a entrada): abre a folha só com essa etiqueta
@@ -2336,8 +2472,7 @@
 
         // ===== LISTAGEM dos lotes selecionados =====
         function printSelectedList(keys) {
-            const QC = { '1a': '1.ª Qualidade', '2a': '2.ª Qualidade', 'Hold': 'Aguardar QC' };
-            const rows = (keys || []).map(k => lotes.find(x => String(x.id) === k.slice(2))).filter(Boolean);
+                        const rows = (keys || []).map(k => lotes.find(x => String(x.id) === k.slice(2))).filter(Boolean);
             if (!rows.length) { showToast('Selecione pelo menos um lote.', 'error'); return; }
             const body = rows.map(l => `<tr>
                 <td class="bar-cell"><svg class="lst-bar" data-code="${esc(l.sku || '-')}"></svg></td>
@@ -2348,8 +2483,7 @@
                 <td>${esc(fornecedorLote(l) || '-')}</td>
                 <td class="num">${esc(l.rolos)}</td>
                 <td class="num">${esc(formatKg(l.peso))}</td>
-                <td>${esc(l.localizacao || '-')}</td>
-                <td>${esc(QC[l.classificacao] || l.classificacao || '-')}</td>
+                <td>${esc(locDisplay(l))}</td>
             </tr>`).join('');
             const totRolos = rows.reduce((a, l) => a + (Number(l.rolos) || 0), 0);
             const totPeso = rows.reduce((a, l) => a + (Number(l.peso) || 0), 0);
@@ -2429,6 +2563,57 @@
             const exact = rows.find(l => String(l.sku || '').toLowerCase() === q);
             if (exact) pickLoteSaida(exact.id);
             else if (rows.length === 1) pickLoteSaida(rows[0].id);
+        }
+
+        // ===== DAR ENTRADA NUM LOTE EXISTENTE (ex.: devolução) =====
+        // Regista-se como movimento "Entrada (+)" do tipo ajuste, para que apagar este registo nunca apague o lote.
+        const ehEntradaExtra = m => m.type === 'ajuste' && String(m.entity_name || '').startsWith('Entrada (+)');
+        const tipoMov = m => ehEntradaExtra(m) ? 'entrada' : m.type;
+        function filterEntidadesEntradaLote(keep, typing) { fillEntitySelect('el-origem', 'el-search', null, keep, typing); }
+        function openEntradaLoteModal(id) {
+            const l = lotes.find(x => String(x.id) === String(id));
+            if (!l) return;
+            document.getElementById('entrada-lote-form').reset();
+            clearFieldErrors(document.getElementById('entrada-lote-form'));
+            document.getElementById('el-lote-id').value = l.id;
+            document.getElementById('el-info').textContent = `Lote ${l.sku} · ${malhaNome(l)} · atualmente ${l.rolos} rolos (${formatKg(l.peso)})`;
+            document.getElementById('el-search').value = '';
+            document.getElementById('el-data').value = hojeInput();
+            fillEntitySelect('el-origem', 'el-search', null, '');
+            document.getElementById('el-origem').selectedIndex = -1;
+            document.getElementById('entrada-lote-modal').classList.remove('hidden');
+        }
+        function closeEntradaLoteModal() { document.getElementById('entrada-lote-modal').classList.add('hidden'); }
+        async function handleEntradaLoteSubmit(e) {
+            e.preventDefault();
+            const form = document.getElementById('entrada-lote-form');
+            if (!validateForm(form)) return;
+            const l = lotes.find(x => String(x.id) === document.getElementById('el-lote-id').value);
+            if (!l) return;
+            const rolos = parseInt(document.getElementById('el-rolos').value);
+            const peso = round2(document.getElementById('el-peso').value);
+            if (!(rolos > 0) || !(peso > 0)) { setFieldError('el-peso', 'Indique rolos e peso superiores a 0.'); return; }
+            const origem = document.getElementById('el-origem').value;
+            const novosRolos = l.rolos + rolos, novoPeso = round2(l.peso + peso);
+            const btn = document.getElementById('el-btn');
+            btn.disabled = true;
+            const patch = { rolos: novosRolos, peso: novoPeso };
+            if (novosRolos > (l.rolos_inicial || 0)) patch.rolos_inicial = novosRolos;   // o "/ total" nunca fica abaixo do que existe
+            if (novoPeso > (l.peso_inicial || 0)) patch.peso_inicial = novoPeso;
+            let { error } = await updateLote(l.id, patch, { rolos: l.rolos, peso: l.peso });
+            if (!error) {
+                ({ error } = await insertMov([{
+                    malha_id: l.id, sku: l.sku, of_num: l.of_num, tear: l.tear,
+                    type: 'ajuste', entity_name: origem ? `Entrada (+) · ${origem}` : 'Entrada (+)', rolos, peso, date: dataEscolhida('el-data').toISOString()
+                }]));
+                if (error) await updateLote(l.id, { rolos: l.rolos, peso: l.peso });   // desfaz
+            }
+            btn.disabled = false;
+            if (error) { showToast(error.code === 'STALE' ? 'O lote foi alterado por outro utilizador. Dados recarregados.' : friendlyDbError(error), 'error'); await loadData(); refreshAll(); return; }
+            showToast(`Entrada registada: +${rolos} rolos · +${formatKg(peso)}.`);
+            await loadData();
+            refreshAll();
+            closeEntradaLoteModal();
         }
 
         function openSaidaModal(id) {
@@ -2513,10 +2698,11 @@
             const q = (document.getElementById('search-mov')?.value || '').toLowerCase();
             const start = document.getElementById('filter-mov-start')?.value || '';
             const end = document.getElementById('filter-mov-end')?.value || '';
+            const tp = document.getElementById('filter-mov-type')?.value || '';
             return movimentos.filter(m => {
-                const okSearch = !q || [m.sku, artigoDoMov(m), loteDoMov(m), m.of_num, m.tear, m.entity_name, m.type].some(v => String(v || '').toLowerCase().includes(q));
+                const okSearch = !q || [m.sku, artigoDoMov(m), loteDoMov(m), m.of_num, m.tear, m.entity_name, m.type, m.created_by, m.updated_by, m.observacoes].some(v => String(v || '').toLowerCase().includes(q));
                 const day = localDay(m.date);
-                return okSearch && (!start || day >= start) && (!end || day <= end);
+                return okSearch && (!tp || tipoMov(m) === tp) && (!start || day >= start) && (!end || day <= end);
             });
         }
         // Utilizador que registou (created_by) e, se for diferente, quem alterou por último (updated_by)
@@ -2531,24 +2717,24 @@
 
         function renderMovimentos() {
             const todos = filteredMovimentos();
-            const mKey = ['search-mov', 'filter-mov-start', 'filter-mov-end'].map(id => document.getElementById(id)?.value || '').join('|');
+            const mKey = ['search-mov', 'filter-mov-type', 'filter-mov-start', 'filter-mov-end'].map(id => document.getElementById(id)?.value || '').join('|');
             if (mKey !== lastMovKey) { lastMovKey = mKey; movLimit = 100; }
             const shownMov = todos.slice(0, movLimit);
             const moreMov = todos.length > shownMov.length
                 ? `<tr><td colspan="11" class="text-center py-4"><button onclick="movLimit += 200; renderMovimentos()" class="px-4 py-2 text-sm font-medium text-blue-600 hover:bg-blue-50 rounded-lg">Mostrar mais (${shownMov.length} de ${todos.length})</button></td></tr>` : '';
             document.getElementById('mov-table-body').innerHTML = (shownMov.map(m => `
                 <tr class="hover:bg-slate-50/80 transition">
-                    <td class="py-3 px-4 text-xs">${dataHoraHtml(m.date)}</td>
-                    <td class="py-3 px-4">${tipoBadge(m.type)}</td>
-                    <td class="py-3 px-4 text-xs font-medium text-slate-700">${esc(artigoDoMov(m))}</td>
-                    <td class="py-3 px-4 font-semibold text-slate-900">${esc(loteDoMov(m))}</td>
-                    <td class="py-3 px-4 text-xs">${esc(m.of_num || '-')}</td>
-                    <td class="py-3 px-4 font-medium">${esc(m.tear || '-')}</td>
-                    <td class="py-3 px-4 text-xs text-slate-600">${esc(m.entity_name || '-')}</td>
-                    <td class="py-3 px-4 text-center font-bold">${m.rolos}</td>
-                    <td class="py-3 px-4 text-center font-bold ${movPositivo(m) ? 'text-emerald-600' : 'text-rose-600'}">${movPositivo(m) ? '+' : '-'}${esc(formatKg(m.peso))}</td>
-                    <td class="py-3 px-4 text-xs">${userCell(m)}</td>
-                    <td class="py-3 px-4 text-center no-print sticky-col-right bg-white shadow-xs border-l border-slate-100">
+                    <td class="py-3 px-4 text-xs" data-label="Data">${dataHoraHtml(m.date)}</td>
+                    <td class="py-3 px-4" data-label="Tipo">${tipoBadge(tipoMov(m))}</td>
+                    <td class="py-3 px-4 text-xs font-medium text-slate-700" data-label="Artigo">${esc(artigoDoMov(m))}</td>
+                    <td class="py-3 px-4 font-semibold text-slate-900" data-label="Lote">${esc(loteDoMov(m))}</td>
+                    <td class="py-3 px-4 text-xs" data-label="OF">${esc(m.of_num || '-')}</td>
+                    <td class="py-3 px-4 font-medium" data-label="Tear">${esc(m.tear || '-')}</td>
+                    <td class="py-3 px-4 text-xs text-slate-600" data-label="Entidade">${esc(m.entity_name || '-')}</td>
+                    <td class="py-3 px-4 text-center font-bold" data-label="Rolos">${m.rolos}</td>
+                    <td class="py-3 px-4 text-center font-bold ${movPositivo(m) ? 'text-emerald-600' : 'text-rose-600'}" data-label="Peso líq.">${movPositivo(m) ? '+' : '-'}${esc(formatKg(m.peso))}</td>
+                    <td class="py-3 px-4 text-xs" data-label="Utilizador">${userCell(m)}</td>
+                    <td data-m="actions" class="py-3 px-4 text-center no-print sticky-col-right bg-white shadow-xs border-l border-slate-100">
                         <div class="flex items-center justify-center space-x-1">
                             <button onclick="openEditMovModal('${esc(m.id)}')" title="Editar" class="p-1.5 text-slate-400 hover:text-blue-600 transition"><i data-lucide="edit-3" class="w-4 h-4"></i></button>
                             <button onclick="deleteMovimento('${esc(m.id)}')" title="Eliminar" class="p-1.5 text-slate-400 hover:text-rose-600 transition"><i data-lucide="trash-2" class="w-4 h-4"></i></button>
@@ -2558,6 +2744,7 @@
             scheduleIcons();
         }
         function clearDateFilter() {
+            const t = document.getElementById('filter-mov-type'); if (t) t.value = '';
             document.getElementById('filter-mov-start').value = '';
             document.getElementById('filter-mov-end').value = '';
             renderMovimentos();
@@ -2659,7 +2846,7 @@
         function mostrarLoteNoStock(l) {
             switchTab('stock');
             document.getElementById('search-stock').value = l.sku;   // mostra só este lote
-            ['filter-stock-tear', 'filter-stock-forn', 'filter-stock-fila'].forEach(i => { const e = document.getElementById(i); if (e) e.value = ''; });
+            STOCK_DIMS.forEach(d => { const e = document.getElementById(d.id); if (e) e.value = ''; });
             renderStock();
             const row = document.getElementById('lote-row-' + l.id);
             if (!row) return;
@@ -2885,12 +3072,25 @@
             const tipos = [...new Set(lotes.map(l => l.tipo_malha).filter(Boolean))].sort();
             sel.innerHTML = '<option value="">Todos</option>' + tipos.map(t => `<option value="${esc(t)}">${esc(t)}</option>`).join('');
             sel.value = tipos.includes(current) ? current : '';
+            const fillRep = (id, todos, pairs) => {
+                const el = document.getElementById(id); if (!el) return;
+                const cur = el.value;
+                el.innerHTML = `<option value="">${todos}</option>` + pairs.map(([k, lb]) => `<option value="${esc(k)}">${esc(lb)}</option>`).join('');
+                el.value = pairs.some(([k]) => k === cur) ? cur : '';
+            };
+            const uniq = f => [...new Map(lotes.map(l => [f.key(l), f.label(l)]).filter(([k]) => k)).entries()].sort((x, y) => (x[0] === '__none__') - (y[0] === '__none__') || x[1].localeCompare(y[1], 'pt', { numeric: true, sensitivity: 'base' }));
+            const dim = n => STOCK_DIMS.find(d => d.f === n);
+            fillRep('rep-forn', 'Todos', uniq(dim('forn')));
+            fillRep('rep-arm', 'Todos', uniq(dim('arm')));
+            fillRep('rep-fila', 'Todas', uniq(dim('fila')));
         }
         function reportRows() {
             const tipo = document.getElementById('rep-malha').value;
             const tear = document.getElementById('rep-tear').value.trim().toLowerCase();
             const jogo = document.getElementById('rep-jogo').value.trim().toLowerCase();
-            return lotes.filter(l => l.rolos > 0 &&
+            const g = id => document.getElementById(id)?.value || '';
+            const F = { forn: g('rep-forn'), arm: g('rep-arm'), fila: g('rep-fila') };
+            return lotes.filter(l => l.rolos > 0 && STOCK_DIMS.filter(d => F[d.f]).every(d => d.key(l) === F[d.f]) &&
                 (!tipo || l.tipo_malha === tipo) &&
                 (!tear || String(l.tear || '').toLowerCase().includes(tear)) &&
                 (!jogo || String(l.jogo || '').toLowerCase().includes(jogo)));
@@ -2910,7 +3110,7 @@
                     <td class="py-3 px-4 text-xs">${esc(l.tipo_malha)}</td>
                     <td class="py-3 px-4 text-center font-bold">${l.rolos}</td>
                     <td class="py-3 px-4 text-center font-bold">${esc(formatKg(l.peso))}</td>
-                    <td class="py-3 px-4 text-xs">${esc(l.localizacao)}</td>
+                    <td class="py-3 px-4 text-xs">${esc(locDisplay(l))}</td>
                 </tr>`).join('') || '<tr><td colspan="9" class="text-center py-6 text-slate-400">Sem dados para os filtros escolhidos.</td></tr>';
         }
 
@@ -2922,12 +3122,12 @@
         }
         // Impressão do stock atual: A4 horizontal, tabela própria (agrupada por designação, até 2 linhas por lote).
         // Respeita a pesquisa e os filtros de tear / fornecedor / fila do ecrã.
-        function printStock() {
+        // Seleção do stock (pesquisa + filtros do ecrã), partilhada pela impressão e pela exportação CSV
+        function stockSelecao() {
             const q = (document.getElementById('search-stock')?.value || '').toLowerCase();
             const fl = fillStockFilters();
             const base = stockFiltrosAtivos(fl) ? lotes.filter(l => lotePassaFiltros(l, fl)) : lotes;
-            const filaSel = document.getElementById('filter-stock-fila');
-            const filaNome = fl.fila ? (filaSel?.options[filaSel.selectedIndex]?.text || '') : '';
+            const filtroNome = nomeFiltroLoc(fl);
             const mapa = mapaUltimoMov();
             const has = vals => vals.some(v => String(v || '').toLowerCase().includes(q));
             const grupos = new Map();
@@ -2945,6 +3145,21 @@
                 lista.push({ nome: g.nome, lotes: ls });
             }
             lista.sort((a, b) => a.nome.localeCompare(b.nome, 'pt'));
+            return { lista, fl, filtroNome, mapa };
+        }
+        function exportStockFiltrado() {
+            const { lista, mapa } = stockSelecao();
+            if (!lista.length) { showToast('Não há stock para exportar.', 'error'); return; }
+            const head = ['Artigo', 'Cor', 'SKU', 'OF', 'Tear', 'NE Fio', 'Jogo', 'Lote Fio', 'Fornecedor', 'Rolos', 'Peso Líq. (kg)', 'Armazém', 'Fila', 'Criado em (data)', 'Criado em (hora)', 'Últ. utilizador'];
+            const lines = [head.map(csvCell).join(';')];
+            for (const g of lista) for (const l of g.lotes) {
+                const q = locOf(l);
+                lines.push([l.tipo_malha, l.cor, l.sku, l.of_num, l.tear, l.ne_fio, l.jogo, l.lote_fio, fornecedorLote(l), l.rolos, l.peso, q.arm, q.fila, fmtData(l.created_at), fmtHora(l.created_at), (ultimoUtilizador(l, mapa) || {}).user || ''].map(csvCell).join(';'));
+            }
+            downloadBlob('﻿' + lines.join('\n'), 'stock_malha_filtrado.csv', 'text/csv;charset=utf-8');
+        }
+        function printStock() {
+            const { lista, filtroNome: filaNome } = stockSelecao();
             if (!lista.length) { showToast('Não há stock para imprimir.', 'error'); return; }
 
             const sum = (arr, f) => arr.reduce((a, l) => a + (Number(l[f]) || 0), 0);
@@ -2968,12 +3183,12 @@
                 return `<tbody style="break-inside:avoid;page-break-inside:avoid">${head + rows}</tbody>`;   // artigo + lotes juntos na mesma folha
             }).join('');
             document.getElementById('printable-list-area').innerHTML = `<table style="table-layout:fixed;width:100%;overflow-wrap:anywhere;word-break:break-word">
-                <colgroup><col style="width:19%"><col style="width:12%"><col style="width:16%"><col style="width:27%"><col style="width:9%"><col style="width:6%"><col style="width:11%"></colgroup>
+                <colgroup><col style="width:19%"><col style="width:9%"><col style="width:22%"><col style="width:27%"><col style="width:9%"><col style="width:5%"><col style="width:9%"></colgroup>
                 <thead><tr><th>SKU / OF</th><th>Tear / NE</th><th>Jogo / Lote Fio</th><th>Fornecedor</th><th>Entrada</th><th class="num">Rolos</th><th class="num">Peso Líq.</th></tr></thead>
                 ${body}</table>
                 <p style="margin-top:8px;font-size:11px;color:#475569;"><b>Total:</b> ${nLotes} ${nLotes === 1 ? 'lote' : 'lotes'} · ${totR} rolos · ${esc(formatKg(totP))}</p>`;
 
-            setPrintHeader('Oliveira & Gonçalves - Stock de Malha em Cru' + (filaNome ? ' - Fila: ' + filaNome : ''));   // também limpa o modo etiquetas/lista
+            setPrintHeader('Oliveira & Gonçalves - Stock de Malha em Cru' + (filaNome ? ' - ' + filaNome : ''));   // também limpa o modo etiquetas/lista
             let st = document.getElementById('label-page-style');
             if (!st) { st = document.createElement('style'); st.id = 'label-page-style'; document.head.appendChild(st); }
             st.textContent = '@page { size: A4 landscape; margin: 10mm; }';
@@ -3024,10 +3239,10 @@
                 `backup_malha_${new Date().toISOString().slice(0, 10)}.json`, 'application/json');
         }
         function exportStockCSV() {
-            const head = ['SKU', 'OF', 'Tear', 'NE Fio', 'Jogo', 'Lote Fio', 'Tipo Malha', 'Fornecedor', 'Rolos', 'Peso Líq. (kg)', 'Localização', 'QC', 'Criado em (data)', 'Criado em (hora)', 'Últ. utilizador'];
+            const head = ['SKU', 'OF', 'Tear', 'NE Fio', 'Jogo', 'Lote Fio', 'Tipo Malha', 'Fornecedor', 'Rolos', 'Peso Líq. (kg)', 'Localização', 'Criado em (data)', 'Criado em (hora)', 'Últ. utilizador'];
             const mapa = mapaUltimoMov();
             const lines = [head.map(csvCell).join(';')].concat(lotes.filter(l => l.rolos > 0).map(l =>
-                [l.sku, l.of_num, l.tear, l.ne_fio, l.jogo, l.lote_fio, l.tipo_malha, l.fornecedor, l.rolos, l.peso, l.localizacao, l.classificacao, fmtData(l.created_at), fmtHora(l.created_at), (ultimoUtilizador(l, mapa) || {}).user || ''].map(csvCell).join(';')));
+                [l.sku, l.of_num, l.tear, l.ne_fio, l.jogo, l.lote_fio, l.tipo_malha, l.fornecedor, l.rolos, l.peso, l.localizacao, fmtData(l.created_at), fmtHora(l.created_at), (ultimoUtilizador(l, mapa) || {}).user || ''].map(csvCell).join(';')));
             downloadBlob('\uFEFF' + lines.join('\n'), 'stock_malha.csv', 'text/csv;charset=utf-8');
         }
         function exportMovimentosCSV() {
