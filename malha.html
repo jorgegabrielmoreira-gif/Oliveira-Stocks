@@ -706,16 +706,19 @@
         <!-- STOCK ATUAL -->
         <div id="content-stock" class="space-y-6 hidden">
             <div class="bg-white p-6 rounded-2xl border border-slate-200 shadow-xs space-y-4">
-                <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-                    <div class="flex flex-col sm:flex-row flex-1 gap-2 min-w-0">
-                    <div class="relative flex-1 max-w-md">
+                <div class="flex flex-col gap-3">
+                    <div class="relative w-full">
                         <span class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400"><i data-lucide="search" class="w-4 h-4"></i></span>
-                        <input type="text" id="search-stock" oninput="debouncedRenderStock()" placeholder="Pesquisar designação, SKU, OF, tear, NE, jogo, lote, fornecedor, local..." class="w-full pl-9 pr-4 py-2 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:outline-none">
+                        <input type="text" id="search-stock" oninput="debouncedRenderStock()" placeholder="Pesquisar designação, SKU, OF, tear, NE, jogo, lote, fornecedor, local (fila)..." class="w-full pl-9 pr-4 py-2 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:outline-none">
                     </div>
+                    <div class="flex flex-wrap items-center justify-between gap-3">
+                    <div class="flex flex-wrap items-center gap-2 min-w-0">
                     <select id="filter-stock-tear" onchange="renderStock()" title="Filtrar por tear" class="px-3 py-2 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:outline-none sm:w-40"></select>
                     <select id="filter-stock-forn" onchange="renderStock()" title="Filtrar por fornecedor" class="px-3 py-2 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:outline-none sm:w-52"></select>
+                    <select id="filter-stock-fila" onchange="renderStock()" title="Filtrar pela localização (fila)" class="px-3 py-2 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:outline-none sm:w-44"></select>
+                    <span id="stock-fila-summary" class="no-print text-xs font-medium text-slate-500 whitespace-nowrap"></span>
                     </div>
-                    <div class="flex items-center space-x-2">
+                    <div class="flex flex-wrap items-center gap-2">
                         <button onclick="openScanner()" class="inline-flex items-center space-x-1.5 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-medium px-3.5 py-2.5 rounded-xl transition shadow-sm no-print">
                             <i data-lucide="scan-barcode" class="w-4 h-4"></i><span>Ler código</span>
                         </button>
@@ -728,6 +731,7 @@
                         <button onclick="switchTab('entrada')" class="inline-flex items-center justify-center space-x-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium px-4 py-2 rounded-xl transition shadow-sm">
                             <i data-lucide="plus" class="w-4 h-4"></i><span>Nova Entrada</span>
                         </button>
+                    </div>
                     </div>
                 </div>
                 <div class="overflow-x-auto rounded-xl border border-slate-200 custom-scrollbar">
@@ -1923,7 +1927,15 @@
             return [l.sku, l.of_num, l.tear, l.ne_fio, l.jogo, l.lote_fio, l.localizacao, fornecedorLote(l), (ultimoUtilizador(l, mapa) || {}).user];
         }
 
-        // Preenche os filtros de tear e fornecedor com os valores existentes nos lotes em stock
+        // Fila = localização do lote (sem diferenciar maiúsculas/minúsculas nem espaços a mais)
+        const filaKey = l => String(l.localizacao || '').trim().replace(/\s+/g, ' ').toLowerCase();
+        const filaLabel = l => String(l.localizacao || '').trim().replace(/\s+/g, ' ');
+        const stockFiltrosAtivos = fl => !!(fl.tear || fl.forn || fl.fila);
+        const lotePassaFiltros = (l, fl) => (!fl.tear || String(l.tear || '').trim() === fl.tear)
+            && (!fl.forn || String(fornecedorLote(l) || '').trim() === fl.forn)
+            && (!fl.fila || filaKey(l) === fl.fila);
+
+        // Preenche os filtros de tear, fornecedor e fila com os valores existentes nos lotes em stock
         function fillStockFilters() {
             const fill = (id, label, vals) => {
                 const sel = document.getElementById(id);
@@ -1935,32 +1947,47 @@
                 sel.value = list.includes(cur) ? cur : '';
                 return sel.value;
             };
+            const fillFila = (lotesFila, cur) => {
+                const sel = document.getElementById('filter-stock-fila');
+                if (!sel) return '';
+                const map = new Map();
+                lotesFila.forEach(l => { const k = filaKey(l); if (k && !map.has(k)) map.set(k, filaLabel(l)); });
+                const items = [...map.entries()].sort((x, y) => x[1].localeCompare(y[1], 'pt', { numeric: true, sensitivity: 'base' }));
+                const html = '<option value="">Todas as filas</option>' + items.map(([k, lb]) => `<option value="${esc(k)}">${esc(lb)}</option>`).join('');
+                if (sel.dataset.sig !== html) { sel.innerHTML = html; sel.dataset.sig = html; }
+                sel.value = map.has(cur) ? cur : '';
+                return sel.value;
+            };
             const ativos = lotes.filter(l => l.rolos > 0);
             const tearDe = l => String(l.tear || '').trim();
             const fornDe = l => String(fornecedorLote(l) || '').trim();
             const selT = document.getElementById('filter-stock-tear');
             const selF = document.getElementById('filter-stock-forn');
+            const selL = document.getElementById('filter-stock-fila');
             let curT = selT ? selT.value : '';
             let curF = selF ? selF.value : '';
-            // Filtros ligados: cada lista só mostra o que existe para a seleção do outro filtro
-            const tearsDoForn = f => ativos.filter(l => !f || fornDe(l) === f).map(tearDe);
-            const fornsDoTear = t => ativos.filter(l => !t || tearDe(l) === t).map(fornDe);
-            if (curT && !tearsDoForn(curF).includes(curT)) curT = '';
-            if (curF && !fornsDoTear(curT).includes(curF)) curF = '';
+            let curL = selL ? selL.value : '';
+            // Filtros ligados: cada lista só mostra o que existe para a seleção dos outros filtros
+            const ok = (l, t, f, k) => (!t || tearDe(l) === t) && (!f || fornDe(l) === f) && (!k || filaKey(l) === k);
+            const tearsDe = (f, k) => ativos.filter(l => ok(l, '', f, k)).map(tearDe);
+            const fornsDe = (t, k) => ativos.filter(l => ok(l, t, '', k)).map(fornDe);
+            const filasDe = (t, f) => ativos.filter(l => ok(l, t, f, ''));
+            if (curT && !tearsDe(curF, curL).includes(curT)) curT = '';
+            if (curF && !fornsDe(curT, curL).includes(curF)) curF = '';
+            if (curL && !filasDe(curT, curF).some(l => filaKey(l) === curL)) curL = '';
             if (selT) selT.value = curT;
             if (selF) selF.value = curF;
             return {
-                tear: fill('filter-stock-tear', 'Todos os teares', tearsDoForn(curF)),
-                forn: fill('filter-stock-forn', 'Todos os fornecedores', fornsDoTear(curT))
+                tear: fill('filter-stock-tear', 'Todos os teares', tearsDe(curF, curL)),
+                forn: fill('filter-stock-forn', 'Todos os fornecedores', fornsDe(curT, curL)),
+                fila: fillFila(filasDe(curT, curF), curL)
             };
         }
 
         function renderStock() {
             const q = (document.getElementById('search-stock')?.value || '').toLowerCase();
             const fl = fillStockFilters();
-            const lotesBase = (fl.tear || fl.forn)
-                ? lotes.filter(l => (!fl.tear || String(l.tear || '').trim() === fl.tear) && (!fl.forn || String(fornecedorLote(l) || '').trim() === fl.forn))
-                : lotes;
+            const lotesBase = stockFiltrosAtivos(fl) ? lotes.filter(l => lotePassaFiltros(l, fl)) : lotes;
             const mapa = mapaUltimoMov();
             const has = (vals) => vals.some(v => String(v || '').toLowerCase().includes(q));
 
@@ -2021,6 +2048,7 @@
                         <button onclick="openEditLoteModal('${esc(l.id)}')" title="Editar lote" class="p-1.5 text-slate-400 hover:text-blue-600 transition"><i data-lucide="edit-3" class="w-4 h-4"></i></button>
                         ${l.rolos > 0 ? `<button onclick="openSaidaModal('${esc(l.id)}')" title="Dar saída" aria-label="Dar saída" class="inline-flex items-center justify-center w-7 h-7 bg-rose-600 hover:bg-rose-700 text-white rounded-lg shadow-sm transition"><i data-lucide="arrow-up-right" class="w-4 h-4"></i></button>` : ''}
                         <button onclick="openLabelModal('${esc(l.id)}')" title="Etiqueta" class="p-1.5 text-slate-400 hover:text-blue-600 transition"><i data-lucide="printer" class="w-4 h-4"></i></button>
+                        <button onclick="deleteLote('${esc(l.id)}')" title="Eliminar lote" aria-label="Eliminar lote" class="p-1.5 text-slate-400 hover:text-rose-600 transition"><i data-lucide="trash-2" class="w-4 h-4"></i></button>
                     </td>
                 </tr>`;
 
@@ -2049,7 +2077,15 @@
                 </td></tr>`;
             };
 
-            if (q !== lastStockKey) { lastStockKey = q; stockLimit = 100; }
+            const stockKey = q + '|' + fl.tear + '|' + fl.forn + '|' + fl.fila;
+            if (stockKey !== lastStockKey) { lastStockKey = stockKey; stockLimit = 100; }
+            const filaSum = document.getElementById('stock-fila-summary');
+            if (filaSum) {
+                if (fl.fila) {
+                    const ls = lista.flatMap(g => g.ativos);
+                    filaSum.textContent = `${ls.length} ${ls.length === 1 ? 'lote' : 'lotes'} · ${ls.reduce((t, l) => t + l.rolos, 0)} rolos · ${formatKg(round2(ls.reduce((t, l) => t + l.peso, 0)))} nesta fila`;
+                } else filaSum.textContent = '';
+            }
             const listaShown = lista.slice(0, stockLimit);
             const moreStock = lista.length > listaShown.length
                 ? `<tr><td colspan="5" class="text-center py-4 no-print"><button onclick="stockLimit += 200; renderStock()" class="px-4 py-2 text-sm font-medium text-blue-600 hover:bg-blue-50 rounded-lg">Mostrar mais (${listaShown.length} de ${lista.length})</button></td></tr>` : '';
@@ -2066,7 +2102,7 @@
                     : '<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border bg-emerald-50 text-emerald-700 border-emerald-200">Normal</span>';
                 return `
                 <tr class="hover:bg-slate-50/80 transition">
-                    <td class="py-3 px-3 font-medium text-slate-900">${esc(g.nome)}</td>
+                    <td class="py-3 px-3 font-medium text-slate-900"><div class="flex items-center gap-1.5"><span>${esc(g.nome)}</span><button onclick="deleteMalhaGrupo('${k}')" title="Eliminar o artigo e todos os seus lotes" aria-label="Eliminar artigo" class="no-print p-1 text-slate-300 hover:text-rose-600 transition"><i data-lucide="trash-2" class="w-3.5 h-3.5"></i></button></div></td>
                     <td class="py-3 px-3">
                         <button onclick="toggleMalhaGrupo('${k}')" class="inline-flex items-center gap-1 text-xs font-semibold text-blue-700 hover:bg-blue-50 rounded-lg px-2 py-1 whitespace-nowrap">
                             <i data-lucide="${open ? 'chevron-down' : 'chevron-right'}" class="w-3.5 h-3.5"></i>
@@ -2079,6 +2115,57 @@
                 </tr>${open ? detalhe(g) : ''}`;
             }).join('') || '<tr><td colspan="5" class="text-center py-6 text-slate-400">Nenhum lote em stock.</td></tr>') + moreStock;
             scheduleIcons();
+        }
+
+        // ===== ELIMINAR LOTE / ARTIGO (stock atual) =====
+        // Apaga os lotes; os movimentos desses lotes saem com eles (se a BD não os apagar sozinha, apaga-os primeiro)
+        async function apagarLotes(ids) {
+            let { error } = await db.from('malha').delete().in('id', ids);
+            if (error && String(error.code) === '23503') {
+                ({ error } = await db.from('malha_movimentos').delete().in('malha_id', ids));
+                if (!error) ({ error } = await db.from('malha').delete().in('id', ids));
+            }
+            return error;
+        }
+        async function depoisDeEliminar(ids, msg) {
+            labelSel = labelSel.filter(k => !ids.some(id => k === 'l:' + id));
+            labelQueue = labelQueue.filter(k => !ids.some(id => k === 'l:' + id));
+            updateLabelBar();
+            showToast(msg);
+            await loadData();
+            refreshAll();
+        }
+        const descMov = n => n ? `${n} ${n === 1 ? 'movimento registado' : 'movimentos registados'}` : 'sem movimentos registados';
+
+        async function deleteLote(id) {
+            const l = lotes.find(x => String(x.id) === String(id));
+            if (!l) return;
+            const nMov = movimentos.filter(m => String(m.malha_id) === String(l.id)).length;
+            const stock = l.rolos > 0 ? `${l.rolos} ${l.rolos === 1 ? 'rolo' : 'rolos'} · ${formatKg(l.peso)} em stock` : 'sem stock (esgotado)';
+            if (!confirm(`Eliminar COMPLETAMENTE o lote ${l.sku || ''}?\n\n${malhaNome(l)}\n${stock}\n${descMov(nMov)} (também serão apagados).\n\nEsta ação não pode ser desfeita.`)) return;
+            const error = await apagarLotes([l.id]);
+            if (error) { showToast(friendlyDbError(error), 'error'); return; }
+            await depoisDeEliminar([l.id], `Lote ${l.sku || ''} eliminado.`);
+        }
+
+        async function deleteMalhaGrupo(k) {
+            k = decodeURIComponent(k);
+            const todos = lotes.filter(l => malhaKey(l) === k);
+            if (!todos.length) return;
+            const ids = todos.map(l => l.id);
+            const idSet = new Set(ids.map(String));
+            const nMov = movimentos.filter(m => idSet.has(String(m.malha_id))).length;
+            const comStock = todos.filter(l => l.rolos > 0);
+            const rolos = comStock.reduce((t, l) => t + l.rolos, 0), peso = round2(comStock.reduce((t, l) => t + l.peso, 0));
+            const fl = fillStockFilters();
+            const visiveis = stockFiltrosAtivos(fl) ? todos.filter(l => lotePassaFiltros(l, fl)).length : todos.length;
+            const nota = visiveis < todos.length ? `\nAtenção: inclui ${todos.length - visiveis} lote(s) que não estão visíveis com os filtros atuais.` : '';
+            const nome = malhaNome(todos[0]);
+            if (!confirm(`Eliminar COMPLETAMENTE o artigo "${nome}" e todos os seus lotes?\n\n${todos.length} ${todos.length === 1 ? 'lote' : 'lotes'} (${comStock.length} com stock: ${rolos} rolos · ${formatKg(peso)})\n${descMov(nMov)} (também serão apagados).${nota}\n\nEsta ação não pode ser desfeita.`)) return;
+            const error = await apagarLotes(ids);
+            if (error) { showToast(friendlyDbError(error), 'error'); return; }
+            expandedMalha.delete(k); showDepletedMalha.delete(k);
+            await depoisDeEliminar(ids.map(String), `Artigo "${nome}" eliminado (${todos.length} ${todos.length === 1 ? 'lote' : 'lotes'}).`);
         }
 
         function openEditLoteModal(id) {
@@ -2572,7 +2659,7 @@
         function mostrarLoteNoStock(l) {
             switchTab('stock');
             document.getElementById('search-stock').value = l.sku;   // mostra só este lote
-            ['filter-stock-tear', 'filter-stock-forn'].forEach(i => { const e = document.getElementById(i); if (e) e.value = ''; });
+            ['filter-stock-tear', 'filter-stock-forn', 'filter-stock-fila'].forEach(i => { const e = document.getElementById(i); if (e) e.value = ''; });
             renderStock();
             const row = document.getElementById('lote-row-' + l.id);
             if (!row) return;
@@ -2834,13 +2921,13 @@
             document.getElementById('print-report-date').textContent = `Emissão: ${new Date().toLocaleDateString('pt-PT')}`;
         }
         // Impressão do stock atual: A4 horizontal, tabela própria (agrupada por designação, até 2 linhas por lote).
-        // Respeita a pesquisa e os filtros de tear / fornecedor do ecrã.
+        // Respeita a pesquisa e os filtros de tear / fornecedor / fila do ecrã.
         function printStock() {
             const q = (document.getElementById('search-stock')?.value || '').toLowerCase();
             const fl = fillStockFilters();
-            const base = (fl.tear || fl.forn)
-                ? lotes.filter(l => (!fl.tear || String(l.tear || '').trim() === fl.tear) && (!fl.forn || String(fornecedorLote(l) || '').trim() === fl.forn))
-                : lotes;
+            const base = stockFiltrosAtivos(fl) ? lotes.filter(l => lotePassaFiltros(l, fl)) : lotes;
+            const filaSel = document.getElementById('filter-stock-fila');
+            const filaNome = fl.fila ? (filaSel?.options[filaSel.selectedIndex]?.text || '') : '';
             const mapa = mapaUltimoMov();
             const has = vals => vals.some(v => String(v || '').toLowerCase().includes(q));
             const grupos = new Map();
@@ -2860,35 +2947,33 @@
             lista.sort((a, b) => a.nome.localeCompare(b.nome, 'pt'));
             if (!lista.length) { showToast('Não há stock para imprimir.', 'error'); return; }
 
-            const QC = { '1a': '1.ª Qualidade', '2a': '2.ª Qualidade', 'Hold': 'Aguardar QC' };
             const sum = (arr, f) => arr.reduce((a, l) => a + (Number(l[f]) || 0), 0);
             const keep = '-webkit-print-color-adjust:exact;print-color-adjust:exact;';
             let nLotes = 0, totR = 0, totP = 0;
             const body = lista.map(g => {
                 const r = sum(g.lotes, 'rolos'), p = sum(g.lotes, 'peso');
                 nLotes += g.lotes.length; totR += r; totP += p;
-                const head = `<tr style="page-break-after:avoid"><td colspan="6" style="background:#e2e8f0;font-weight:700;${keep}">${esc(g.nome)} <span style="font-weight:400">· ${g.lotes.length} ${g.lotes.length === 1 ? 'lote' : 'lotes'}</span></td>
+                const head = `<tr style="page-break-after:avoid"><td colspan="5" style="background:#e2e8f0;font-weight:700;${keep}">${esc(g.nome)} <span style="font-weight:400">· ${g.lotes.length} ${g.lotes.length === 1 ? 'lote' : 'lotes'}</span></td>
                     <td class="num" style="background:#e2e8f0;font-weight:700;${keep}">${r}</td>
                     <td class="num" style="background:#e2e8f0;font-weight:700;${keep}">${esc(formatKg(p))}</td></tr>`;
                 const rows = g.lotes.map(l => `<tr>
-                    <td><b style="font-family:monospace">${esc(l.sku || '-')}</b><br>OF: ${esc(l.of_num || '-')}</td>
+                    <td><b style="font-family:monospace;overflow-wrap:anywhere">${esc(l.sku || '-')}</b><br>OF: ${esc(l.of_num || '-')}</td>
                     <td>${esc(l.tear || '-')}<br>${esc(l.ne_fio || '-')}</td>
                     <td><b>${esc(l.jogo || '-')}</b><br>${esc(l.lote_fio || '-')}</td>
                     <td>${esc(fornecedorLote(l) || '-')}</td>
-                    <td>${esc(l.localizacao || '-')}<br>${esc(QC[l.classificacao] || l.classificacao || '-')}</td>
                     <td style="white-space:nowrap">${esc(fmtData(l.created_at))}</td>
                     <td class="num"><b>${esc(l.rolos)}</b><br>/ ${esc(l.rolos_inicial)}</td>
                     <td class="num"><b>${esc(formatKg(l.peso))}</b></td>
                 </tr>`).join('');
-                return head + rows;
+                return `<tbody style="break-inside:avoid;page-break-inside:avoid">${head + rows}</tbody>`;   // artigo + lotes juntos na mesma folha
             }).join('');
-            document.getElementById('printable-list-area').innerHTML = `<table style="table-layout:fixed;width:100%">
-                <colgroup><col style="width:11%"><col style="width:9%"><col style="width:11%"><col style="width:26%"><col style="width:14%"><col style="width:9%"><col style="width:7%"><col style="width:13%"></colgroup>
-                <thead><tr><th>SKU / OF</th><th>Tear / NE</th><th>Jogo / Lote Fio</th><th>Fornecedor</th><th>Local / Qualidade</th><th>Entrada</th><th class="num">Rolos</th><th class="num">Peso Líq.</th></tr></thead>
-                <tbody>${body}</tbody></table>
+            document.getElementById('printable-list-area').innerHTML = `<table style="table-layout:fixed;width:100%;overflow-wrap:anywhere;word-break:break-word">
+                <colgroup><col style="width:19%"><col style="width:12%"><col style="width:16%"><col style="width:27%"><col style="width:9%"><col style="width:6%"><col style="width:11%"></colgroup>
+                <thead><tr><th>SKU / OF</th><th>Tear / NE</th><th>Jogo / Lote Fio</th><th>Fornecedor</th><th>Entrada</th><th class="num">Rolos</th><th class="num">Peso Líq.</th></tr></thead>
+                ${body}</table>
                 <p style="margin-top:8px;font-size:11px;color:#475569;"><b>Total:</b> ${nLotes} ${nLotes === 1 ? 'lote' : 'lotes'} · ${totR} rolos · ${esc(formatKg(totP))}</p>`;
 
-            setPrintHeader('Oliveira & Gonçalves - Stock de Malha em Cru');   // também limpa o modo etiquetas/lista
+            setPrintHeader('Oliveira & Gonçalves - Stock de Malha em Cru' + (filaNome ? ' - Fila: ' + filaNome : ''));   // também limpa o modo etiquetas/lista
             let st = document.getElementById('label-page-style');
             if (!st) { st = document.createElement('style'); st.id = 'label-page-style'; document.head.appendChild(st); }
             st.textContent = '@page { size: A4 landscape; margin: 10mm; }';
