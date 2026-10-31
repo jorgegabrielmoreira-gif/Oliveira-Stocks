@@ -1263,7 +1263,29 @@
         function scheduleIcons() {
             if (iconsQueued) return;
             iconsQueued = true;
-            requestAnimationFrame(() => { iconsQueued = false; if (window.lucide) lucide.createIcons(); });
+            requestAnimationFrame(() => { iconsQueued = false; renderIcons(); });
+        }
+        // Desenha só os <i data-lucide> ainda por desenhar (e os ícones cujo nome mudou, ex.: olho da palavra-passe).
+        // Se a biblioteca não tiver a API esperada, usa o lucide.createIcons() de sempre.
+        const iconKey = n => n.replace(/(^|-)([a-z0-9])/g, (_, __, c) => c.toUpperCase());
+        function renderIcons() {
+            const L = window.lucide;
+            if (!L) return;
+            if (typeof L.createElement !== 'function' || !L.icons) { L.createIcons(); return; }
+            let missing = false;
+            for (const el of document.querySelectorAll('[data-lucide]')) {
+                const name = el.getAttribute('data-lucide');
+                if (el.tagName.toLowerCase() === 'svg' && el.getAttribute('data-rendered') === name) continue;
+                const node = L.icons[iconKey(name)];
+                let svg = null;
+                try { if (node) svg = L.createElement(node); } catch (e) { svg = null; }
+                if (!svg || String(svg.tagName).toLowerCase() !== 'svg') { missing = true; continue; }
+                for (const a of el.attributes) if (a.name !== 'class') svg.setAttribute(a.name, a.value);
+                svg.setAttribute('class', ('lucide lucide-' + name + ' ' + (el.getAttribute('class') || '')).trim());
+                svg.setAttribute('data-rendered', name);
+                el.replaceWith(svg);
+            }
+            if (missing) L.createIcons();
         }
 
         // HELPERS: escape HTML (anti-XSS), CSV, downloads, erros, debounce
@@ -2164,8 +2186,10 @@
             });
         }
 
-        function formatEuro(val) { return new Intl.NumberFormat('pt-PT', { style: 'currency', currency: 'EUR' }).format(val); }
-        function formatKg(val) { return Number(val).toLocaleString('pt-PT', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' kg'; }
+        const EURO_FMT = new Intl.NumberFormat('pt-PT', { style: 'currency', currency: 'EUR' });
+        const KG_FMT = new Intl.NumberFormat('pt-PT', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+        function formatEuro(val) { return EURO_FMT.format(val); }
+        function formatKg(val) { return KG_FMT.format(Number(val)) + ' kg'; }
         function formatDateTime(str) { if (!str) return '-'; const p = str.split('T'); return p.length === 2 ? `${p[0].split('-').reverse().join('/')} ${p[1]}` : str; }
 
         function renderDashboard() {
@@ -2191,8 +2215,28 @@
         // Guardada num só texto ("Armazém 1 › Fila 3"), por isso não é preciso alterar a base de dados.
         // Os valores antigos continuam a funcionar: "Fila 3" = fila sem armazém; "Armazém A, Prat. 3" é separado em armazém + fila.
         const LOC_SEP = ' › ';
-        const normLoc = s => String(s ?? '').normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/\s+/g, ' ').trim().toLowerCase();
+        const normLocCache = new Map(), parseLocCache = new Map();
+        const normLoc = s => {
+            const k = String(s ?? '');
+            let r = normLocCache.get(k);
+            if (r === undefined) {
+                r = k.normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/\s+/g, ' ').trim().toLowerCase();
+                if (normLocCache.size > 20000) normLocCache.clear();
+                normLocCache.set(k, r);
+            }
+            return r;
+        };
         function parseLoc(v) {
+            const k = String(v ?? '');
+            let r = parseLocCache.get(k);
+            if (!r) {
+                r = Object.freeze(parseLocRaw(k));
+                if (parseLocCache.size > 20000) parseLocCache.clear();
+                parseLocCache.set(k, r);
+            }
+            return r;
+        }
+        function parseLocRaw(v) {
             const s = String(v ?? '').trim().replace(/\s+/g, ' ');
             if (!s) return { arm: '', fila: '' };
             const i = s.indexOf(LOC_SEP);
@@ -2284,7 +2328,17 @@
             return set;
         }
         // Onde está o stock de um lote: as paletes com localização própria à parte; o resto na localização do lote (ou do produto)
+        let segCache = null;
         function lotSegments(p, l) {
+            const key = movIndexKey();
+            if (!segCache || segCache.mv !== movements || segCache.key !== key || segCache.lots !== lots || segCache.products !== products)
+                segCache = { mv: movements, key, lots, products, map: new Map() };
+            const k = String(l.id) + '|' + (p.location || '');
+            let r = segCache.map.get(k);
+            if (!r) { r = computeLotSegments(p, l); segCache.map.set(k, r); }
+            return r;
+        }
+        function computeLotSegments(p, l) {
             const base = l.location || p.location || '';
             const total = Number(l.qty) || 0;
             if (!lotsWithPalLoc().has(String(l.id))) return [{ loc: base, qty: total, pals: [] }];
@@ -2339,7 +2393,7 @@
             return { arm, fila, active: !!(arm || fila), label: parts.join(LOC_SEP) };
         }
         // Filtros armazém / fila: só mostram o que existe com stock; as filas dependem do armazém escolhido
-        let locRefreshQueued = false;
+        let locRefreshQueued = false, locPairsCache = null;
         function populateLocFilters() {
             const sa = document.getElementById('filter-armazem'), sf = document.getElementById('filter-fila');
             if (!sa || !sf) return;
@@ -2348,13 +2402,18 @@
                 locRefreshQueued = true;
                 ensureAllMovements(true).then(() => { locRefreshQueued = false; if (movementsFull) renderProductsTable(); });
             }
-            const pairs = [];
-            products.forEach(p => {
-                if (p.archived) return;
-                const act = activeLots(p);
-                if (act.length) act.forEach(l => lotSegments(p, l).forEach(g => pairs.push(parseLoc(g.loc))));
-                else pairs.push(parseLoc(p.location));
-            });
+            const pk = movIndexKey();
+            if (!locPairsCache || locPairsCache.mv !== movements || locPairsCache.key !== pk || locPairsCache.lots !== lots || locPairsCache.products !== products) {
+                const list = [];
+                products.forEach(p => {
+                    if (p.archived) return;
+                    const act = activeLots(p);
+                    if (act.length) act.forEach(l => lotSegments(p, l).forEach(g => list.push(parseLoc(g.loc))));
+                    else list.push(parseLoc(p.location));
+                });
+                locPairsCache = { mv: movements, key: pk, lots, products, list };
+            }
+            const pairs = locPairsCache.list;
             const sortL = m => [...m.entries()].sort((a, b) => a[1].localeCompare(b[1], 'pt', { numeric: true, sensitivity: 'base' }));
             const arms = new Map(); let hasNone = false;
             pairs.forEach(q => { if (q.arm) { const k = normLoc(q.arm); if (!arms.has(k)) arms.set(k, q.arm); } else hasNone = true; });
