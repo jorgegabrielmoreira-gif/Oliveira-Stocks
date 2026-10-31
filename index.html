@@ -782,9 +782,13 @@
 
                     <div>
                         <span class="block text-[10px] font-semibold uppercase mb-0.5 ml-1 invisible" aria-hidden="true">.</span>
-                        <button onclick="printMovementsPDF()" class="h-9 w-full lg:w-auto bg-slate-800 hover:bg-slate-900 text-white text-xs font-medium px-3.5 rounded-xl transition flex items-center justify-center space-x-1.5 shadow-sm whitespace-nowrap">
+                        <div class="flex gap-2">
+                        <button onclick="openMovementModal('entrada')" class="h-9 flex-1 lg:flex-none bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-medium px-3.5 rounded-xl transition flex items-center justify-center space-x-1.5 shadow-sm whitespace-nowrap"><i data-lucide="arrow-down-left" class="w-4 h-4"></i> <span>Entrada</span></button>
+                        <button onclick="openMovementModal('saida')" class="h-9 flex-1 lg:flex-none bg-rose-600 hover:bg-rose-700 text-white text-xs font-medium px-3.5 rounded-xl transition flex items-center justify-center space-x-1.5 shadow-sm whitespace-nowrap"><i data-lucide="arrow-up-right" class="w-4 h-4"></i> <span>Saída</span></button>
+                        <button onclick="printMovementsPDF()" class="h-9 flex-1 lg:flex-none bg-slate-800 hover:bg-slate-900 text-white text-xs font-medium px-3.5 rounded-xl transition flex items-center justify-center space-x-1.5 shadow-sm whitespace-nowrap">
                             <i data-lucide="printer" class="w-4 h-4"></i> <span>Imprimir / PDF</span>
                         </button>
+                        </div>
                     </div>
                 </div>
 
@@ -2687,11 +2691,14 @@
                 <tr><td colspan="11" class="bg-slate-50 px-4 py-3">
                     <div class="max-w-4xl">
                         <div class="flex items-center justify-between mb-1">
-                            <span class="text-xs font-semibold text-slate-500">Lotes de ${esc(p.name)}</span>
+                            <span class="flex items-center gap-2">
+                                <span class="text-xs font-semibold text-slate-500">Lotes de ${esc(p.name)}</span>
+                                ${p.archived ? '' : `<button onclick="openNewLotEntry('${esc(p.id)}')" title="Registar a entrada de um lote novo deste produto" class="no-print inline-flex items-center gap-1 text-[11px] font-semibold text-white bg-emerald-600 hover:bg-emerald-700 rounded-lg px-2 py-1 shadow-sm"><i data-lucide="plus" class="w-3.5 h-3.5"></i>Novo lote</button>`}
+                            </span>
                             ${toggle}
                         </div>
                         ${list.length ? `<table class="w-full text-left"><thead><tr class="text-[11px] text-slate-400"><th class="py-1 px-3 font-semibold">Lote</th><th class="py-1 px-3 font-semibold text-right">Stock</th><th class="py-1 px-3 font-semibold">Localização</th><th class="py-1 px-3 font-semibold">Fornecedor</th><th class="py-1 px-3 font-semibold">Criado</th><th></th></tr></thead><tbody>${rows}</tbody></table>`
-                                    : `<p class="text-xs text-slate-400 py-2">${all.length ? 'Todos os lotes estão esgotados.' : 'Sem lotes. Registe uma Entrada para criar o primeiro lote.'}</p>`}
+                                    : `<p class="text-xs text-slate-400 py-2">${all.length ? 'Todos os lotes estão esgotados.' : 'Sem lotes. Use o botão "Novo lote" para registar a primeira entrada.'}</p>`}
                     </div>
                 </td></tr>`;
         }
@@ -2749,6 +2756,7 @@
                     <td class="py-3 px-1 text-center no-print sticky-col-right bg-white shadow-xs border-l border-slate-100">
                         <div class="flex items-center justify-center">
                             ${historyBtn(`toggleProductHistory('${esc(p.id)}')`, openProductHistory.has(String(p.id)), 'Ver histórico do produto', 'p-1')}
+                            ${p.archived ? '' : `<button onclick="openNewLotEntry('${esc(p.id)}')" title="Entrada de um lote novo deste produto" aria-label="Entrada de um lote novo" class="p-1 text-emerald-600 hover:text-emerald-700 transition"><i data-lucide="package-plus" class="w-4 h-4"></i></button>`}
                             <button onclick="openLabelModal('${esc(p.id)}')" title="Imprimir Etiqueta" class="p-1 text-slate-400 hover:text-slate-900 transition"><i data-lucide="qr-code" class="w-4 h-4"></i></button>
                             <button onclick="openProductModal('${esc(p.id)}')" title="Editar Produto" class="p-1 text-slate-400 hover:text-blue-600 transition"><i data-lucide="edit-3" class="w-4 h-4"></i></button>
                             ${archiveSupported !== false && (p.archived || Number(p.qty) <= 0) ? `<button onclick="archiveProduct('${esc(p.id)}', ${p.archived ? 'false' : 'true'})" title="${p.archived ? 'Restaurar produto' : 'Arquivar produto (esconde-o sem perder o histórico)'}" class="p-1 text-slate-400 hover:text-amber-600 transition"><i data-lucide="${p.archived ? 'archive-restore' : 'archive'}" class="w-4 h-4"></i></button>` : ''}
@@ -3455,6 +3463,20 @@
             const search = document.getElementById('search-product'); if (search) search.value = p.barcode || p.sku || p.name || '';
             expandedProducts.add(p.id);
             switchTab('produtos');
+        }
+        // Abre uma Entrada já com o produto escolhido e "Novo lote" selecionado (cursor no código do lote)
+        function openNewLotEntry(pid) {
+            const p = products.find(x => String(x.id) === String(pid));
+            if (!p) return;
+            openMovementModal('entrada');
+            document.getElementById('search-movement-product').value = '';
+            filterMovementProducts();
+            document.getElementById('movement-product-id').value = p.id;
+            document.getElementById('movement-lote').value = '';
+            onMovementProductChange();
+            const sel = document.getElementById('movement-lote-select');
+            if (sel.value !== '__new__') { sel.value = '__new__'; onMovementLoteSelect(true); }
+            document.getElementById('movement-lote').focus();
         }
         // Abre uma Entrada / Saída já com o produto e o lote escolhidos (a partir da linha do lote)
         function openMovementForLot(type, pid, lid) {
