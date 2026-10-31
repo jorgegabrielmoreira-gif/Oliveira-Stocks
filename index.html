@@ -428,6 +428,71 @@
             #products-table > tbody > tr.prod-row > td.sticky-col-right { position: static !important; justify-content: flex-end; margin-top: 4px; padding-top: 8px !important; border-top: 1px solid #eef0f9 !important; }
             #products-table > tbody > tr:not(.prod-row) > td { padding-left: 8px !important; padding-right: 8px !important; overflow-x: auto; }
         }
+
+        /* ===== Barras fixas: menu dos separadores colado ao cabeçalho azul + barra de opções de cada separador ===== */
+        :root { --hdr-h: 68px; --tabs-h: 58px; }
+        @media screen {
+            #sticky-tabs { position: sticky; top: var(--hdr-h); z-index: 25; }
+            body #sticky-tabs .tabs-container { background: #fff; backdrop-filter: none; border-top: 0; border-top-left-radius: 0; border-top-right-radius: 0; }
+        }
+        /* No telemóvel só o menu fica fixo (as barras de opções ocupariam o ecrã quase todo) */
+        @media screen and (min-width: 768px) {
+            /* a barra de opções fica sempre encostada aos separadores (também antes de rolar) */
+            body.bar-flush #sticky-tabs .tabs-container { border-bottom-left-radius: 0; border-bottom-right-radius: 0; box-shadow: none; }
+            body #content-produtos, body #content-entidades, body #content-movimentos, body #content-alertas, body #content-relatorios { margin-top: 0 !important; }
+            body #content-produtos > .bg-white, body #content-entidades > .bg-white, body #content-movimentos > .bg-white, body #content-alertas > .bg-white {
+                border-top: 0 !important; border-top-left-radius: 0 !important; border-top-right-radius: 0 !important; padding-top: 0 !important; }
+            .stick-bar { position: sticky; top: calc(var(--hdr-h) + var(--tabs-h)); z-index: 20; margin: 0 -1.5rem; padding: .85rem 1.5rem;
+                background: color-mix(in srgb, var(--tab, #4f46e5) 5%, #fff); border-bottom: 1px solid #e4e0fb; }
+            .stick-bar.is-stuck { box-shadow: 0 12px 18px -16px rgba(43,39,112,.55); }
+            .stick-panel { position: sticky; top: calc(var(--hdr-h) + var(--tabs-h)); z-index: 20; }
+            body #content-relatorios > .stick-panel { border-top-left-radius: 0 !important; border-top-right-radius: 0 !important; }
+
+            /* ----- Zona fixa mais compacta (cabeçalho, separadores e barras de opções), para sobrar mais espaço para a lista ----- */
+            header.app-header > div { height: 3.25rem !important; }
+            header.app-header img { height: 1.75rem !important; }
+            header.app-header .bg-white.rounded-xl { padding: 2px 8px !important; border-radius: 10px; }
+            header.app-header h1 { font-size: 1.05rem !important; line-height: 1.25; }
+            header.app-header h1 > span { font-size: 10px !important; padding: 1px 6px !important; }
+            header.app-header h1 + p { display: none !important; }
+            header.app-header span.lg\:inline { font-size: 10px; line-height: 1.2; }
+            header.app-header a, header.app-header button { padding-top: .3rem !important; padding-bottom: .3rem !important; font-size: .75rem !important; }
+
+            #sticky-tabs .tabs-container { padding: 3px !important; }
+            #sticky-tabs .tabs-container button { padding-top: .35rem !important; padding-bottom: .35rem !important; font-size: .8rem !important; }
+            body #badge-entidades, body #badge-alertas { top: 3px !important; font-size: 9px !important; }
+
+            .stick-bar { padding: .5rem 1.5rem; gap: .5rem !important; }
+            .stick-bar .gap-2, .stick-bar .gap-3, .stick-bar .gap-4 { gap: .4rem !important; }
+            .stick-bar input:not([type=checkbox]), .stick-bar select { height: 1.9rem !important; padding-top: 0 !important; padding-bottom: 0 !important; font-size: .75rem !important; border-radius: 10px !important; }
+            .stick-bar button { height: 1.9rem !important; padding-top: 0 !important; padding-bottom: 0 !important; font-size: .75rem !important; border-radius: 10px !important; }
+            .stick-bar label, .stick-bar #fila-summary { font-size: .7rem !important; }
+            .stick-bar h2 { font-size: .95rem !important; }
+            .stick-bar span.text-\[10px\] { font-size: 9px !important; margin-bottom: 0 !important; line-height: 1.2; }
+            /* Produtos: botões e pesquisa na mesma linha, filtros por baixo */
+            #content-produtos .stick-bar { flex-direction: row !important; flex-wrap: wrap; align-items: center; }
+            #content-produtos .stick-bar > div:first-child { order: 1; }
+            #content-produtos .stick-bar > .relative { order: 2; flex: 1 1 280px; width: auto !important; }
+            #content-produtos .stick-bar > div:last-child { order: 3; flex-basis: 100%; }
+
+            body #content-relatorios > .stick-panel { padding: .6rem 1.25rem !important; gap: .5rem !important; }
+            body #content-relatorios > .stick-panel h3 { font-size: .9rem !important; }
+            body #content-relatorios > .stick-panel p { font-size: .7rem !important; margin-top: 0 !important; }
+            /* Linha de títulos das tabelas: metade da altura e fixa por baixo da barra de opções (deslocada por JS, porque a tabela rola na horizontal) */
+            table.stick-head > thead > tr > th { padding-top: 3px !important; padding-bottom: 3px !important; font-size: 10px !important; line-height: 1.3; }
+            table.stick-head > thead { position: relative; z-index: 18; transform: translateY(var(--head-y, 0px)); will-change: transform; }
+            table.stick-head.head-stuck > thead > tr { box-shadow: 0 8px 12px -10px rgba(43,39,112,.5); }
+            /* a tabela começa logo por baixo da barra de opções: os títulos não andam antes de fixar */
+            .stick-bar ~ .overflow-x-auto { margin-top: 0 !important; border-top: 0 !important; border-top-left-radius: 0 !important; border-top-right-radius: 0 !important; }
+            /* quando a tabela cabe na largura do ecrã, os títulos ficam fixos pelo próprio browser (sem atraso nenhum) */
+            .head-native { overflow: visible !important; }
+            .head-native > table.stick-head > thead { transform: none; }
+            .head-native > table.stick-head > thead > tr > th { position: sticky; top: var(--th-top, 0px); z-index: 18;
+                background: color-mix(in srgb, var(--tab, #4f46e5) 12%, #fff); }
+            .head-native > table.stick-head > thead > tr > th.sticky-col-right { z-index: 19; }
+            .head-native > table.stick-head.head-stuck > thead > tr > th { box-shadow: 0 8px 10px -10px rgba(43,39,112,.5); }
+            body #content-relatorios > .stick-panel button { padding-top: .35rem !important; padding-bottom: .35rem !important; font-size: .75rem !important; }
+        }
     </style>
 </head>
 <body class="bg-slate-50 text-slate-800 antialiased min-h-screen flex flex-col">
@@ -511,15 +576,9 @@
     </div>
     <div id="printable-list-area"></div>
 
-    <main class="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
-
-        <!-- Aviso de fim de sessão (em ecrãs pequenos, onde não cabe no cabeçalho) -->
-        <p class="lg:hidden no-print flex items-center gap-2 text-xs text-indigo-900 bg-indigo-50 border border-indigo-200 rounded-xl px-3 py-2">
-            <i data-lucide="log-out" class="w-4 h-4 shrink-0 text-indigo-600"></i>
-            <span>No fim, carregue em <b>Sair</b> (no canto superior direito) para fechar a sessão neste aparelho.</span>
-        </p>
-
-        <!-- Navigation Tabs -->
+    <main class="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 pt-0 pb-6 space-y-6">
+        <!-- Navigation Tabs (fixas: colam ao cabeçalho ao rolar a página) -->
+        <div id="sticky-tabs" class="no-print">
         <div class="tabs-container flex overflow-x-auto space-x-1 bg-white p-1 rounded-xl border border-slate-200 shadow-xs no-print">
             <button onclick="switchTab('dashboard')" id="tab-dashboard" class="flex-1 min-w-[110px] py-2.5 px-3 text-sm font-medium rounded-lg transition flex items-center justify-center space-x-2 bg-blue-600 text-white shadow-xs">
                 <i data-lucide="layout-dashboard" class="w-4 h-4"></i>
@@ -548,6 +607,15 @@
                 <span>Relatórios</span>
             </button>
         </div>
+        </div>
+
+        <!-- Aviso de fim de sessão (em ecrãs pequenos, onde não cabe no cabeçalho) -->
+        <p class="lg:hidden no-print flex items-center gap-2 text-xs text-indigo-900 bg-indigo-50 border border-indigo-200 rounded-xl px-3 py-2">
+            <i data-lucide="log-out" class="w-4 h-4 shrink-0 text-indigo-600"></i>
+            <span>No fim, carregue em <b>Sair</b> (no canto superior direito) para fechar a sessão neste aparelho.</span>
+        </p>
+
+
 
         <!-- TAB 1: DASHBOARD -->
         <div id="content-dashboard" class="space-y-6">
@@ -620,7 +688,7 @@
         <!-- TAB 2: PRODUTOS -->
         <div id="content-produtos" class="space-y-6 hidden">
             <div class="bg-white p-6 rounded-2xl border border-slate-200 shadow-xs space-y-4">
-                <div class="flex flex-col gap-3">
+                <div class="stick-bar flex flex-col gap-3">
                     <div class="flex flex-wrap items-center gap-2 no-print">
                         <button onclick="openProductModal()" class="inline-flex items-center justify-center space-x-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium px-4 py-2 rounded-xl transition shadow-sm">
                             <i data-lucide="plus" class="w-4 h-4"></i>
@@ -673,7 +741,7 @@
                 </div>
 
                 <div class="overflow-x-auto rounded-xl border border-slate-200 custom-scrollbar">
-                    <table id="products-table" class="w-full text-left border-collapse min-w-[980px]">
+                    <table id="products-table" class="stick-head w-full text-left border-collapse min-w-[980px]">
                         <thead>
                             <tr class="bg-slate-50 border-b border-slate-200 text-xs font-semibold text-slate-500 uppercase tracking-wider">
                                 <th class="py-3 px-2">SKU / Cód. Barras</th>
@@ -698,7 +766,7 @@
         <!-- TAB 3: ENTIDADES -->
         <div id="content-entidades" class="space-y-6 hidden">
             <div class="bg-white p-6 rounded-2xl border border-slate-200 shadow-xs space-y-4">
-                <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                <div class="stick-bar flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
                     <div class="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 flex-1">
                         <div class="relative flex-1 max-w-md">
                             <span class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
@@ -719,7 +787,7 @@
                 </div>
 
                 <div class="overflow-x-auto rounded-xl border border-slate-200 custom-scrollbar">
-                    <table class="w-full text-left border-collapse min-w-[900px]">
+                    <table class="stick-head w-full text-left border-collapse min-w-[900px]">
                         <thead>
                             <tr class="bg-slate-50 border-b border-slate-200 text-xs font-semibold text-slate-500 uppercase tracking-wider">
                                 <th class="py-3 px-4">Nome da Entidade</th>
@@ -740,7 +808,7 @@
         <!-- TAB 4: MOVIMENTOS -->
         <div id="content-movimentos" class="space-y-6 hidden">
             <div class="bg-white p-6 rounded-2xl border border-slate-200 shadow-xs space-y-4">
-                <div class="flex flex-col lg:flex-row lg:items-end justify-between gap-4 no-print">
+                <div class="stick-bar flex flex-col lg:flex-row lg:items-end justify-between gap-4 no-print">
                     <div class="grid grid-cols-1 sm:grid-cols-3 md:grid-cols-6 gap-3 flex-1 items-end">
                         <div class="sm:col-span-2">
                             <span class="block text-[10px] font-semibold uppercase mb-0.5 ml-1 invisible" aria-hidden="true">.</span>
@@ -793,7 +861,7 @@
                 </div>
 
                 <div class="overflow-x-auto rounded-xl border border-slate-200 custom-scrollbar">
-                    <table class="w-full text-left border-collapse min-w-[950px]">
+                    <table class="stick-head w-full text-left border-collapse min-w-[950px]">
                         <thead>
                             <tr class="bg-slate-50 border-b border-slate-200 text-xs font-semibold text-slate-500 uppercase tracking-wider">
                                 <th class="py-3 px-4">Data/Hora</th>
@@ -816,7 +884,7 @@
         <!-- TAB 5: ALERTAS -->
         <div id="content-alertas" class="space-y-6 hidden">
             <div class="bg-white p-6 rounded-2xl border border-slate-200 shadow-xs space-y-4">
-                <div class="flex items-center justify-between">
+                <div class="stick-bar flex items-center justify-between">
                     <div>
                         <h2 class="font-bold text-slate-900 text-lg flex items-center"><i data-lucide="alert-triangle" class="w-5 h-5 text-rose-500 mr-2"></i> Alertas de Stock Mínimo</h2>
                     </div>
@@ -828,7 +896,7 @@
 
         <!-- TAB 6: RELATÓRIOS -->
         <div id="content-relatorios" class="space-y-6 hidden">
-            <div class="bg-blue-50 border border-blue-200 p-6 rounded-2xl shadow-xs flex flex-col md:flex-row items-center justify-between gap-4">
+            <div class="stick-panel no-print bg-blue-50 border border-blue-200 p-6 rounded-2xl shadow-xs flex flex-col md:flex-row items-center justify-between gap-4">
                 <div>
                     <h3 class="font-bold text-blue-900 text-base flex items-center"><i data-lucide="database" class="w-5 h-5 mr-2 text-blue-600"></i> Exportar Dados</h3>
                     <p class="text-xs text-blue-700 mt-0.5">Faça o download do inventário em CSV ou JSON.</p>
@@ -2204,7 +2272,62 @@
             scheduleIcons();
         }
 
+        // Mede o cabeçalho, o menu e a barra de opções do separador aberto, para as barras fixas encaixarem umas nas outras
+        // e para que "ir para a linha" (scrollIntoView) não a deixe escondida por baixo delas.
+        let stickyRaf = 0;
+        function updateStickyLayout() {
+            const root = document.documentElement;
+            const hdr = document.querySelector('header.app-header');
+            const tabs = document.getElementById('sticky-tabs');
+            const hh = hdr ? hdr.offsetHeight : 0, th = tabs ? tabs.offsetHeight : 0;
+            root.style.setProperty('--hdr-h', hh + 'px');
+            root.style.setProperty('--tabs-h', th + 'px');
+            const top = hh + th;
+            let barH = 0, anyStuck = false;
+            document.querySelectorAll('.stick-bar, .stick-panel').forEach(b => {
+                const visible = b.offsetParent !== null && getComputedStyle(b).position === 'sticky';
+                const stuck = visible && window.scrollY > 0 && b.getBoundingClientRect().top <= top + 1;
+                b.classList.toggle('is-stuck', stuck);
+                if (visible) { barH = Math.max(barH, b.offsetHeight); if (stuck) anyStuck = true; }
+            });
+            document.body.classList.toggle('bar-flush', barH > 0);
+            // títulos das tabelas: acompanham a página enquanto a tabela está à vista
+            const wide = window.matchMedia('(min-width: 768px)').matches;
+            let headH = 0;
+            root.style.setProperty('--th-top', (top + barH) + 'px');
+            document.querySelectorAll('table.stick-head').forEach(t => {
+                const head = t.tHead, wrap = t.parentElement;
+                let y = 0, stuck = false;
+                if (wide && head && t.offsetParent !== null) {
+                    const r = t.getBoundingClientRect(), hh2 = head.offsetHeight;
+                    stuck = r.top < top + barH - 0.5;
+                    headH = Math.max(headH, hh2);
+                    // cabe no ecrã → títulos fixos pelo browser; tabela mais larga (rola para o lado) → acompanham por JS
+                    const native = t.scrollWidth <= wrap.clientWidth + 1;
+                    wrap.classList.toggle('head-native', native);
+                    if (!native) y = Math.max(0, Math.min(top + barH - r.top, r.height - hh2 - 40));
+                } else if (wrap) wrap.classList.remove('head-native');
+                t.style.setProperty('--head-y', y + 'px');
+                t.classList.toggle('head-stuck', stuck);
+            });
+            root.style.scrollPaddingTop = (top + barH + headH + 8) + 'px';
+        }
+        function scheduleStickyLayout() {
+            if (stickyRaf) return;
+            stickyRaf = requestAnimationFrame(() => { stickyRaf = 0; updateStickyLayout(); });
+        }
+        window.addEventListener('scroll', scheduleStickyLayout, { passive: true });
+        window.addEventListener('resize', scheduleStickyLayout);
+        function initStickyLayout() {
+            if (window.ResizeObserver) {
+                const ro = new ResizeObserver(scheduleStickyLayout);
+                ['header.app-header', '#sticky-tabs', '.stick-bar', '.stick-panel', 'table.stick-head'].forEach(q => document.querySelectorAll(q).forEach(el => ro.observe(el)));
+            }
+            scheduleStickyLayout();
+        }
+        if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', initStickyLayout); else initStickyLayout();
         function switchTab(tabId) {
+            scheduleStickyLayout();
             ['dashboard', 'produtos', 'entidades', 'movimentos', 'alertas', 'relatorios'].forEach(t => {
                 document.getElementById(`content-${t}`).classList.toggle('hidden', t !== tabId);
                 document.getElementById(`tab-${t}`).className = t === tabId 
