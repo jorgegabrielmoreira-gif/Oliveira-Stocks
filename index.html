@@ -1119,7 +1119,7 @@
                 </div>
                 <div>
                     <label class="block text-xs font-medium mb-1">Produto *</label>
-                    <div class="flex gap-2 mb-2"><input type="text" id="search-movement-product" oninput="filterMovementProducts()" placeholder="🔍 Pesquisar por nome, SKU, lote, fornecedor ou código barras..." class="flex-1 min-w-0 px-3 py-2 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:bg-white outline-none focus:ring-2 focus:ring-blue-500/20"><button type="button" onclick="openScanner(scanParaMovimento)" title="Ler a etiqueta com a câmara" class="shrink-0 inline-flex items-center gap-1.5 px-3 py-2 text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 rounded-xl"><i data-lucide="scan-barcode" class="w-4 h-4"></i><span class="hidden sm:inline">Ler</span></button></div>
+                    <div class="flex gap-2 mb-2"><input type="text" id="search-movement-product" oninput="debouncedFilterMovementProducts()" placeholder="🔍 Pesquisar por nome, SKU, lote, fornecedor ou código barras..." class="flex-1 min-w-0 px-3 py-2 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:bg-white outline-none focus:ring-2 focus:ring-blue-500/20"><button type="button" onclick="openScanner(scanParaMovimento)" title="Ler a etiqueta com a câmara" class="shrink-0 inline-flex items-center gap-1.5 px-3 py-2 text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 rounded-xl"><i data-lucide="scan-barcode" class="w-4 h-4"></i><span class="hidden sm:inline">Ler</span></button></div>
                     <select id="movement-product-id" onchange="document.getElementById('movement-lote').value=''; onMovementProductChange()" required class="w-full px-3 py-2 text-sm border rounded-xl"></select>
                 </div>
                 <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -1223,7 +1223,7 @@
                 </div>
                 <div class="pt-3 border-t border-slate-100">
                     <label class="block text-xs font-medium text-slate-700 mb-1">Mover para outro produto (opcional)</label>
-                    <input type="text" id="lot-move-search" oninput="filterLotMoveProducts()" placeholder="🔍 Pesquisar produto de destino..." class="w-full px-3 py-2 mb-2 text-sm bg-slate-50 border border-slate-200 rounded-xl">
+                    <input type="text" id="lot-move-search" oninput="debouncedFilterLotMoveProducts()" placeholder="🔍 Pesquisar produto de destino..." class="w-full px-3 py-2 mb-2 text-sm bg-slate-50 border border-slate-200 rounded-xl">
                     <select id="lot-move-product" class="w-full px-3 py-2 text-sm border border-slate-200 rounded-xl"></select>
                     <p class="text-[11px] text-slate-500 mt-1">Os movimentos deste lote passam também para o produto de destino.</p>
                 </div>
@@ -1353,6 +1353,8 @@
         const debouncedRenderProducts = debounce(() => renderProductsTable());
         const debouncedRenderMovements = debounce(() => renderMovementsTable());
         const debouncedRenderEntities = debounce(() => renderEntitiesTable());
+        const debouncedFilterMovementProducts = debounce(() => filterMovementProducts(), 200);
+        const debouncedFilterLotMoveProducts = debounce(() => filterLotMoveProducts(), 200);
 
         // 2. FUNÇÃO PARA CARREGAR OS DADOS DA CLOUD (em paralelo, com cache local)
         const CACHE_KEY = 'os_cache_v3';
@@ -2473,13 +2475,30 @@
                 || map.get('pl:' + l.product_id + '|' + String(l.lote || '').trim().toLowerCase())
                 || '';
         }
+        // Índice dos movimentos por lote: construído uma vez por versão dos movimentos (antes cada lote percorria TODOS os movimentos)
+        let movIdx = null;
+        function movIndexKey() { return movVersion + '|' + movements.length; }
+        function movementIndex() {
+            if (movIdx && movIdx.mv === movements && movIdx.key === movIndexKey()) return movIdx;
+            const byId = new Map(), byPl = new Map();
+            const add = (map, k, m) => { let a = map.get(k); if (!a) map.set(k, a = []); a.push(m); };
+            for (const m of movements) {
+                if (m.lot_id != null && m.lot_id !== '') add(byId, String(m.lot_id), m);
+                else add(byPl, m.product_id + '|' + String(m.lote || '').trim().toLowerCase(), m);
+            }
+            const asc = (a, b) => String(a.date || '').localeCompare(String(b.date || '')) ||
+                String(a.id).localeCompare(String(b.id), undefined, { numeric: true });
+            byId.forEach(a => a.sort(asc)); byPl.forEach(a => a.sort(asc));
+            movIdx = { mv: movements, key: movIndexKey(), byId, byPl, asc, pallets: new Map() };
+            return movIdx;
+        }
         function lotMovements(l) {
-            const lote = String(l.lote || '').trim().toLowerCase();
-            return movements.filter(m => m.lot_id != null && m.lot_id !== ''
-                    ? String(m.lot_id) === String(l.id)
-                    : (String(m.product_id) === String(l.product_id) && String(m.lote || '').trim().toLowerCase() === lote))
-                .sort((a, b) => String(a.date || '').localeCompare(String(b.date || '')) ||
-                    String(a.id).localeCompare(String(b.id), undefined, { numeric: true }));
+            const ix = movementIndex();
+            const a = ix.byId.get(String(l.id)) || [];
+            const b = ix.byPl.get(l.product_id + '|' + String(l.lote || '').trim().toLowerCase()) || [];
+            if (!b.length) return a.slice();
+            if (!a.length) return b.slice();
+            return a.concat(b).sort(ix.asc);
         }
         function renderLotHistory(l) {
             const list = lotMovements(l);
@@ -2536,6 +2555,11 @@
             const focused = focusLot && focusLot.pid === p.id && focusLot.q === query ? all.find(l => l.id === focusLot.lid) : null;
             const F = getLocFilter();
             let list = focused ? [focused] : ((showDepleted.has(p.id) || query) ? all : active);
+            if (!focused && query && !productOwnMatch(p, query)) {
+                const hits = list.filter(l => String(l.lote || '').toLowerCase().includes(query) || lotSupplier(l).toLowerCase().includes(query) ||
+                    lotSegments(p, l).some(g => String(g.loc || '').toLowerCase().includes(query)));
+                if (hits.length) list = hits;
+            }
             if (F.active && !focused) list = list.filter(l => lotSegments(p, l).some(g => locMatches(g.loc, F)));
             const depleted = all.length - active.length;
             const toggle = focused
@@ -3250,14 +3274,12 @@
                 return;
             }
             // 1) código de lote (SKU-LOTE) → só a linha desse lote
-            for (const l of lots) {
-                const lp = products.find(x => String(x.id) === String(l.product_id));
-                if (lp && lotCode(lp, l).toUpperCase() === code) {
-                    if (navigator.vibrate) try { navigator.vibrate(80); } catch (e) {}
-                    closeScanner();
-                    mostrarLoteLido(lp, l);
-                    return;
-                }
+            const hit = findLotByCode(code);
+            if (hit) {
+                if (navigator.vibrate) try { navigator.vibrate(80); } catch (e) {}
+                closeScanner();
+                mostrarLoteLido(hit.p, hit.l);
+                return;
             }
             // 2) código do produto (etiquetas antigas / do produto) → linha do produto
             const p = products.find(x => String(x.barcode || '').trim().toUpperCase() === code || String(x.sku || '').trim().toUpperCase() === code);
@@ -3266,16 +3288,27 @@
             closeScanner();
             mostrarProdutoLido(p);
         }
+        // Mapa "CÓDIGO DO LOTE" → { p, l }, refeito só quando os produtos ou os lotes mudam
+        let lotCodeIdx = null;
+        function findLotByCode(code) {
+            if (!lotCodeIdx || lotCodeIdx.p !== products || lotCodeIdx.l !== lots) {
+                const byId = new Map(products.map(x => [String(x.id), x]));
+                const map = new Map();
+                for (const l of lots) {
+                    const lp = byId.get(String(l.product_id));
+                    if (lp) { const c = lotCode(lp, l).toUpperCase(); if (!map.has(c)) map.set(c, { p: lp, l }); }
+                }
+                lotCodeIdx = { p: products, l: lots, map };
+            }
+            return lotCodeIdx.map.get(code) || null;
+        }
         // Etiqueta de palete: "<código do lote>#<palete>" → { p, l, palName } (ou null se não for desse tipo)
         function parsePaleteCode(code) {
             const i = code.lastIndexOf('#');
             if (i < 1 || i === code.length - 1) return null;
             const base = code.slice(0, i), palName = code.slice(i + 1).trim();
-            for (const l of lots) {
-                const lp = products.find(x => String(x.id) === String(l.product_id));
-                if (lp && lotCode(lp, l).toUpperCase() === base) return { p: lp, l, palName };
-            }
-            return null;
+            const hit = findLotByCode(base);
+            return hit ? { p: hit.p, l: hit.l, palName } : null;
         }
         // Lida a etiqueta de uma palete: abre a Saída já com produto, lote, palete e o peso que lá está (ajustável)
         async function handlePaleteLida({ p, l, palName }) {
@@ -3302,10 +3335,8 @@
         // Leitura na Entrada / Saída: seleciona o produto e o lote no formulário do movimento
         function scanParaMovimento(code) {
             let prod = null, lot = null;
-            for (const l of lots) {
-                const lp = products.find(x => String(x.id) === String(l.product_id));
-                if (lp && lotCode(lp, l).toUpperCase() === code) { prod = lp; lot = l; break; }
-            }
+            const hit = findLotByCode(code);
+            if (hit) { prod = hit.p; lot = hit.l; }
             if (!prod) prod = products.find(x => String(x.barcode || '').trim().toUpperCase() === code || String(x.sku || '').trim().toUpperCase() === code);
             if (!prod) return `Código "${code}" não encontrado.`;
             const type = document.getElementById('movement-type').value;
@@ -3438,6 +3469,13 @@
             return lots.find(x => String(x.product_id) === String(m.product_id) && String(x.lote || '').trim().toLowerCase() === lote) || null;
         }
         function lotPallets(l) {
+            const ix = movementIndex();
+            const k = l.id + '|' + l.product_id + '|' + String(l.lote || '').trim().toLowerCase();
+            let r = ix.pallets.get(k);
+            if (!r) { r = computeLotPallets(l); ix.pallets.set(k, r); }
+            return r;
+        }
+        function computeLotPallets(l) {
             const map = new Map();
             for (const m of lotMovements(l)) {
                 const raw = String(m.palete || '').trim();
