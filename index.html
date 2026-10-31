@@ -82,6 +82,9 @@
             body.printing-list #printable-list-area { display: block !important; }
             #printable-list-area table th, #printable-list-area table td { font-size: 11px !important; }
             #printable-list-area .num { text-align: right !important; white-space: nowrap; }
+            /* Listagem de produtos (A4 vertical): células mais justas para caber tudo */
+            #printable-list-area table.prod-print th, #printable-list-area table.prod-print td { padding: 4px 5px !important; font-size: 10.5px !important; vertical-align: top; }
+            #printable-list-area table.prod-print .pal { display: block; font-size: 9.5px; color: #334155; margin-top: 1px; }
             #printable-list-area .lst-bar { display: block; width: 40mm; max-width: 100%; height: auto; }
             #printable-list-area td.bar-cell { width: 44mm; }
             body {
@@ -4314,29 +4317,28 @@
                     <td style="${hd}">${esc(p.location || '-')}</td>
                     <td class="num" style="${hd}">${formatKg(stockP)}</td>
                     <td class="num" style="${hd}">${formatKg(p.min)}</td>
-                    <td class="num" style="${hd}">${formatEuro(p.cost)}</td>
-                    <td class="num" style="${hd}">${formatEuro(p.price)}</td>
                 </tr>`;
                 const rows = ls.map(l => `<tr>
-                    <td style="padding-left:14px !important;font-family:monospace"><b>${esc(l.lote)}</b>${(s => s ? `<br><span style="font-family:inherit;font-weight:400;font-size:10px">${s.named.map(x => esc(x.name) + ' ' + formatKg(x.saldo) + (x.cones != null ? ' (' + conesTxt(x.cones) + ')' : '')).join(' · ')}${s.rest ? ' · sem palete ' + formatKg(s.rest) : ''}</span>` : '')(lotPalSummary(l))}</td>
-                    <td>${esc(lotSupplier(l) || '-')}</td>
+                    <td style="padding-left:10px !important;font-family:monospace;white-space:nowrap"><b>${esc(l.lote)}</b></td>
+                    <td>${esc(lotSupplier(l) || '-')}${(s => s ? `<span class="pal">Paletes: ${s.named.map(x => esc(x.name) + ' ' + formatKg(x.saldo) + (x.cones != null ? ' (' + conesTxt(x.cones) + ')' : '')).join(' · ')}${s.rest ? ' · sem palete ' + formatKg(s.rest) : ''}</span>` : '')(lotPalSummary(l))}</td>
                     <td style="white-space:nowrap">${esc(formatDate(l.created_at))}</td>
                     <td>${lotLocPrint(p, l, F)}</td>
                     <td class="num">${formatKg(F.active ? lotQtyIn(p, l, F) : l.qty)}</td>
-                    <td colspan="3"></td>
+                    <td></td>
                 </tr>`).join('');
                 return `<tbody style="break-inside:avoid;page-break-inside:avoid">${head + rows}</tbody>`;   // produto + lotes juntos na mesma folha
             }).join('');
-            document.getElementById('printable-list-area').innerHTML = `<table style="table-layout:fixed;width:100%">
-                <colgroup><col style="width:14%"><col style="width:30%"><col style="width:13%"><col style="width:12%"><col style="width:11%"><col style="width:7%"><col style="width:6.5%"><col style="width:6.5%"></colgroup>
-                <thead><tr><th>SKU / Lote</th><th>Descrição / Fornecedor</th><th>Categoria / Criado</th><th>Localização</th><th class="num">${F.active ? 'Stock (local)' : 'Stock'}</th><th class="num">Mín.</th><th class="num">P. Custo</th><th class="num">P. Venda</th></tr></thead>
+            // A4 vertical, sem preços: SKU e localização mais estreitos, descrição mais larga
+            document.getElementById('printable-list-area').innerHTML = `<table class="prod-print" style="table-layout:fixed;width:100%;overflow-wrap:anywhere">
+                <colgroup><col style="width:14%"><col style="width:38%"><col style="width:11%"><col style="width:16%"><col style="width:12%"><col style="width:9%"></colgroup>
+                <thead><tr><th>SKU / Lote</th><th>Descrição / Fornecedor</th><th>Categoria / Criado</th><th>Localização</th><th class="num">${F.active ? 'Stock (local)' : 'Stock'}</th><th class="num">Mín.</th></tr></thead>
                 ${body}</table>
                 <p style="margin-top:8px;font-size:11px;color:#475569;"><b>Total:</b> ${list.length} ${list.length === 1 ? 'produto' : 'produtos'} · ${nLotes} ${nLotes === 1 ? 'lote' : 'lotes'} · ${formatKg(totQty)}</p>`;
 
             setPrintHeader('Oliveira & Gonçalves - Relatório de Produtos' + (F.active ? ' - ' + F.label : ''));   // também limpa o modo etiquetas/lista
             let st = document.getElementById('label-page-style');
             if (!st) { st = document.createElement('style'); st.id = 'label-page-style'; document.head.appendChild(st); }
-            st.textContent = '@page { size: A4 landscape; margin: 10mm; }';
+            st.textContent = '@page { size: A4 portrait; margin: 10mm; }';
             document.body.classList.add('printing-list');
             window.print();
         }
