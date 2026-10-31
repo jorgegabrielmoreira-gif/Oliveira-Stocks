@@ -2610,7 +2610,7 @@
                 <div class="mb-3">
                     <div class="text-[11px] font-semibold text-slate-500 mb-1">Paletes${incompletas.length ? ` · <span class="text-amber-700">${incompletas.length} incompleta(s): ${incompletas.map(x => esc(x.name || 'sem palete') + ' ' + formatKg(x.saldo)).join(', ')}</span>` : ''}</div>
                     <div class="overflow-x-auto"><table class="w-full text-left"><thead><tr class="text-[11px] text-slate-400"><th class="py-1 px-2 font-semibold">Palete</th><th class="py-1 px-2 font-semibold text-right">Inicial</th><th class="py-1 px-2 font-semibold text-right">Saído</th><th class="py-1 px-2 font-semibold text-right">Atual</th><th class="py-1 px-2 font-semibold">Localização</th><th class="py-1 px-2 font-semibold">Estado</th><th class="py-1 px-2 font-semibold text-right">Ações</th></tr></thead><tbody>
-                    ${pals.map(x => `<tr class="border-t border-slate-200/70"><td class="py-1.5 px-2 text-xs font-semibold text-slate-800">${esc(x.name || '(sem palete)')}</td><td class="py-1.5 px-2 text-right text-xs text-slate-600">${formatKg(x.inicial)}</td><td class="py-1.5 px-2 text-right text-xs text-rose-600">${x.saido ? '-' + formatKg(x.saido) : '-'}</td><td class="py-1.5 px-2 text-right text-xs font-bold text-slate-800">${formatKg(x.saldo)}</td><td class="py-1.5 px-2 text-xs ${x.local ? 'text-slate-700 font-medium' : 'text-slate-400 italic'}">${esc(x.local || baseLoc)}</td><td class="py-1.5 px-2"><span class="px-2 py-0.5 rounded-full text-[10px] font-semibold border ${badge[x.estado]}">${x.estado}</span></td><td class="py-1.5 px-2 text-right whitespace-nowrap">${!x.name && x.saldo > 0.005 ? `<button type="button" onclick="nameLotPalete('${esc(l.id)}')" title="Dar nome a esta palete (ex.: P1) e indicar onde está" class="inline-flex items-center gap-1 text-[11px] font-semibold text-blue-700 hover:bg-blue-50 rounded-lg px-2 py-1"><i data-lucide="tag" class="w-3.5 h-3.5"></i>Dar nome</button>` : ''}${x.name && x.saldo > 0.005 ? `<button type="button" data-lot="${esc(l.id)}" data-pal="${esc(x.name)}" onclick="changePaleteLocal(this.dataset.lot, this.dataset.pal)" title="Mudar a localização da palete ${esc(x.name)}" class="text-slate-400 hover:text-blue-600 p-1"><i data-lucide="map-pin" class="w-4 h-4"></i></button><button type="button" data-lot="${esc(l.id)}" data-pal="${esc(x.name)}" onclick="splitPalete(this.dataset.lot, this.dataset.pal)" title="Dividir a palete ${esc(x.name)} (passar parte do peso para uma palete nova)" class="text-slate-400 hover:text-blue-600 p-1"><i data-lucide="split" class="w-4 h-4"></i></button><button type="button" data-key="${esc('t:' + l.id + '|' + x.name)}" onclick="openLabelSheet([this.dataset.key])" title="Imprimir etiqueta da palete ${esc(x.name)} (para a saída)" class="text-slate-400 hover:text-indigo-600 p-1"><i data-lucide="printer" class="w-4 h-4"></i></button>` : ''}</td></tr>`).join('')}
+                    ${pals.map(x => `<tr class="border-t border-slate-200/70"><td class="py-1.5 px-2 text-xs font-semibold text-slate-800">${esc(x.name || '(sem palete)')}</td><td class="py-1.5 px-2 text-right text-xs text-slate-600">${formatKg(x.inicial)}</td><td class="py-1.5 px-2 text-right text-xs text-rose-600">${x.saido ? '-' + formatKg(x.saido) : '-'}</td><td class="py-1.5 px-2 text-right text-xs font-bold text-slate-800">${formatKg(x.saldo)}</td><td class="py-1.5 px-2 text-xs ${x.local ? 'text-slate-700 font-medium' : 'text-slate-400 italic'}">${esc(x.local || baseLoc)}</td><td class="py-1.5 px-2"><span class="px-2 py-0.5 rounded-full text-[10px] font-semibold border ${badge[x.estado]}">${x.estado}</span></td><td class="py-1.5 px-2 text-right whitespace-nowrap">${!x.name && x.saldo > 0.005 ? `<button type="button" onclick="nameLotPalete('${esc(l.id)}')" title="Dar nome a esta palete (ex.: P1) e indicar onde está" class="inline-flex items-center gap-1 text-[11px] font-semibold text-blue-700 hover:bg-blue-50 rounded-lg px-2 py-1"><i data-lucide="tag" class="w-3.5 h-3.5"></i>Dar nome</button>` : ''}${x.name && x.saldo > 0.005 ? `<button type="button" data-lot="${esc(l.id)}" data-pal="${esc(x.name)}" onclick="changePaleteLocal(this.dataset.lot, this.dataset.pal)" title="Mudar a localização da palete ${esc(x.name)}" class="text-slate-400 hover:text-blue-600 p-1"><i data-lucide="map-pin" class="w-4 h-4"></i></button><button type="button" data-lot="${esc(l.id)}" data-pal="${esc(x.name)}" onclick="splitPalete(this.dataset.lot, this.dataset.pal)" title="Dividir a palete ${esc(x.name)} (passar parte do peso para uma palete nova)" class="text-slate-400 hover:text-blue-600 p-1"><i data-lucide="split" class="w-4 h-4"></i></button><button type="button" data-lot="${esc(l.id)}" data-pal="${esc(x.name)}" onclick="anularPalete(this.dataset.lot, this.dataset.pal)" title="Eliminar a palete ${esc(x.name)} e o seu stock (engano)" class="text-slate-400 hover:text-rose-600 p-1"><i data-lucide="trash-2" class="w-4 h-4"></i></button><button type="button" data-key="${esc('t:' + l.id + '|' + x.name)}" onclick="openLabelSheet([this.dataset.key])" title="Imprimir etiqueta da palete ${esc(x.name)} (para a saída)" class="text-slate-400 hover:text-indigo-600 p-1"><i data-lucide="printer" class="w-4 h-4"></i></button>` : ''}</td></tr>`).join('')}
                     </tbody></table></div>
                 </div>` : '';
             return `<tr class="bg-white no-print"><td colspan="6" class="px-3 py-3 border-t border-slate-200">
@@ -3643,6 +3643,56 @@
             setLocInputs('pal', pal.local || '');
             refreshLocLists('');
             document.getElementById('pal-loc-modal').classList.remove('hidden');
+        }
+        // Elimina uma palete criada por engano, tirando o seu stock do lote (não passa para outra palete).
+        // Se a palete só tem entradas de acerto (foi criada ao dar nome ao stock importado), essas entradas são apagadas e a palete desaparece.
+        // Caso contrário (tem saídas reais, ou veio de uma divisão), regista uma saída de acerto com o que resta, para não apagar histórico.
+        async function anularPalete(lotId, palName) {
+            const lot = lots.find(l => String(l.id) === String(lotId)); if (!lot) return;
+            if (!movementsFull) await ensureAllMovements();
+            const pal = lotPallets(lot).find(x => x.name && x.name.toLowerCase() === String(palName).toLowerCase());
+            if (!pal || !(pal.saldo > 0.005)) { showToast('Esta palete já não tem stock.', 'error'); return; }
+            const key = pal.name.toLowerCase();
+            const movs = lotMovements(lot);
+            const daPalete = movs.filter(m => String(m.palete || '').trim().toLowerCase() === key);
+            const parDivisao = movs.some(m => m.type !== 'entrada' && /^Divisão:/.test(m.notes || '') && String(m.notes).includes('palete ' + pal.name));
+            const soAcerto = !parDivisao && daPalete.length > 0 && daPalete.every(m => m.type === 'entrada' && m.entity_name === 'Acerto de inventário');
+            const fica = Math.round(((Number(lot.qty) || 0) - pal.saldo) * 1000) / 1000;
+            const msg = `Eliminar a palete ${pal.name} do lote ${lot.lote}?
+
+`
+                + `Os ${formatKg(pal.saldo)} desta palete saem do stock (não passam para outra palete).
+`
+                + `O lote fica com ${formatKg(fica)}.
+
+`
+                + (soAcerto
+                    ? 'A entrada de acerto que criou esta palete é apagada e a palete deixa de aparecer.'
+                    : 'Como esta palete tem outros movimentos, fica registada uma saída de "Acerto de inventário" (pode anulá-la depois em Movimentos).');
+            if (!confirm(msg)) return;
+            const prod = products.find(x => String(x.id) === String(lot.product_id));
+            const prodAntes = prod ? Number(prod.qty) : null;
+            let error = null;
+            if (soAcerto) {
+                const ids = daPalete.map(m => m.id);
+                ({ error } = await db.from('movements').delete().in('id', ids));
+                if (!error) movements = movements.filter(m => !ids.some(id => String(id) === String(m.id)));
+            } else {
+                const row = { date: agoraLocal(), type: 'saida', product_id: lot.product_id, product_name: prod ? prod.name : '', lote: lot.lote,
+                    qty: pal.saldo, entity_name: 'Acerto de inventário', palete: pal.name, notes: `Palete ${pal.name} eliminada (engano)` };
+                const res = await db.from('movements').insert([row]).select();
+                error = res.error;
+                if (!error) (res.data || []).forEach(upsertLocalMovement);
+            }
+            if (error) { showMovementError(error); return; }
+            await loadData({ products: true, lots: true });
+            const l2 = lots.find(x => String(x.id) === String(lot.id));
+            const p2 = products.find(x => String(x.id) === String(lot.product_id));
+            let aviso = '';
+            if (l2 && Math.abs(Number(l2.qty) - fica) > 0.005) aviso += ` Confirme o stock do lote: ficou ${formatKg(l2.qty)} (esperado ${formatKg(fica)}).`;
+            if (prodAntes !== null && p2 && Math.abs((prodAntes - Number(p2.qty)) - pal.saldo) > 0.005) aviso += ` Confirme o stock do produto: era ${formatKg(prodAntes)} e ficou ${formatKg(p2.qty)}.`;
+            showToast(`Palete ${pal.name} eliminada. O lote ${lot.lote} tem agora ${formatKg(l2 ? l2.qty : fica)}.` + aviso, aviso ? 'error' : 'success');
+            refreshAll();
         }
         // Divide uma palete com nome: parte do peso passa para uma palete nova do mesmo lote
         async function splitPalete(lotId, palName) {
