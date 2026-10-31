@@ -926,9 +926,13 @@
     <!-- MODAL PRODUTO -->
     <div id="pal-loc-modal" class="fixed inset-0 bg-slate-900/50 backdrop-blur-xs z-50 flex items-center justify-center p-4 hidden no-print">
         <div class="bg-white rounded-2xl shadow-xl w-full max-w-md p-6 space-y-4">
-            <h3 class="font-bold text-slate-900">Localização da palete</h3>
+            <h3 class="font-bold text-slate-900" id="pal-loc-title">Localização da palete</h3>
             <p id="pal-loc-info" class="text-xs text-slate-500"></p>
-            <input type="hidden" id="pal-loc-lot"><input type="hidden" id="pal-loc-name">
+            <input type="hidden" id="pal-loc-lot"><input type="hidden" id="pal-loc-name"><input type="hidden" id="pal-loc-mode" value="loc">
+            <div id="pal-new-name-wrap" class="hidden">
+                <label class="block text-xs font-medium mb-1">Nome da palete *</label>
+                <input type="text" id="pal-new-name" autocomplete="off" placeholder="Ex: P1" class="w-full px-3 py-2 text-sm border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500/20 outline-none">
+            </div>
             <div class="grid grid-cols-2 gap-2">
                 <div><select id="pal-arm-sel" onchange="onLocSel('pal','arm')" class="w-full px-3 py-2 text-sm border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500/20 outline-none"></select><input type="text" id="pal-arm" list="loc-arm-list" autocomplete="off" oninput="refreshLocLists(this.value)" placeholder="Escreva o armazém" class="hidden mt-2 w-full px-3 py-2 text-sm border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500/20 outline-none"></div>
                 <div><select id="pal-fila-sel" onchange="onLocSel('pal','fila')" class="w-full px-3 py-2 text-sm border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500/20 outline-none"></select><input type="text" id="pal-fila" list="loc-fila-list" autocomplete="off" placeholder="Escreva a posição (ex: Corredor B)" class="hidden mt-2 w-full px-3 py-2 text-sm border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500/20 outline-none"></div>
@@ -1195,6 +1199,12 @@
                     <label class="block text-xs font-medium text-slate-700 mb-1">Stock do lote (kg) *</label>
                     <input type="number" step="0.001" min="0" id="lot-qty" required class="w-full px-3 py-2 text-sm border border-slate-200 rounded-xl">
                     <p class="text-[11px] text-slate-500 mt-1">Alterar aqui é um acerto de inventário e não fica registado nos movimentos.</p>
+                </div>
+                <div id="lot-sempalete-wrap" class="hidden p-3 rounded-xl border border-blue-200 bg-blue-50 space-y-2">
+                    <p class="text-xs text-blue-900"><b>Stock sem palete: <span id="lot-sempalete-kg"></span></b> — dê-lhe o nome de uma palete para o distinguir de outras entradas deste lote.</p>
+                    <input type="text" id="lot-sempalete-nome" autocomplete="off" placeholder="Nome da palete (ex: P1) — opcional" class="w-full px-3 py-2 text-sm border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500/20 outline-none">
+                    <div class="grid grid-cols-2 gap-2"><div><select id="lp-arm-sel" onchange="onLocSel('lp','arm')" class="w-full px-3 py-2 text-sm border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500/20 outline-none"></select><input type="text" id="lp-arm" list="loc-arm-list" autocomplete="off" placeholder="Escreva o armazém" class="hidden mt-2 w-full px-3 py-2 text-sm border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500/20 outline-none"></div><div><select id="lp-fila-sel" onchange="onLocSel('lp','fila')" class="w-full px-3 py-2 text-sm border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500/20 outline-none"></select><input type="text" id="lp-fila" list="loc-fila-list" autocomplete="off" placeholder="Escreva a posição (ex: Corredor B)" class="hidden mt-2 w-full px-3 py-2 text-sm border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500/20 outline-none"></div></div>
+                    <p class="text-[11px] text-slate-500">Localização da palete (opcional). Vazio = a do lote.</p>
                 </div>
                 <div>
                     <label class="block text-xs font-medium text-slate-700 mb-1">Localização do lote</label>
@@ -1515,6 +1525,7 @@
             document.getElementById('lot-code').value = lot.lote;
             document.getElementById('lot-qty').value = lot.qty;
             setLocInputs('lot', lot.location); refreshLocLists('');
+            prepararSemPalete(lot);
             document.getElementById('lot-supplier-search').value = '';
             filterLotSuppliers(lot.supplier || '');
             document.getElementById('lot-move-search').value = '';
@@ -1748,11 +1759,18 @@
             if (sup !== (lot.supplier || '')) patch.supplier = sup || null;
             if (!error && Object.keys(patch).length) ({ error } = await db.from('lots').update(patch).eq('id', id));
             if (!error && dest) ({ error } = await db.rpc('move_lot', { p_lot: id, p_product: dest }));
+            let nomeMsg = '';
+            const nomePal = document.getElementById('lot-sempalete-nome').value.trim();
+            if (!error && nomePal && !document.getElementById('lot-sempalete-wrap').classList.contains('hidden')) {
+                const r = await aplicarNomePalete(lot, nomePal, getLocInputs('lp'), qty);
+                if (r.error) error = r.error; else if (r.msg) nomeMsg = r.msg; else if (r.aviso) nomeMsg = r.aviso;
+            }
             btn.disabled = false;
 
             const lotScope = { products: true, lots: true, movements: true };   // renomear/mover pode alterar movimentos
             if (error) { showLotError(error); await loadData(lotScope); refreshAll(); return; }
-            showToast('Lote atualizado!');
+            if (nomeMsg) showToast('Lote atualizado, mas a palete não foi criada: ' + nomeMsg, 'error');
+            else showToast(nomePal ? 'Lote atualizado e palete "' + nomePal + '" criada.' : 'Lote atualizado!');
             await loadData(lotScope);
             refreshAll();
             closeLotModal();
@@ -1922,6 +1940,7 @@
             if (!p) return;
             document.getElementById('note-title').textContent = p.name || 'Observações';
             document.getElementById('note-text').textContent = String(p.notes || '').trim();
+            document.getElementById('note-edit').classList.remove('hidden');
             document.getElementById('note-edit').onclick = () => { closeProductNote(); openProductModal(p.id); };
             document.getElementById('note-modal').classList.remove('hidden');
             scheduleIcons();
@@ -2225,11 +2244,11 @@
         // Sugestões dos campos armazém / fila (do que já existe); com armazém escrito, só as filas desse armazém
         // As listas de armazém/fila ficam preenchidas logo ao abrir a página (não dependem de os dados terem carregado)
         (function initLocSelects() {
-            const run = () => ['product', 'lot', 'movement-palete', 'pal'].forEach(fillLocSelects);
+            const run = () => ['product', 'lot', 'movement-palete', 'pal', 'lp'].forEach(fillLocSelects);
             if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', run); else run();
         })();
         function refreshLocLists(armTyped) {
-            ['product', 'lot', 'movement-palete', 'pal'].forEach(fillLocSelects);
+            ['product', 'lot', 'movement-palete', 'pal', 'lp'].forEach(fillLocSelects);
             const arms = new Map(), filas = new Map();
             const armKey = normLoc(armTyped);
             const add = v => {
@@ -2491,11 +2510,13 @@
             const incompletas = pals.filter(x => x.estado === 'Incompleta');
             const pr = products.find(x => String(x.id) === String(l.product_id));
             const baseLoc = l.location || (pr && pr.location) || '-';
-            const palTable = temPaletes ? `
+            // painel também com stock sem nome, para o poder transformar em palete
+            const palTable = (temPaletes || pals.some(x => !x.name && x.saldo > 0.005)) ? `
+
                 <div class="mb-3">
                     <div class="text-[11px] font-semibold text-slate-500 mb-1">Paletes${incompletas.length ? ` · <span class="text-amber-700">${incompletas.length} incompleta(s): ${incompletas.map(x => esc(x.name || 'sem palete') + ' ' + formatKg(x.saldo)).join(', ')}</span>` : ''}</div>
                     <div class="overflow-x-auto"><table class="w-full text-left"><thead><tr class="text-[11px] text-slate-400"><th class="py-1 px-2 font-semibold">Palete</th><th class="py-1 px-2 font-semibold text-right">Inicial</th><th class="py-1 px-2 font-semibold text-right">Saído</th><th class="py-1 px-2 font-semibold text-right">Atual</th><th class="py-1 px-2 font-semibold">Localização</th><th class="py-1 px-2 font-semibold">Estado</th><th class="py-1 px-2 font-semibold text-right">Ações</th></tr></thead><tbody>
-                    ${pals.map(x => `<tr class="border-t border-slate-200/70"><td class="py-1.5 px-2 text-xs font-semibold text-slate-800">${esc(x.name || '(sem palete)')}</td><td class="py-1.5 px-2 text-right text-xs text-slate-600">${formatKg(x.inicial)}</td><td class="py-1.5 px-2 text-right text-xs text-rose-600">${x.saido ? '-' + formatKg(x.saido) : '-'}</td><td class="py-1.5 px-2 text-right text-xs font-bold text-slate-800">${formatKg(x.saldo)}</td><td class="py-1.5 px-2 text-xs ${x.local ? 'text-slate-700 font-medium' : 'text-slate-400 italic'}">${esc(x.local || baseLoc)}</td><td class="py-1.5 px-2"><span class="px-2 py-0.5 rounded-full text-[10px] font-semibold border ${badge[x.estado]}">${x.estado}</span></td><td class="py-1.5 px-2 text-right whitespace-nowrap">${x.name && x.saldo > 0.005 ? `<button type="button" data-lot="${esc(l.id)}" data-pal="${esc(x.name)}" onclick="changePaleteLocal(this.dataset.lot, this.dataset.pal)" title="Mudar a localização da palete ${esc(x.name)}" class="text-slate-400 hover:text-blue-600 p-1"><i data-lucide="map-pin" class="w-4 h-4"></i></button><button type="button" data-key="${esc('t:' + l.id + '|' + x.name)}" onclick="openLabelSheet([this.dataset.key])" title="Imprimir etiqueta da palete ${esc(x.name)} (para a saída)" class="text-slate-400 hover:text-indigo-600 p-1"><i data-lucide="printer" class="w-4 h-4"></i></button>` : ''}</td></tr>`).join('')}
+                    ${pals.map(x => `<tr class="border-t border-slate-200/70"><td class="py-1.5 px-2 text-xs font-semibold text-slate-800">${esc(x.name || '(sem palete)')}</td><td class="py-1.5 px-2 text-right text-xs text-slate-600">${formatKg(x.inicial)}</td><td class="py-1.5 px-2 text-right text-xs text-rose-600">${x.saido ? '-' + formatKg(x.saido) : '-'}</td><td class="py-1.5 px-2 text-right text-xs font-bold text-slate-800">${formatKg(x.saldo)}</td><td class="py-1.5 px-2 text-xs ${x.local ? 'text-slate-700 font-medium' : 'text-slate-400 italic'}">${esc(x.local || baseLoc)}</td><td class="py-1.5 px-2"><span class="px-2 py-0.5 rounded-full text-[10px] font-semibold border ${badge[x.estado]}">${x.estado}</span></td><td class="py-1.5 px-2 text-right whitespace-nowrap">${!x.name && x.saldo > 0.005 ? `<button type="button" onclick="nameLotPalete('${esc(l.id)}')" title="Dar nome a esta palete (ex.: P1) e indicar onde está" class="inline-flex items-center gap-1 text-[11px] font-semibold text-blue-700 hover:bg-blue-50 rounded-lg px-2 py-1"><i data-lucide="tag" class="w-3.5 h-3.5"></i>Dar nome</button>` : ''}${x.name && x.saldo > 0.005 ? `<button type="button" data-lot="${esc(l.id)}" data-pal="${esc(x.name)}" onclick="changePaleteLocal(this.dataset.lot, this.dataset.pal)" title="Mudar a localização da palete ${esc(x.name)}" class="text-slate-400 hover:text-blue-600 p-1"><i data-lucide="map-pin" class="w-4 h-4"></i></button><button type="button" data-key="${esc('t:' + l.id + '|' + x.name)}" onclick="openLabelSheet([this.dataset.key])" title="Imprimir etiqueta da palete ${esc(x.name)} (para a saída)" class="text-slate-400 hover:text-indigo-600 p-1"><i data-lucide="printer" class="w-4 h-4"></i></button>` : ''}</td></tr>`).join('')}
                     </tbody></table></div>
                 </div>` : '';
             return `<tr class="bg-white no-print"><td colspan="6" class="px-3 py-3 border-t border-slate-200">
@@ -2531,6 +2552,7 @@
                     <td class="py-2 px-3 text-right no-print whitespace-nowrap">
                         ${p.archived || l.archived ? '' : `<button onclick="openMovementForLot('entrada', '${esc(p.id)}', '${esc(l.id)}')" title="Registar entrada neste lote" aria-label="Registar entrada neste lote" class="inline-flex items-center justify-center w-7 h-7 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg shadow-sm transition"><i data-lucide="arrow-down-left" class="w-4 h-4"></i></button>`}
                         ${l.qty > 0 ? `<button onclick="openMovementForLot('saida', '${esc(p.id)}', '${esc(l.id)}')" title="Registar saída deste lote" aria-label="Registar saída deste lote" class="inline-flex items-center justify-center w-7 h-7 bg-rose-600 hover:bg-rose-700 text-white rounded-lg shadow-sm transition"><i data-lucide="arrow-up-right" class="w-4 h-4"></i></button>` : ''}
+                        ${l.qty > 0 && !p.archived && !l.archived ? `<button onclick="nameLotPalete('${esc(l.id)}')" title="Dar nome à palete (stock deste lote que ainda não tem palete)" aria-label="Dar nome à palete" class="p-1.5 text-slate-400 hover:text-blue-600 transition"><i data-lucide="tag" class="w-4 h-4"></i></button>` : ''}
                         <button onclick="toggleLotHistory('${esc(l.id)}')" title="Ver movimentos do lote" class="p-1.5 transition ${openLotHistory.has(String(l.id)) ? 'text-blue-600' : 'text-slate-400 hover:text-blue-600'}"><i data-lucide="history" class="w-4 h-4"></i></button>
                         <button onclick="openLabelModal('${esc(p.id)}', '${esc(l.id)}')" title="Imprimir Etiqueta do Lote" class="p-1.5 text-slate-400 hover:text-slate-900 transition"><i data-lucide="qr-code" class="w-4 h-4"></i></button>
                         <button onclick="openLotModal('${esc(l.id)}')" title="Editar Lote" class="p-1.5 text-slate-400 hover:text-blue-600 transition"><i data-lucide="edit-3" class="w-4 h-4"></i></button>
@@ -3446,7 +3468,11 @@
             const typed = (document.getElementById('movement-palete').value || '').trim().toLowerCase();
             const cur = typed && pals.find(x => x.name.toLowerCase() === typed);
             if (cur) { info.textContent = `Palete ${cur.name}: ${formatKg(cur.saldo)} agora (entrada inicial ${formatKg(cur.inicial)}) · ${cur.estado}`; info.classList.remove('hidden'); }
-            else info.classList.add('hidden');
+            else if (typed && document.getElementById('movement-type').value === 'entrada' && semPaleteInfo(lot)) {
+                const sn = semPaleteInfo(lot);
+                info.textContent = `Atenção: este lote tem ${formatKg(sn.kg)} sem palete. Para os distinguir, feche esta janela e use o botão da etiqueta (Dar nome à palete) na linha do lote.`;
+                info.classList.remove('hidden');
+            } else info.classList.add('hidden');
         }
         // Campo "Localização da palete": só numa entrada com palete; sugere a da palete se já existir
         function updatePaleteLocalField() {
@@ -3475,14 +3501,134 @@
             const base = lot.location || (prod && prod.location) || '-';
             document.getElementById('pal-loc-lot').value = lot.id;
             document.getElementById('pal-loc-name').value = pal.name;
+            document.getElementById('pal-loc-mode').value = 'loc';
+            document.getElementById('pal-new-name-wrap').classList.add('hidden');
+            document.getElementById('pal-loc-title').textContent = 'Localização da palete';
             document.getElementById('pal-loc-info').textContent = `Palete ${pal.name} · lote ${lot.lote} · localização do lote: ${base}`;
             setLocInputs('pal', pal.local || '');
             refreshLocLists('');
             document.getElementById('pal-loc-modal').classList.remove('hidden');
         }
+        // Dá nome a uma palete que entrou sem nome (ex.: o stock que já existia antes de se usarem paletes)
+        async function nameLotPalete(lotId) {
+            const lot = lots.find(l => String(l.id) === String(lotId)); if (!lot) return;
+            if (!movementsFull) await ensureAllMovements();
+            const pal = semPaleteInfo(lot);
+            if (!pal) { mostrarDiagnosticoPaletes(lot); return; }
+            const prod = products.find(x => String(x.id) === String(lot.product_id));
+            const base = lot.location || (prod && prod.location) || '-';
+            document.getElementById('pal-loc-lot').value = lot.id;
+            document.getElementById('pal-loc-name').value = '';
+            document.getElementById('pal-loc-mode').value = 'name';
+            document.getElementById('pal-loc-title').textContent = 'Dar nome à palete';
+            document.getElementById('pal-new-name-wrap').classList.remove('hidden');
+            document.getElementById('pal-new-name').value = '';
+            document.getElementById('pal-loc-info').textContent = `Stock sem palete: ${formatKg(pal.kg)} · lote ${lot.lote} · localização do lote: ${base}` + (pal.tipo === 'acerto' ? '. Este stock não consta dos movimentos: será registada uma entrada de acerto (o stock do lote não muda).' : '');
+            setLocInputs('pal', '');
+            refreshLocLists('');
+            document.getElementById('pal-loc-modal').classList.remove('hidden');
+            document.getElementById('pal-new-name').focus();
+        }
+        // Explica porque é que não há stock sem palete: compara o stock do lote com o histórico de movimentos
+        function mostrarDiagnosticoPaletes(lot) {
+            const pals = lotPallets(lot), movs = lotMovements(lot);
+            const ent = movs.filter(m => m.type === 'entrada').reduce((t, m) => t + (Number(m.qty) || 0), 0);
+            const sai = movs.filter(m => m.type !== 'entrada').reduce((t, m) => t + (Number(m.qty) || 0), 0);
+            const saldo = Math.round((ent - sai) * 1000) / 1000, stock = Number(lot.qty) || 0, dif = Math.round((stock - saldo) * 1000) / 1000;
+            const linhas = [
+                `Stock do lote: ${formatKg(stock)}`,
+                `Movimentos do lote (${movs.length}): entradas ${formatKg(ent)} − saídas ${formatKg(sai)} = ${formatKg(saldo)}`,
+                `Paletes no histórico: ${pals.length ? pals.map(x => `${x.name || '(sem palete)'} ${formatKg(x.saldo)}`).join(' · ') : 'nenhuma'}`,
+                '',
+                Math.abs(dif) > 0.005
+                    ? `O stock do lote (${formatKg(stock)}) não bate com o histórico (${formatKg(saldo)}): faltam ${formatKg(dif)} nos movimentos. Isto acontece quando o stock foi acertado a mão na edição do lote, por isso essa parte não pertence a nenhuma palete no histórico.`
+                    : 'O stock bate certo com o histórico e já está tudo com nome de palete.'
+            ];
+            document.getElementById('note-title').textContent = 'Paletes do lote ' + (lot.lote || '');
+            document.getElementById('note-text').textContent = linhas.join('\n');
+            document.getElementById('note-edit').classList.add('hidden');
+            document.getElementById('note-modal').classList.remove('hidden');
+            scheduleIcons();
+        }
         function closePaleteLocalModal() { document.getElementById('pal-loc-modal').classList.add('hidden'); }
+        // Stock do lote sem palete: 'nome' = entradas sem palete no histórico; 'acerto' = stock que não está nos movimentos
+        function semPaleteInfo(lot, stock) {
+            const pals = lotPallets(lot);
+            const un = pals.find(x => !x.name && x.saldo > 0.005);
+            if (un) return { tipo: 'nome', kg: un.saldo };
+            const st = stock === undefined ? Number(lot.qty) || 0 : stock;
+            const soma = pals.reduce((t, x) => t + x.saldo, 0);
+            const dif = Math.round((st - soma) * 1000) / 1000;
+            return dif > 0.005 ? { tipo: 'acerto', kg: dif } : null;
+        }
+        // Dá nome ao stock sem palete. 'nome': renomeia as entradas sem palete. 'acerto': regista uma entrada de acerto com a palete
+        // e repõe o stock do lote (o trigger da BD soma a entrada, mas esse stock já lá estava). Devolve { error?, msg?, saldo?, aviso? }
+        async function aplicarNomePalete(lot, nome, local, stock) {
+            nome = String(nome || '').trim();
+            if (!nome) return { msg: 'Indique o nome da palete.' };
+            const pals = lotPallets(lot);
+            if (pals.some(x => x.name && x.name.toLowerCase() === nome.toLowerCase())) return { msg: `Já existe uma palete "${nome}" neste lote. Escolha outro nome.` };
+            const info = semPaleteInfo(lot, stock);
+            if (!info) return { msg: 'Este lote não tem stock sem palete.' };
+            if (info.tipo === 'nome') {
+                const semNome = lotMovements(lot).filter(m => !String(m.palete || '').trim());
+                const entradas = semNome.filter(m => m.type === 'entrada'), outros = semNome.filter(m => m.type !== 'entrada');
+                let res = await db.from('movements').update({ palete: nome, palete_local: local || null }).in('id', entradas.map(m => m.id)).select();
+                let rows = res.data || [], error = res.error;
+                if (!error && outros.length) { res = await db.from('movements').update({ palete: nome }).in('id', outros.map(m => m.id)).select(); error = res.error; rows = rows.concat(res.data || []); }
+                if (error) return { error };
+                rows.forEach(upsertLocalMovement);
+                return { saldo: info.kg };
+            }
+            // acerto
+            const alvo = stock === undefined ? Number(lot.qty) || 0 : stock;
+            const prod = products.find(x => String(x.id) === String(lot.product_id));
+            const qtyProdAntes = prod ? Number(prod.qty) : null;
+            const hoje = new Date(); const dia = `${hoje.getFullYear()}-${String(hoje.getMonth() + 1).padStart(2, '0')}-${String(hoje.getDate()).padStart(2, '0')}`;
+            const row = { date: dia, type: 'entrada', product_id: lot.product_id, product_name: prod ? prod.name : '', lote: lot.lote, qty: info.kg,
+                entity_name: 'Acerto de inventário', notes: 'Stock que já existia, identificado como palete', palete: nome, palete_local: local || null };
+            const ins = await db.from('movements').insert([row]).select();
+            if (ins.error) return { error: ins.error };
+            (ins.data || []).forEach(upsertLocalMovement);
+            await loadData({ products: true, lots: true });
+            const l2 = lots.find(x => String(x.id) === String(lot.id));
+            let aviso = '';
+            if (l2 && Math.abs(Number(l2.qty) - alvo) > 0.0005) {
+                const up = await db.from('lots').update({ qty: alvo }).eq('id', lot.id);
+                if (up.error) return { error: up.error };
+                await loadData({ products: true, lots: true });
+            }
+            const p2 = products.find(x => String(x.id) === String(lot.product_id));
+            if (qtyProdAntes !== null && p2 && Math.abs(Number(p2.qty) - qtyProdAntes) > 0.0005) aviso = `Confirme o stock do produto: era ${formatKg(qtyProdAntes)} e ficou ${formatKg(p2.qty)}.`;
+            return { saldo: info.kg, aviso };
+        }
+        async function savePaleteNome(lot) {
+            const btn = document.getElementById('pal-loc-save'); btn.disabled = true;
+            const r = await aplicarNomePalete(lot, document.getElementById('pal-new-name').value, getLocInputs('pal'));
+            btn.disabled = false;
+            if (r.msg) { showToast(r.msg, 'error'); return; }
+            if (r.error) { showMovementError(r.error); return; }
+            closePaleteLocalModal();
+            showToast(`Palete "${document.getElementById('pal-new-name').value.trim()}" criada (${formatKg(r.saldo)}).` + (r.aviso ? ' ' + r.aviso : ''), r.aviso ? 'error' : 'success');
+            refreshAll();
+        }
+        // No editar lote: mostra o bloco "Stock sem palete" se o lote tiver stock sem nome de palete
+        async function prepararSemPalete(lot) {
+            const wrap = document.getElementById('lot-sempalete-wrap');
+            wrap.classList.add('hidden');
+            document.getElementById('lot-sempalete-nome').value = '';
+            setLocInputs('lp', '');
+            if (!(Number(lot.qty) > 0)) return;
+            if (!movementsFull) await ensureAllMovements();
+            if (document.getElementById('lot-edit-id').value !== String(lot.id)) return;
+            const pal = semPaleteInfo(lot);
+            if (!pal) return;
+            document.getElementById('lot-sempalete-kg').textContent = formatKg(pal.kg);
+            wrap.classList.remove('hidden');
+        }
         async function savePaleteLocal() {
             const lot = lots.find(l => String(l.id) === document.getElementById('pal-loc-lot').value); if (!lot) return;
+            if (document.getElementById('pal-loc-mode').value === 'name') return savePaleteNome(lot);
             const palName = document.getElementById('pal-loc-name').value;
             const pal = lotPallets(lot).find(x => x.name && x.name.toLowerCase() === palName.toLowerCase()); if (!pal) return;
             const atual = pal.local || '';
