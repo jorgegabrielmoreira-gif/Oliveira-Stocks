@@ -1257,6 +1257,7 @@
         let labelSel = [], labelQueue = [];   // etiquetas selecionadas nas listas / etiquetas no modal
         let lots = [], lotsByProduct = {};
         const expandedProducts = new Set(), showDepleted = new Set();
+        const collapsedProducts = new Set(), showAllLots = new Set();   // pesquisa por lote: listas fechadas à mão / com todos os lotes
         let entityLimit = 100, lastEntityKey = '', productLimit = 100, movementLimit = 100, lastProductKey = '', lastMovementKey = '';
         let iconsQueued = false;
         function scheduleIcons() {
@@ -2421,8 +2422,20 @@
             return (lotsByProduct[p.id] || []).some(l => l.lote.toLowerCase().includes(query) || lotSupplier(l).toLowerCase().includes(query)) || productLocMatch(p, query);
         }
 
+        // A lista de lotes está aberta se foi aberta à mão, ou se a pesquisa encontrou um lote deste produto (e não foi fechada à mão)
+        function lotsOpen(p, query) {
+            if (expandedProducts.has(p.id)) return true;
+            return !!(query && !collapsedProducts.has(p.id) && !productOwnMatch(p, query) && productLotMatch(p, query));
+        }
         function toggleLots(id) {
-            if (expandedProducts.has(id)) expandedProducts.delete(id); else expandedProducts.add(id);
+            const p = products.find(x => String(x.id) === String(id));
+            const query = (document.getElementById('search-product')?.value || '').toLowerCase();
+            if (p && lotsOpen(p, query)) { expandedProducts.delete(id); collapsedProducts.add(id); }
+            else { expandedProducts.add(id); collapsedProducts.delete(id); }
+            renderProductsTable();
+        }
+        function toggleAllLots(id) {
+            if (showAllLots.has(id)) showAllLots.delete(id); else showAllLots.add(id);
             renderProductsTable();
         }
         function toggleDepleted(id) {
@@ -2555,15 +2568,21 @@
             const focused = focusLot && focusLot.pid === p.id && focusLot.q === query ? all.find(l => l.id === focusLot.lid) : null;
             const F = getLocFilter();
             let list = focused ? [focused] : ((showDepleted.has(p.id) || query) ? all : active);
+            let queryFiltered = false;
             if (!focused && query && !productOwnMatch(p, query)) {
                 const hits = list.filter(l => String(l.lote || '').toLowerCase().includes(query) || lotSupplier(l).toLowerCase().includes(query) ||
                     lotSegments(p, l).some(g => String(g.loc || '').toLowerCase().includes(query)));
-                if (hits.length) list = hits;
+                if (hits.length && hits.length < list.length) {
+                    queryFiltered = true;
+                    if (!showAllLots.has(p.id)) list = hits;
+                }
             }
             if (F.active && !focused) list = list.filter(l => lotSegments(p, l).some(g => locMatches(g.loc, F)));
             const depleted = all.length - active.length;
             const toggle = focused
                 ? `<button onclick="clearFocusLot()" class="text-xs font-semibold text-blue-600 hover:text-blue-700">Mostrar todos os lotes (${all.length})</button>`
+                : queryFiltered
+                ? `<button onclick="toggleAllLots('${esc(p.id)}')" class="text-xs font-semibold text-blue-600 hover:text-blue-700">${showAllLots.has(p.id) ? 'Só os lotes da pesquisa' : 'Mostrar todos os lotes (' + all.length + ')'}</button>`
                 : depleted > 0 && !query
                 ? `<button onclick="toggleDepleted('${esc(p.id)}')" class="text-xs font-semibold text-blue-600 hover:text-blue-700">${showDepleted.has(p.id) ? 'Ocultar esgotados' : 'Mostrar esgotados (' + depleted + ')'}</button>` : '';
             const rows = list.map(l => `
@@ -2604,7 +2623,7 @@
             document.getElementById('arquivar-aviso')?.classList.toggle('hidden', !(archiveSupported === false && (products.some(isZero) || lots.some(l => Number(l.qty) <= 0))));
             const tbody = document.getElementById('products-table-body');
             const pKey = query + '|' + catFilter + '|' + F.arm + '|' + F.fila + '|' + stateF + '|' + showArch;
-            if (pKey !== lastProductKey) { lastProductKey = pKey; productLimit = 100; }
+            if (pKey !== lastProductKey) { lastProductKey = pKey; productLimit = 100; collapsedProducts.clear(); showAllLots.clear(); }
             const filaSum = document.getElementById('fila-summary');
             if (filaSum) filaSum.textContent = F.active ? `${listed.length} ${listed.length === 1 ? 'produto' : 'produtos'} · ${formatKg(listed.reduce((t, p) => t + filaQty(p, F), 0))} em ${F.label}` : '';
             const shownProducts = listed.slice(0, productLimit);
@@ -2618,7 +2637,7 @@
             tbody.innerHTML = shownProducts.map(p => {
                 const pl = (lotsByProduct[p.id] || []).filter(l => showArch || !l.archived);
                 const active = pl.filter(l => l.qty > 0).length;
-                const open = expandedProducts.has(p.id) || (query && !productOwnMatch(p, query) && productLotMatch(p, query));
+                const open = lotsOpen(p, query);
                 const zc = isZero(p) ? 'zero-stock' : '';
                 return `
                 <tr data-pid="${esc(p.id)}" class="prod-row ${zc} ${p.archived ? 'opacity-60' : ''} hover:bg-slate-50/80 transition ${p.id === highlightProductId ? 'row-flash' : ''}">
