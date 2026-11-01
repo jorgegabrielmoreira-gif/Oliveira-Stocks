@@ -1214,7 +1214,7 @@
                         <input type="text" id="movement-lote" placeholder="Código do novo lote" class="w-full px-3 py-2 mt-2 text-sm border rounded-xl hidden">
                     </div>
                     <div>
-                        <label class="block text-xs font-medium mb-1">Qtd (kg) *</label>
+                        <div class="flex items-center justify-between gap-2 mb-1"><label class="block text-xs font-medium">Qtd (kg) *</label><button type="button" onclick="abrirCalcMovimento()" title="Abrir calculadora" aria-label="Abrir calculadora" class="inline-flex items-center gap-1 text-[11px] font-medium text-indigo-600 hover:text-indigo-800"><i data-lucide="calculator" class="w-3.5 h-3.5"></i>Calculadora</button></div>
                         <input type="number" step="0.01" min="0.01" id="movement-qty" required class="w-full px-3 py-2 text-sm border rounded-xl">
                         <p id="movement-stock-info" class="text-[11px] text-slate-500 mt-1 font-medium hidden"></p>
                     </div>
@@ -2664,6 +2664,8 @@
         let focusLot = null, highlightLotId = null;
         function clearFocusLot() { focusLot = null; renderProductsTable(); }
 
+        // Divisões entre paletes: entrada e saída iguais que só mudam o peso de palete; não alteram o stock do lote
+        const movInterno = m => m.entity_name === 'Acerto de inventário' && /^Divisão( anulada)?:/.test(m.notes || '');
         // Histórico de movimentos de um lote (com saldo a correr)
         const openLotHistory = new Set();
         function toggleLotHistory(id) {
@@ -2732,19 +2734,22 @@
         }
         function renderLotHistory(l) {
             const list = lotMovements(l);
-            let saldo = 0, entrado = 0, saido = 0;
+            let saldo = 0, entrado = 0, saido = 0, interno = 0;
             const entradas = [];
             const rows = list.map(m => {
                 const q = Number(m.qty) || 0, isIn = m.type === 'entrada';
-                if (isIn) { saldo += q; entrado += q; entradas.push(q); } else { saldo -= q; saido += q; }
+                saldo += isIn ? q : -q;
+                if (movInterno(m)) interno += isIn ? q : -q;
+                else if (isIn) { entrado += q; entradas.push(q); } else saido += q;
                 return `<tr class="border-t border-slate-200/70">
                     <td class="py-1.5 px-2 text-xs text-slate-500 whitespace-nowrap">${historyDateCell(m)}</td>
                     <td class="py-1.5 px-2">${historyTypeCell(m)}</td>
                     <td class="py-1.5 px-2 text-xs font-medium text-slate-700">${esc(m.palete || '')}${m.palete && m.palete_local ? `<div class="text-[10px] font-semibold text-slate-900">${locDuasLinhas(m.palete_local)}</div>` : ''}${movCones(m) != null ? `<div class="text-[10px] font-normal text-slate-500">${conesTxt(movCones(m))}</div>` : ''}</td>
                     <td class="py-1.5 px-2 text-right text-xs font-semibold ${isIn ? 'text-emerald-600' : 'text-rose-600'}">${isIn ? '+' : '-'}${formatKg(q)}</td>
-                    <td class="py-1.5 px-2 text-right text-xs font-bold text-slate-800">${formatKg(saldo)}</td>
+                    <td class="py-1.5 px-2 text-right text-xs font-bold text-slate-800">${formatKg(saldo - interno)}</td>
                     <td class="py-1.5 px-2 text-xs text-slate-600">${esc(m.entity_name || '-')}</td>
                     <td class="py-1.5 px-2 text-xs text-slate-600">${esc(m.notes || '')}</td>
+                    <td class="py-1.5 px-2 text-center no-print"><button type="button" onclick="abrirCalcMov('${esc(m.id)}')" title="Calculadora" aria-label="Calculadora" class="text-slate-400 hover:text-indigo-600 p-1"><i data-lucide="calculator" class="w-4 h-4"></i></button></td>
                 </tr>`;
             }).join('');
             const diff = Math.abs(saldo - Number(l.qty));
@@ -2765,14 +2770,14 @@
                 <div class="mb-3">
                     <div class="text-[11px] font-semibold text-slate-500 mb-1">Paletes${incompletas.length ? ` · <span class="text-amber-700">${incompletas.length} incompleta(s): ${incompletas.map(x => esc(x.name || 'sem palete') + ' ' + formatKg(x.saldo)).join(', ')}</span>` : ''}</div>
                     <div class="overflow-x-auto"><table class="w-full text-left"><thead><tr class="text-[11px] text-slate-400"><th class="py-1 px-2 font-semibold">Palete</th><th class="py-1 px-2 font-semibold text-right">Inicial</th><th class="py-1 px-2 font-semibold text-right">Saído</th><th class="py-1 px-2 font-semibold text-right">Atual</th><th class="py-1 px-2 font-semibold text-right">Cones</th><th class="py-1 px-2 font-semibold">Localização</th><th class="py-1 px-2 font-semibold">Estado</th><th class="py-1 px-2 font-semibold text-right">Ações</th></tr></thead><tbody>
-                    ${pals.map(x => `<tr class="border-t border-slate-200/70"><td class="py-1.5 px-2 text-xs font-semibold text-slate-800">${esc(x.name || '(sem palete)')}</td><td class="py-1.5 px-2 text-right text-xs text-slate-600">${formatKg(x.inicial)}</td><td class="py-1.5 px-2 text-right text-xs text-rose-600">${x.saido ? '-' + formatKg(x.saido) : '-'}</td><td class="py-1.5 px-2 text-right text-xs font-bold text-slate-800">${formatKg(x.saldo)}</td><td class="py-1.5 px-2 text-right text-xs font-semibold text-slate-700" ${x.conesInicial != null && x.conesInicial !== x.cones ? `title="Entraram ${x.conesInicial}"` : ''}>${x.cones != null ? x.cones : '<span class="text-slate-300">-</span>'}</td><td class="py-1.5 px-2 text-xs ${x.local ? 'text-slate-700 font-medium' : 'text-slate-400 italic'}">${esc(x.local || baseLoc)}</td><td class="py-1.5 px-2"><span class="px-2 py-0.5 rounded-full text-[10px] font-semibold border ${badge[x.estado]}">${x.estado}</span></td><td class="py-1.5 px-2 text-right whitespace-nowrap">${!x.name && x.saldo > 0.005 ? `<button type="button" onclick="nameLotPalete('${esc(l.id)}')" title="Dar nome a esta palete (ex.: P1) e indicar onde está" class="inline-flex items-center gap-1 text-[11px] font-semibold text-blue-700 hover:bg-blue-50 rounded-lg px-2 py-1"><i data-lucide="tag" class="w-3.5 h-3.5"></i>Dar nome</button>` : ''}${x.name && x.saldo > 0.005 ? `<button type="button" data-lot="${esc(l.id)}" data-pal="${esc(x.name)}" onclick="changePaleteLocal(this.dataset.lot, this.dataset.pal)" title="Mudar a localização ou os cones da palete ${esc(x.name)}" class="text-slate-400 hover:text-blue-600 p-1"><i data-lucide="map-pin" class="w-4 h-4"></i></button><button type="button" data-lot="${esc(l.id)}" data-pal="${esc(x.name)}" onclick="splitPalete(this.dataset.lot, this.dataset.pal)" title="Dividir a palete ${esc(x.name)} (passar parte do peso para uma palete nova)" class="text-slate-400 hover:text-blue-600 p-1"><i data-lucide="split" class="w-4 h-4"></i></button><button type="button" data-lot="${esc(l.id)}" data-pal="${esc(x.name)}" onclick="anularPalete(this.dataset.lot, this.dataset.pal)" title="Eliminar a palete ${esc(x.name)} e o seu stock (engano)" class="text-slate-400 hover:text-rose-600 p-1"><i data-lucide="trash-2" class="w-4 h-4"></i></button><button type="button" data-key="${esc('t:' + l.id + '|' + x.name)}" onclick="openLabelSheet([this.dataset.key])" title="Imprimir etiqueta da palete ${esc(x.name)} (para a saída)" class="text-slate-400 hover:text-indigo-600 p-1"><i data-lucide="printer" class="w-4 h-4"></i></button>` : ''}</td></tr>`).join('')}
+                    ${pals.map(x => `<tr class="border-t border-slate-200/70"><td class="py-1.5 px-2 text-xs font-semibold text-slate-800">${esc(x.name || '(sem palete)')}</td><td class="py-1.5 px-2 text-right text-xs text-slate-600">${formatKg(x.inicial)}</td><td class="py-1.5 px-2 text-right text-xs text-rose-600">${x.saido ? '-' + formatKg(x.saido) : '-'}</td><td class="py-1.5 px-2 text-right text-xs font-bold text-slate-800">${formatKg(x.saldo)}</td><td class="py-1.5 px-2 text-right text-xs font-semibold text-slate-700" ${x.conesInicial != null && x.conesInicial !== x.cones ? `title="Entraram ${x.conesInicial}"` : ''}>${x.cones != null ? x.cones : '<span class="text-slate-300">-</span>'}</td><td class="py-1.5 px-2 text-xs ${x.local ? 'text-slate-700 font-medium' : 'text-slate-400 italic'}">${esc(x.local || baseLoc)}</td><td class="py-1.5 px-2"><span class="px-2 py-0.5 rounded-full text-[10px] font-semibold border ${badge[x.estado]}">${x.estado}</span></td><td class="py-1.5 px-2 text-right whitespace-nowrap"><button type="button" data-prod="${esc(l.product_id)}" data-lot="${esc(l.id)}" data-pal="${esc(x.name || '')}" onclick="abrirCalcPalete(this.dataset.prod, this.dataset.lot, this.dataset.pal)" title="Calculadora" aria-label="Calculadora" class="text-slate-400 hover:text-indigo-600 p-1"><i data-lucide="calculator" class="w-4 h-4"></i></button>${!x.name && x.saldo > 0.005 ? `<button type="button" onclick="nameLotPalete('${esc(l.id)}')" title="Dar nome a esta palete (ex.: P1) e indicar onde está" class="inline-flex items-center gap-1 text-[11px] font-semibold text-blue-700 hover:bg-blue-50 rounded-lg px-2 py-1"><i data-lucide="tag" class="w-3.5 h-3.5"></i>Dar nome</button>` : ''}${x.name && x.saldo > 0.005 ? `<button type="button" data-lot="${esc(l.id)}" data-pal="${esc(x.name)}" onclick="changePaleteLocal(this.dataset.lot, this.dataset.pal)" title="Mudar a localização ou os cones da palete ${esc(x.name)}" class="text-slate-400 hover:text-blue-600 p-1"><i data-lucide="map-pin" class="w-4 h-4"></i></button><button type="button" data-lot="${esc(l.id)}" data-pal="${esc(x.name)}" onclick="splitPalete(this.dataset.lot, this.dataset.pal)" title="Dividir a palete ${esc(x.name)} (passar parte do peso para uma palete nova)" class="text-slate-400 hover:text-blue-600 p-1"><i data-lucide="split" class="w-4 h-4"></i></button><button type="button" data-lot="${esc(l.id)}" data-pal="${esc(x.name)}" onclick="anularPalete(this.dataset.lot, this.dataset.pal)" title="Eliminar a palete ${esc(x.name)} e o seu stock (engano)" class="text-slate-400 hover:text-rose-600 p-1"><i data-lucide="trash-2" class="w-4 h-4"></i></button><button type="button" data-key="${esc('t:' + l.id + '|' + x.name)}" onclick="openLabelSheet([this.dataset.key])" title="Imprimir etiqueta da palete ${esc(x.name)} (para a saída)" class="text-slate-400 hover:text-indigo-600 p-1"><i data-lucide="printer" class="w-4 h-4"></i></button>` : ''}</td></tr>`).join('')}
                     </tbody></table></div>
                 </div>` : '';
             return `<tr class="bg-white no-print"><td colspan="6" class="px-3 py-3 border-t border-slate-200">
                 <div class="text-xs font-semibold text-slate-600 mb-1">Movimentos do lote ${esc(l.lote)}</div>
                 ${resumo}
                 ${palTable}
-                ${list.length ? `<div class="overflow-x-auto"><table class="w-full text-left"><thead><tr class="text-[11px] text-slate-400"><th class="py-1 px-2 font-semibold">Data</th><th class="py-1 px-2 font-semibold">Tipo</th><th class="py-1 px-2 font-semibold">Palete</th><th class="py-1 px-2 font-semibold text-right">Peso</th><th class="py-1 px-2 font-semibold text-right">Saldo</th><th class="py-1 px-2 font-semibold">Entidade</th><th class="py-1 px-2 font-semibold">Notas</th></tr></thead><tbody>${rows}</tbody></table></div>`
+                ${list.length ? `<div class="overflow-x-auto"><table class="w-full text-left"><thead><tr class="text-[11px] text-slate-400"><th class="py-1 px-2 font-semibold">Data</th><th class="py-1 px-2 font-semibold">Tipo</th><th class="py-1 px-2 font-semibold">Palete</th><th class="py-1 px-2 font-semibold text-right">Peso</th><th class="py-1 px-2 font-semibold text-right">Saldo</th><th class="py-1 px-2 font-semibold">Entidade</th><th class="py-1 px-2 font-semibold">Notas</th><th class="py-1 px-2 font-semibold text-center no-print">Ações</th></tr></thead><tbody>${rows}</tbody></table></div>`
                     : '<p class="text-xs text-slate-400 py-1">Sem movimentos registados para este lote.</p>'}
                 ${warn}${loading}
             </td></tr>`;
@@ -2827,6 +2832,7 @@
                     <td class="py-2 px-3 text-xs text-slate-400">${formatDate(l.created_at)}</td>
                     <td class="py-2 px-3 text-right no-print whitespace-nowrap">
                         ${p.archived || l.archived ? '' : `<button onclick="openMovementForLot('entrada', '${esc(p.id)}', '${esc(l.id)}')" title="Registar entrada neste lote" aria-label="Registar entrada neste lote" class="inline-flex items-center justify-center w-7 h-7 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg shadow-sm transition"><i data-lucide="arrow-down-left" class="w-4 h-4"></i></button>`}
+                        <button onclick="abrirCalcLote('${esc(p.id)}', '${esc(l.id)}')" title="Calculadora" aria-label="Calculadora" class="p-1.5 text-slate-400 hover:text-indigo-600 transition"><i data-lucide="calculator" class="w-4 h-4"></i></button>
                         ${l.qty > 0 ? `<button onclick="openMovementForLot('saida', '${esc(p.id)}', '${esc(l.id)}')" title="Registar saída deste lote" aria-label="Registar saída deste lote" class="inline-flex items-center justify-center w-7 h-7 bg-rose-600 hover:bg-rose-700 text-white rounded-lg shadow-sm transition"><i data-lucide="arrow-up-right" class="w-4 h-4"></i></button>` : ''}
                         ${l.qty > 0 && !p.archived && !l.archived ? `<button onclick="nameLotPalete('${esc(l.id)}')" title="Dar nome à palete (stock deste lote que ainda não tem palete)" aria-label="Dar nome à palete" class="p-1.5 text-slate-400 hover:text-blue-600 transition"><i data-lucide="tag" class="w-4 h-4"></i></button>` : ''}
                         <button onclick="toggleLotHistory('${esc(l.id)}')" title="Ver movimentos do lote" class="p-1.5 transition ${openLotHistory.has(String(l.id)) ? 'text-blue-600' : 'text-slate-400 hover:text-blue-600'}"><i data-lucide="history" class="w-4 h-4"></i></button>
@@ -2906,6 +2912,7 @@
                         <div class="flex items-center justify-center">
                             ${historyBtn(`toggleProductHistory('${esc(p.id)}')`, openProductHistory.has(String(p.id)), 'Ver histórico do produto', 'p-1')}
                             ${p.archived ? '' : `<button onclick="openNewLotEntry('${esc(p.id)}')" title="Entrada de um lote novo deste produto" aria-label="Entrada de um lote novo" class="p-1 text-emerald-600 hover:text-emerald-700 transition"><i data-lucide="package-plus" class="w-4 h-4"></i></button>`}
+                            <button onclick="abrirCalcProduto('${esc(p.id)}')" title="Calculadora" aria-label="Calculadora" class="p-1 text-slate-400 hover:text-indigo-600 transition"><i data-lucide="calculator" class="w-4 h-4"></i></button>
                             <button onclick="openLabelModal('${esc(p.id)}')" title="Imprimir Etiqueta" class="p-1 text-slate-400 hover:text-slate-900 transition"><i data-lucide="qr-code" class="w-4 h-4"></i></button>
                             <button onclick="openProductModal('${esc(p.id)}')" title="Editar Produto" class="p-1 text-slate-400 hover:text-blue-600 transition"><i data-lucide="edit-3" class="w-4 h-4"></i></button>
                             ${archiveSupported !== false && (p.archived || Number(p.qty) <= 0) ? `<button onclick="archiveProduct('${esc(p.id)}', ${p.archived ? 'false' : 'true'})" title="${p.archived ? 'Restaurar produto' : 'Arquivar produto (esconde-o sem perder o histórico)'}" class="p-1 text-slate-400 hover:text-amber-600 transition"><i data-lucide="${p.archived ? 'archive-restore' : 'archive'}" class="w-4 h-4"></i></button>` : ''}
@@ -3011,6 +3018,7 @@
                     <td class="py-3 px-4 text-center no-print sticky-col-right bg-white shadow-xs border-l border-slate-100">
                         <div class="flex items-center justify-center space-x-1">
                             ${m.product_id ? historyBtn(`toggleMovHistory('${esc(m.id)}')`, openMovHistory.has(String(m.id)), 'Ver histórico deste produto') : ''}
+                            <button onclick="abrirCalcMov('${esc(m.id)}')" title="Calculadora" aria-label="Calculadora" class="p-1.5 text-slate-400 hover:text-indigo-600 transition"><i data-lucide="calculator" class="w-4 h-4"></i></button>
                             <button onclick="openMovementModal('${esc(m.type)}', '${esc(m.id)}')" title="Editar Movimento" class="p-1.5 text-slate-400 hover:text-blue-600 transition"><i data-lucide="edit-3" class="w-4 h-4"></i></button>
                             <button onclick="deleteMovement('${esc(m.id)}')" title="Eliminar Movimento" class="p-1.5 text-slate-400 hover:text-rose-600 transition"><i data-lucide="trash-2" class="w-4 h-4"></i></button>
                         </div>
@@ -3692,17 +3700,19 @@
         // mode 'product': histórico de um produto (todos os lotes) com saldo; mode 'entity': movimentos de uma entidade
         function renderHistoryPanel({ mode, title, list, colspan, product, hlId }) {
             list = list.slice().sort(movAsc);
-            let saldo = 0, entrado = 0, saido = 0;
+            let saldo = 0, entrado = 0, saido = 0, interno = 0;
             const th = (t, c) => `<th class="py-1 px-2 font-semibold ${c || ''}">${t}</th>`;
             const rows = list.map(m => {
                 const q = Number(m.qty) || 0, isIn = m.type === 'entrada';
-                if (isIn) { saldo += q; entrado += q; } else { saldo -= q; saido += q; }
+                saldo += isIn ? q : -q;
+                if (movInterno(m)) interno += isIn ? q : -q;
+                else if (isIn) entrado += q; else saido += q;
                 const hl = hlId != null && String(m.id) === String(hlId) ? 'bg-amber-50' : '';
                 const peso = `<td class="py-1.5 px-2 text-right text-xs font-semibold ${isIn ? 'text-emerald-600' : 'text-rose-600'}">${isIn ? '+' : '-'}${formatKg(q)}</td>`;
                 const lote = `<td class="py-1.5 px-2 font-mono text-xs font-semibold text-blue-700">${loteLink(m)}</td><td class="py-1.5 px-2 text-xs font-medium text-slate-700">${esc(m.palete || '')}</td>`;
                 const notas = `<td class="py-1.5 px-2 text-xs text-slate-600">${esc(m.notes || '')}</td>`;
                 return mode === 'product'
-                    ? `<tr class="border-t border-slate-200/70 ${hl}"><td class="py-1.5 px-2 text-xs text-slate-500 whitespace-nowrap">${historyDateCell(m)}</td><td class="py-1.5 px-2">${historyTypeCell(m)}</td>${lote}${peso}<td class="py-1.5 px-2 text-right text-xs font-bold text-slate-800">${formatKg(saldo)}</td><td class="py-1.5 px-2 text-xs text-slate-600">${esc(m.entity_name || '-')}</td>${notas}</tr>`
+                    ? `<tr class="border-t border-slate-200/70 ${hl}"><td class="py-1.5 px-2 text-xs text-slate-500 whitespace-nowrap">${historyDateCell(m)}</td><td class="py-1.5 px-2">${historyTypeCell(m)}</td>${lote}${peso}<td class="py-1.5 px-2 text-right text-xs font-bold text-slate-800">${formatKg(saldo - interno)}</td><td class="py-1.5 px-2 text-xs text-slate-600">${esc(m.entity_name || '-')}</td>${notas}</tr>`
                     : `<tr class="border-t border-slate-200/70 ${hl}"><td class="py-1.5 px-2 text-xs text-slate-500 whitespace-nowrap">${historyDateCell(m)}</td><td class="py-1.5 px-2">${historyTypeCell(m)}</td><td class="py-1.5 px-2 text-xs font-medium text-slate-800">${productNameLink(m)}</td>${lote}${peso}${notas}</tr>`;
             }).join('');
             const head = mode === 'product'
@@ -4413,6 +4423,265 @@
             st.textContent = '@page { size: A4 landscape; margin: 10mm; }';
             document.body.classList.add('printing-list');
             window.print();
+        }
+    </script>
+    <!-- CALCULADORA (não altera o stock; só passa o resultado para o formulário quando se pede) -->
+    <div id="calc-modal" class="fixed inset-0 bg-slate-900/50 z-[70] flex items-center justify-center p-4 hidden no-print" onclick="if(event.target===this)calcFechar()">
+        <div id="calc-panel" role="dialog" aria-modal="true" aria-labelledby="calc-title" tabindex="-1" class="bg-white rounded-2xl shadow-xl w-full max-w-xs p-4 space-y-3 outline-none">
+            <div class="flex items-start justify-between gap-2">
+                <div class="min-w-0">
+                    <h3 id="calc-title" class="font-bold text-slate-900 text-sm">Calculadora</h3>
+                    <p id="calc-sub" class="text-[11px] text-slate-500 break-words"></p>
+                </div>
+                <button type="button" onclick="calcFechar()" aria-label="Fechar calculadora" class="text-slate-400 hover:text-slate-700 text-xl leading-none px-1">&times;</button>
+            </div>
+            <div id="calc-chips" class="flex flex-wrap gap-1.5"></div>
+            <div class="bg-slate-100 rounded-xl px-3 py-2 text-right">
+                <div id="calc-expr" class="text-xs text-slate-500 min-h-[1rem] break-all"></div>
+                <div id="calc-res" aria-live="polite" class="text-2xl font-bold text-slate-900 break-all">0</div>
+            </div>
+            <p id="calc-ficam" class="text-[11px] font-medium hidden"></p>
+            <div id="calc-keys" class="grid grid-cols-4 gap-1.5"></div>
+            <button type="button" id="calc-usar" onclick="calcUsar()" class="hidden w-full px-3 py-2 text-sm font-semibold text-white bg-blue-600 hover:bg-blue-700 rounded-xl disabled:opacity-40 disabled:cursor-not-allowed"></button>
+            <button type="button" id="calc-criar" onclick="calcCriar()" class="hidden w-full px-3 py-2 text-sm font-semibold text-indigo-800 bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 rounded-xl disabled:opacity-40 disabled:cursor-not-allowed">Criar palete com este peso</button>
+        </div>
+    </div>
+    <script>
+        // ===== CALCULADORA =====
+        let calcCfg = {}, calcExpr = '', calcFeito = false, calcFocoAntes = null;
+        const calcNum = v => Number(v).toLocaleString('pt-PT', { maximumFractionDigits: 6 });
+        const calcKg = v => Number(v).toLocaleString('pt-PT', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' kg';
+        // Lê a conta sem usar eval: + - × ÷, percentagem e sinal negativo
+        function calcAvaliar(txt) {
+            let i = 0;
+            const num = () => {
+                if (txt[i] === '-') { i++; return -num(); }
+                const m = /^\d*\.?\d+|^\d+\./.exec(txt.slice(i));
+                if (!m) throw new Error('conta');
+                i += m[0].length;
+                let v = parseFloat(m[0]);
+                while (txt[i] === '%') { v /= 100; i++; }
+                return v;
+            };
+            const termo = () => {
+                let v = num();
+                while (txt[i] === '*' || txt[i] === '/') {
+                    const op = txt[i++], d = num();
+                    if (op === '/' && d === 0) throw new Error('zero');
+                    v = op === '*' ? v * d : v / d;
+                }
+                return v;
+            };
+            let v = termo();
+            while (txt[i] === '+' || txt[i] === '-') { const op = txt[i++], d = termo(); v = op === '+' ? v + d : v - d; }
+            if (i < txt.length) throw new Error('conta');
+            return Number(v.toFixed(8));
+        }
+        function calcResultado() {
+            const t = calcExpr.replace(/[+\-*/.]+$/, '');
+            if (!t) return 0;
+            try { return calcAvaliar(t); } catch (e) { return null; }
+        }
+        function calcDesenhar() {
+            const r = calcResultado();
+            document.getElementById('calc-expr').textContent = calcExpr.replace(/\*/g, ' × ').replace(/\//g, ' ÷ ').replace(/\+/g, ' + ').replace(/(\d|%)-/g, '$1 − ').replace(/\./g, ',');
+            const fimNum = calcExpr.endsWith('.') || /\.\d*0$/.test(calcExpr);
+            const emCurso = /^-?\d*\.?\d*$/.test(calcExpr) && fimNum ? calcExpr.replace('.', ',') : null;
+            document.getElementById('calc-res').textContent = r === null ? 'Erro' : (emCurso || calcNum(r));
+            const f = document.getElementById('calc-ficam'), a = calcCfg.disponivel;
+            if (a != null && r !== null && r > 0) {
+                const acima = r > a + 0.004;
+                f.textContent = acima ? `Acima do disponível (${calcKg(a)}).` : `Se sair este peso, ficam ${calcKg(a - r)}.`;
+                f.className = 'text-[11px] font-medium ' + (acima ? 'text-rose-600' : 'text-emerald-700');
+            } else f.className = 'hidden';
+            const u = document.getElementById('calc-usar');
+            const valido = r !== null && Math.round(r * 100) / 100 > 0;
+            if (calcCfg.usar) u.disabled = !valido;
+            document.getElementById('calc-criar').disabled = !valido;
+        }
+        function calcTecla(k) {
+            const ops = '+-*/';
+            if (k === 'C') { calcExpr = ''; calcFeito = false; }
+            else if (k === '<') { if (calcFeito) calcExpr = ''; else calcExpr = calcExpr.slice(0, -1); calcFeito = false; }
+            else if (k === '=') { const r = calcResultado(); if (r !== null && calcExpr) { calcExpr = String(r).includes('e') ? '' : String(r); calcFeito = true; } }
+            else if (ops.includes(k)) {
+                calcFeito = false;
+                if (!calcExpr) { if (k === '-') calcExpr = '-'; }
+                else if (calcExpr === '-') { /* só o sinal: não junta operador */ }
+                else if (ops.includes(calcExpr.slice(-1))) calcExpr = calcExpr.slice(0, -1) + k;
+                else calcExpr += k;
+            }
+            else if (k === '%') { calcFeito = false; if (/[\d.]$/.test(calcExpr)) calcExpr += '%'; }
+            else if (k === '.') {
+                if (calcFeito) { calcExpr = ''; calcFeito = false; }
+                const ult = calcExpr.split(/[+\-*/]/).pop();
+                if (!ult.includes('.') && !ult.includes('%')) calcExpr += ult === '' ? '0.' : '.';
+            }
+            else if (/^\d$/.test(k)) {
+                if (calcFeito) { calcExpr = ''; calcFeito = false; }
+                if (!calcExpr.endsWith('%') && calcExpr.length < 60) calcExpr += k;
+            }
+            calcDesenhar();
+        }
+        // Valor de referência: começa a conta, ou entra como número seguinte
+        function calcInserir(i) {
+            const v = String(calcCfg.chips[i].valor);
+            if (calcFeito || !calcExpr) calcExpr = v;
+            else if (/[+\-*/]$/.test(calcExpr)) calcExpr += v;
+            else calcExpr = calcExpr.replace(/\d*\.?\d*%?$/, '') + v;
+            calcFeito = false;
+            calcDesenhar();
+        }
+        function calcAbrir(cfg) {
+            calcCfg = cfg; calcExpr = ''; calcFeito = false;
+            calcFocoAntes = document.activeElement;
+            document.getElementById('calc-title').textContent = cfg.titulo || 'Calculadora';
+            document.getElementById('calc-sub').textContent = cfg.sub || '';
+            document.getElementById('calc-chips').innerHTML = (cfg.chips || []).map((c, i) =>
+                `<button type="button" onclick="calcInserir(${i})" title="Usar este valor na conta" class="px-2 py-1 text-[11px] bg-indigo-50 hover:bg-indigo-100 text-indigo-800 border border-indigo-100 rounded-lg">${esc(c.rotulo)}: <b>${esc(c.texto)}</b></button>`).join('');
+            const k = [['C', 'C'], ['<', '⌫'], ['%', '%'], ['/', '÷'], ['7', '7'], ['8', '8'], ['9', '9'], ['*', '×'], ['4', '4'], ['5', '5'], ['6', '6'], ['-', '−'], ['1', '1'], ['2', '2'], ['3', '3'], ['+', '+'], ['0', '0'], ['.', ','], ['=', '=']];
+            document.getElementById('calc-keys').innerHTML = k.map(([v, t]) => {
+                const cor = v === '=' ? 'col-span-2 bg-indigo-600 hover:bg-indigo-700 text-white' : /^\d|\.$/.test(v) ? 'bg-white hover:bg-slate-100 border border-slate-200 text-slate-900' : 'bg-slate-200 hover:bg-slate-300 text-slate-800';
+                return `<button type="button" onclick="calcTecla('${v}')" aria-label="${v === '<' ? 'Apagar' : v === 'C' ? 'Limpar' : t}" class="py-2.5 text-base font-semibold rounded-xl transition ${cor}">${t}</button>`;
+            }).join('');
+            const u = document.getElementById('calc-usar');
+            u.classList.toggle('hidden', !cfg.usar);
+            u.textContent = cfg.usarTexto || '';
+            document.getElementById('calc-criar').classList.toggle('hidden', !cfg.criar);
+            document.getElementById('calc-criar').textContent = cfg.criarTexto || 'Criar palete com este peso';
+            calcDesenhar();
+            document.getElementById('calc-modal').classList.remove('hidden');
+            document.getElementById('calc-panel').focus();
+        }
+        function calcFechar() {
+            document.getElementById('calc-modal').classList.add('hidden');
+            if (calcFocoAntes && calcFocoAntes.focus && document.contains(calcFocoAntes)) calcFocoAntes.focus();
+        }
+        function calcUsar() {
+            const r = calcResultado();
+            if (r === null || !calcCfg.usar) return;
+            const v = (Math.round(r * 100) / 100).toFixed(2), usar = calcCfg.usar;
+            calcFechar();
+            usar(v);
+        }
+        function calcCriar() {
+            const r = calcResultado();
+            if (r === null || !calcCfg.criar) return;
+            const v = (Math.round(r * 100) / 100).toFixed(2), criar = calcCfg.criar;
+            calcFechar();
+            criar(v);
+        }
+        function calcPorEm(id, v) {
+            const el = document.getElementById(id);
+            if (!el) return;
+            el.value = v;
+            el.dispatchEvent(new Event('input', { bubbles: true }));
+            el.focus();
+        }
+        // Teclado do computador, só com a calculadora aberta
+        document.addEventListener('keydown', e => {
+            if (document.getElementById('calc-modal').classList.contains('hidden') || e.ctrlKey || e.metaKey || e.altKey) return;
+            let k = e.key;
+            if (k === 'Escape') { e.preventDefault(); e.stopPropagation(); calcFechar(); return; }
+            if (k === 'Tab') return;
+            if (k === 'Enter') {
+                const a = document.activeElement;
+                if (a && a.tagName === 'BUTTON' && document.getElementById('calc-modal').contains(a)) return;
+                k = '=';
+            }
+            if (k === 'Backspace') k = '<';
+            if (k === 'Delete') k = 'C';
+            if (k === ',') k = '.';
+            if (k === 'x' || k === 'X') k = '*';
+            if (/^[\d.+\-*/%=<C]$/.test(k)) { e.preventDefault(); e.stopPropagation(); calcTecla(k); }
+        }, true);
+
+        function abrirCalcProduto(id) {
+            const p = products.find(x => String(x.id) === String(id));
+            if (!p) return;
+            const c = [{ rotulo: 'Stock', texto: calcKg(p.qty), valor: Number(p.qty) || 0 }];
+            if (Number(p.cost) > 0) c.push({ rotulo: 'Custo/kg', texto: formatEuro(p.cost), valor: Number(p.cost) });
+            if (Number(p.price) > 0) c.push({ rotulo: 'Venda/kg', texto: formatEuro(p.price), valor: Number(p.price) });
+            calcAbrir({ titulo: 'Calculadora', sub: p.name || '', chips: c, criar: p.archived ? null : v => calcPaleteNovaEntrada(() => openNewLotEntry(p.id), v, true) });
+        }
+        // A partir da tabela de paletes do lote: dá saída desta palete ou divide-a com o peso calculado
+        async function abrirCalcPalete(pid, lid, nome) {
+            const p = products.find(x => String(x.id) === String(pid));
+            const l = lots.find(x => String(x.id) === String(lid));
+            if (!p || !l) return;
+            if (!nome) { abrirCalcLote(pid, lid); return; }
+            if (!movementsFull) await ensureAllMovements();
+            const pal = lotPallets(l).find(x => x.name && x.name.toLowerCase() === nome.toLowerCase());
+            if (!pal) return;
+            const tem = pal.saldo > 0.005, ativo = !p.archived && !l.archived;
+            calcAbrir({
+                titulo: 'Calculadora', sub: `${p.name || ''} · lote ${l.lote} · palete ${pal.name}`,
+                chips: [{ rotulo: 'Palete', texto: calcKg(pal.saldo), valor: pal.saldo }, { rotulo: 'Stock do lote', texto: calcKg(l.qty), valor: Number(l.qty) || 0 }],
+                disponivel: tem ? pal.saldo : null, usarTexto: 'Dar saída desta palete com este peso',
+                usar: tem && ativo ? v => {
+                    openMovementForLot('saida', p.id, l.id);
+                    const el = document.getElementById('movement-palete');
+                    if (el) { el.value = pal.name; refreshPaleteOptions(); }
+                    calcPorEm('movement-qty', v);
+                } : null,
+                criarTexto: 'Dividir palete com este peso',
+                criar: tem && ativo ? async v => {
+                    await splitPalete(l.id, pal.name);
+                    document.getElementById('pal-new-qty').value = v;
+                } : null
+            });
+        }
+        // A partir do histórico: junta o peso do movimento aos valores do lote
+        function abrirCalcMov(id) {
+            const m = movements.find(x => String(x.id) === String(id));
+            if (!m) return;
+            const extra = [{ rotulo: 'Peso do mov.', texto: calcKg(m.qty), valor: Number(m.qty) || 0 }];
+            const lk = String(m.lote || '').trim().toLowerCase();
+            const l = (lotsByProduct[m.product_id] || []).find(x => String(x.lote || '').trim().toLowerCase() === lk);
+            if (l) abrirCalcLote(m.product_id, l.id, extra);
+            else calcAbrir({ titulo: 'Calculadora', sub: [m.product_name, m.lote && `lote ${m.lote}`].filter(Boolean).join(' · '), chips: extra });
+        }
+        function abrirCalcLote(pid, lid, extra = []) {
+            const p = products.find(x => String(x.id) === String(pid));
+            const l = lots.find(x => String(x.id) === String(lid));
+            if (!p || !l) return;
+            const tem = Number(l.qty) > 0;
+            calcAbrir({
+                titulo: 'Calculadora', sub: `${p.name || ''} · lote ${l.lote}`, chips: extra.concat([{ rotulo: 'Stock do lote', texto: calcKg(l.qty), valor: Number(l.qty) || 0 }]),
+                disponivel: tem ? Number(l.qty) : null, usarTexto: 'Dar saída com este peso',
+                usar: tem ? v => { openMovementForLot('saida', p.id, l.id); calcPorEm('movement-qty', v); } : null,
+                criar: p.archived || l.archived ? null : v => calcPaleteDoLote(p, l, v)
+            });
+        }
+        // Abre uma entrada com o peso preenchido e o cursor no nome da palete; só conta quando for confirmada
+        function calcPaleteNovaEntrada(abrir, v, focoLote) {
+            abrir();
+            calcPorEm('movement-qty', v);
+            const pal = document.getElementById('movement-palete');
+            if (pal) { refreshPaleteOptions(); (focoLote ? document.getElementById('movement-lote') : pal).focus(); }
+        }
+        // Stock do lote ainda sem palete → usa o "Dar nome à palete", que não altera o stock.
+        // Sem esse stock, a palete só pode ser mercadoria nova → entrada, que soma ao stock quando for confirmada.
+        async function calcPaleteDoLote(p, l, v) {
+            if (!movementsFull) await ensureAllMovements();
+            const sem = semPaleteInfo(l);
+            if (sem) {
+                await nameLotPalete(l.id);
+                document.getElementById('pal-new-qty').value = v;
+                document.getElementById('pal-new-qty-hint').textContent = `Peso vindo da calculadora. Este lote tem ${formatKg(sem.kg)} sem palete; o que sobrar continua sem palete. O stock do lote não muda.`;
+                return;
+            }
+            calcPaleteNovaEntrada(() => openMovementForLot('entrada', p.id, l.id), v);
+            showToast('Este lote não tem stock sem palete: esta entrada soma ao stock. Para separar de uma palete, use Dividir palete.');
+        }
+        // Dentro da janela de movimento: mostra o stock do lote escolhido e passa o resultado para a quantidade
+        function abrirCalcMovimento() {
+            const p = products.find(x => String(x.id) === document.getElementById('movement-product-id').value);
+            const codigo = document.getElementById('movement-lote').value;
+            const l = p ? (lotsByProduct[p.id] || []).find(x => x.lote === codigo) : null;
+            const saida = document.getElementById('movement-type').value === 'saida';
+            const c = l ? [{ rotulo: 'Stock do lote', texto: calcKg(l.qty), valor: Number(l.qty) || 0 }] : p ? [{ rotulo: 'Stock', texto: calcKg(p.qty), valor: Number(p.qty) || 0 }] : [];
+            calcAbrir({ titulo: 'Calculadora', sub: p ? (p.name || '') + (l ? ` · lote ${l.lote}` : '') : '', chips: c, disponivel: saida && l ? Number(l.qty) : null, usarTexto: 'Usar na quantidade', usar: v => calcPorEm('movement-qty', v), criar: saida ? null : v => { calcPorEm('movement-qty', v); document.getElementById('movement-palete').focus(); } });
         }
     </script>
 </body>
