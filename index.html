@@ -1359,12 +1359,21 @@
         // Desenha só os <i data-lucide> ainda por desenhar (e os ícones cujo nome mudou, ex.: olho da palavra-passe).
         // Se a biblioteca não tiver a API esperada, usa o lucide.createIcons() de sempre.
         const iconKey = n => n.replace(/(^|-)([a-z0-9])/g, (_, __, c) => c.toUpperCase());
+        let iconsPedido = 0;
         function renderIcons() {
             const L = window.lucide;
             if (!L) return;
             if (typeof L.createElement !== 'function' || !L.icons) { L.createIcons(); return; }
-            let missing = false;
-            for (const el of document.querySelectorAll('[data-lucide]')) {
+            // Desenha aos poucos para o teclado não prender; um novo pedido substitui o anterior
+            const lista = [...document.querySelectorAll('[data-lucide]')];
+            const pedido = ++iconsPedido;
+            let i = 0, missing = false;
+            const etapa = () => {
+            if (pedido !== iconsPedido) return;
+            const fim = performance.now() + 8;
+            for (; i < lista.length && performance.now() < fim; i++) {
+                const el = lista[i];
+                if (!el.isConnected) continue;
                 const name = el.getAttribute('data-lucide');
                 if (el.tagName.toLowerCase() === 'svg' && el.getAttribute('data-rendered') === name) continue;
                 const node = L.icons[iconKey(name)];
@@ -1376,7 +1385,10 @@
                 svg.setAttribute('data-rendered', name);
                 el.replaceWith(svg);
             }
+            if (i < lista.length) { requestAnimationFrame(etapa); return; }
             if (missing) L.createIcons();
+            };
+            etapa();
         }
 
         // HELPERS: escape HTML (anti-XSS), CSV, downloads, erros, debounce
@@ -1465,7 +1477,13 @@
         }
 
         function debounce(fn, ms = 250) { let t; return (...a) => { clearTimeout(t); t = setTimeout(() => fn(...a), ms); }; }
-        const debouncedRenderProducts = debounce(() => renderProductsTable());
+        // Pesquisa de produtos: com 1 ou 2 caracteres quase tudo coincide e a lista é pesada, por isso espera mais pela tecla seguinte
+        let searchProductTimer = null;
+        function debouncedRenderProducts() {
+            clearTimeout(searchProductTimer);
+            const n = (document.getElementById('search-product')?.value || '').trim().length;
+            searchProductTimer = setTimeout(() => renderProductsTable(), n > 0 && n < 3 ? 500 : 250);
+        }
         const debouncedRenderMovements = debounce(() => renderMovementsTable());
         const debouncedRenderEntities = debounce(() => renderEntitiesTable());
         const debouncedFilterMovementProducts = debounce(() => filterMovementProducts(), 200);
@@ -2865,7 +2883,7 @@
             document.getElementById('arquivar-aviso')?.classList.toggle('hidden', !(archiveSupported === false && (products.some(isZero) || lots.some(l => Number(l.qty) <= 0))));
             const tbody = document.getElementById('products-table-body');
             const pKey = query + '|' + catFilter + '|' + F.arm + '|' + F.fila + '|' + stateF + '|' + showArch;
-            if (pKey !== lastProductKey) { lastProductKey = pKey; productLimit = 100; collapsedProducts.clear(); showAllLots.clear(); }
+            if (pKey !== lastProductKey) { lastProductKey = pKey; productLimit = query ? 30 : 100; collapsedProducts.clear(); showAllLots.clear(); }
             const filaSum = document.getElementById('fila-summary');
             if (filaSum) filaSum.textContent = F.active ? `${listed.length} ${listed.length === 1 ? 'produto' : 'produtos'} · ${formatKg(listed.reduce((t, p) => t + filaQty(p, F), 0))} em ${F.label}` : '';
             const shownProducts = listed.slice(0, productLimit);
