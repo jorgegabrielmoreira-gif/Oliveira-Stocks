@@ -557,7 +557,7 @@
             
             <div class="flex items-center space-x-1.5 sm:space-x-2">
                 <div id="header-user" title="Utilizador com sessão iniciada"><i data-lucide="user" class="w-3 h-3 shrink-0"></i><span id="header-user-name"></span></div>
-                <a href="malha.html" title="Abrir o Armazém de Malhas" class="inline-flex items-center space-x-1 bg-white/10 hover:bg-white/20 border border-white/25 text-white text-xs font-medium px-2 py-1.5 rounded-lg transition">
+                <a href="malha.html" title="Abrir o Armazém de Malhas" class="inline-flex items-center space-x-1 bg-amber-400 hover:bg-amber-300 text-amber-950 font-semibold text-xs px-2 py-1.5 rounded-lg transition shadow-xs">
                     <i data-lucide="layers" class="w-4 h-4"></i>
                     <span>Malhas</span>
                 </a>
@@ -2438,6 +2438,11 @@
                 else { sel.value = '__outro__'; inp.value = v; inp.classList.remove('hidden'); }
             }
         }
+        // Armazém numa linha e fila na outra (se só houver uma das duas, fica numa linha)
+        function locDuasLinhas(v) {
+            const q = parseLoc(v);
+            return q.arm && q.fila ? `<span class="whitespace-nowrap">${esc(q.arm)}</span><br><span class="whitespace-nowrap">${esc(q.fila)}</span>` : esc(composeLoc(q.arm, q.fila) || v);
+        }
         function getLocInputs(prefix) {
             return composeLoc(document.getElementById(prefix + '-arm')?.value, document.getElementById(prefix + '-fila')?.value);
         }
@@ -2735,7 +2740,7 @@
                 return `<tr class="border-t border-slate-200/70">
                     <td class="py-1.5 px-2 text-xs text-slate-500 whitespace-nowrap">${historyDateCell(m)}</td>
                     <td class="py-1.5 px-2">${historyTypeCell(m)}</td>
-                    <td class="py-1.5 px-2 text-xs font-medium text-slate-700">${esc(m.palete || '')}${m.palete && m.palete_local ? `<div class="text-[10px] font-normal text-slate-400">${esc(m.palete_local)}</div>` : ''}${movCones(m) != null ? `<div class="text-[10px] font-normal text-slate-500">${conesTxt(movCones(m))}</div>` : ''}</td>
+                    <td class="py-1.5 px-2 text-xs font-medium text-slate-700">${esc(m.palete || '')}${m.palete && m.palete_local ? `<div class="text-[10px] font-semibold text-slate-900">${locDuasLinhas(m.palete_local)}</div>` : ''}${movCones(m) != null ? `<div class="text-[10px] font-normal text-slate-500">${conesTxt(movCones(m))}</div>` : ''}</td>
                     <td class="py-1.5 px-2 text-right text-xs font-semibold ${isIn ? 'text-emerald-600' : 'text-rose-600'}">${isIn ? '+' : '-'}${formatKg(q)}</td>
                     <td class="py-1.5 px-2 text-right text-xs font-bold text-slate-800">${formatKg(saldo)}</td>
                     <td class="py-1.5 px-2 text-xs text-slate-600">${esc(m.entity_name || '-')}</td>
@@ -3849,6 +3854,12 @@
             const daPalete = movs.filter(m => String(m.palete || '').trim().toLowerCase() === key);
             const parDivisao = movs.some(m => m.type !== 'entrada' && /^Divisão:/.test(m.notes || '') && String(m.notes).includes('palete ' + pal.name));
             const soAcerto = !parDivisao && daPalete.length > 0 && daPalete.every(m => m.type === 'entrada' && m.entity_name === 'Acerto de inventário');
+            // Palete criada por uma divisão: eliminar = devolver o que tem à palete de onde veio (o stock do lote não muda)
+            const entDiv = daPalete.find(m => m.type === 'entrada' && /^Divisão:/.test(m.notes || ''));
+            if (entDiv) {
+                const mm = String(entDiv.notes).match(/da palete (.+?) passam para a palete /);
+                return devolverDivisao(lot, pal, mm ? mm[1] : '');
+            }
             const fica = Math.round(((Number(lot.qty) || 0) - pal.saldo) * 1000) / 1000;
             const msg = `Eliminar a palete ${pal.name} do lote ${lot.lote}?
 
@@ -3884,6 +3895,26 @@
             if (l2 && Math.abs(Number(l2.qty) - fica) > 0.005) aviso += ` Confirme o stock do lote: ficou ${formatKg(l2.qty)} (esperado ${formatKg(fica)}).`;
             if (prodAntes !== null && p2 && Math.abs((prodAntes - Number(p2.qty)) - pal.saldo) > 0.005) aviso += ` Confirme o stock do produto: era ${formatKg(prodAntes)} e ficou ${formatKg(p2.qty)}.`;
             showToast(`Palete ${pal.name} eliminada. O lote ${lot.lote} tem agora ${formatKg(l2 ? l2.qty : fica)}.` + aviso, aviso ? 'error' : 'success');
+            refreshAll();
+        }
+        // Anula uma divisão: o que está na palete criada pela divisão volta à palete de origem ('' = stock sem palete).
+        // Regista uma saída da palete e uma entrada na origem, iguais, num só pedido: o stock do lote e do produto não muda.
+        async function devolverDivisao(lot, pal, origem) {
+            const destino = origem ? 'a palete ' + origem : 'o stock sem palete';
+            if (!confirm(`Eliminar a palete ${pal.name} do lote ${lot.lote}?\n\nEsta palete foi criada por uma divisão: os ${formatKg(pal.saldo)} que tem voltam para ${destino}.\nO stock do lote não muda.\n\nFica registado nos movimentos (pode anulá-lo depois).`)) return;
+            const prod = products.find(x => String(x.id) === String(lot.product_id));
+            const base = { date: agoraLocal(), product_id: lot.product_id, product_name: prod ? prod.name : '', lote: lot.lote, qty: pal.saldo, entity_name: 'Acerto de inventário' };
+            const nota = `Divisão anulada: ${formatKg(pal.saldo)} voltam da palete ${pal.name} para ${destino}`;
+            const cones = pal.cones != null ? { cones: pal.cones } : {};
+            const rows = [
+                { ...base, type: 'saida', palete: pal.name, ...cones, notes: nota },
+                { ...base, type: 'entrada', ...(origem ? { palete: origem } : {}), ...cones, notes: nota }
+            ];
+            const res = await db.from('movements').insert(rows).select();
+            if (res.error) { showMovementError(res.error); return; }
+            (res.data || []).forEach(upsertLocalMovement);
+            await loadData({ products: true, lots: true });
+            showToast(`Palete ${pal.name} eliminada: ${formatKg(pal.saldo)} voltaram para ${destino}.`);
             refreshAll();
         }
         // Divide uma palete com nome: parte do peso passa para uma palete nova do mesmo lote
