@@ -1221,10 +1221,11 @@
                 </div>
                 <div>
                     <label class="block text-xs font-medium mb-1">Palete <span class="text-slate-400 font-normal">(opcional)</span></label>
-                    <input type="text" id="movement-palete" list="movement-palete-list" autocomplete="off" oninput="refreshPaleteOptions()" placeholder="Ex.: P3 (escolha uma existente ou escreva uma nova)" class="w-full px-3 py-2 text-sm border rounded-xl">
+                    <input type="text" id="movement-palete" list="movement-palete-list" autocomplete="off" oninput="refreshPaleteOptions()" placeholder="Nome da palete" class="w-full px-3 py-2 text-sm border rounded-xl">
                     <datalist id="movement-palete-list"></datalist>
                     <datalist id="loc-arm-list"></datalist><datalist id="loc-fila-list"></datalist>
                     <p id="movement-palete-info" class="text-[11px] text-slate-500 mt-1 font-medium hidden"></p>
+                    <button type="button" id="movement-palete-sugestao" onclick="usarPaleteSugerida()" class="hidden mt-1 text-[11px] font-semibold text-blue-700 bg-blue-50 hover:bg-blue-100 border border-blue-200 rounded-lg px-2 py-1"></button>
                 </div>
                 <div id="movement-cones-wrap" class="hidden">
                     <label class="block text-xs font-medium mb-1"><span id="movement-cones-label">Nº de cones da palete</span> <span class="text-slate-400 font-normal">(opcional)</span></label>
@@ -2234,6 +2235,14 @@
             const loteKey = lote.trim().toLowerCase();
             const lotExisted = lots.some(l => String(l.product_id) === String(product_id) && String(l.lote).toLowerCase() === loteKey);
             btn.disabled = true;
+            // Entrada: o nome da palete não pode já ter sido usado neste lote (nem por uma palete que já saiu)
+            if (palete && type === 'entrada') {
+                if (!movementsFull) await ensureAllMovements();
+                if (!movementsFull) { btn.disabled = false; setFieldError('movement-palete', 'Não foi possível confirmar se este nome já foi usado (histórico por carregar). Tente de novo.'); return; }
+                const lotAlvo = lots.find(l => String(l.product_id) === String(product_id) && String(l.lote || '').trim().toLowerCase() === loteKey);
+                const usada = conflitoPalete(lotAlvo, palete, product_id);
+                if (usada) { btn.disabled = false; setFieldError('movement-palete', `${textoPaleteUsada(usada)} Escolha outro nome, por exemplo ${proximaPalete(lotAlvo)}.`); return; }
+            }
             const { data: savedRows, error } = editId
                 ? await db.from('movements').update(row).eq('id', editId).select()
                 : await db.from('movements').insert([row]).select();
@@ -2553,6 +2562,24 @@
             }
             return out;
         }
+        // Onde está o stock do artigo, somando os lotes e as paletes; sem stock em lotes, a localização da ficha do artigo
+        function productLocs(p) {
+            const act = activeLots(p);
+            if (!act.length) return [{ loc: p.location || '', qty: null }];
+            const m = new Map();
+            act.forEach(l => lotSegments(p, l).forEach(g => {
+                const k = normLoc(g.loc);
+                if (!m.has(k)) m.set(k, { loc: g.loc || '', qty: 0 });
+                m.get(k).qty += g.qty;
+            }));
+            return [...m.values()].sort((a, b) => a.loc.localeCompare(b.loc, 'pt', { numeric: true, sensitivity: 'base' }));
+        }
+        // Texto da localização na linha do artigo: uma linha por localização, com os kg só quando há mais do que uma
+        function productLocHtml(p) {
+            const locs = productLocs(p);
+            if (locs.length === 1) return esc(locs[0].loc || '-');
+            return locs.map(g => `<div style="white-space:nowrap">${esc(g.loc || '-')} <span style="font-weight:400;opacity:.7">${formatKg(g.qty)}</span></div>`).join('');
+        }
         // lotes com stock que têm parte do stock na localização escolhida
         function filaLots(p, F) { return activeLots(p).filter(l => lotSegments(p, l).some(g => locMatches(g.loc, F))); }
         function lotQtyIn(p, l, F) { return lotSegments(p, l).filter(g => locMatches(g.loc, F)).reduce((t, g) => t + g.qty, 0); }
@@ -2799,6 +2826,18 @@
             const temPaletes = pals.some(x => x.name);
             const badge = { 'Incompleta': 'bg-amber-50 text-amber-700 border-amber-200', 'Completa': 'bg-emerald-50 text-emerald-700 border-emerald-200', 'Saída total': 'bg-slate-100 text-slate-500 border-slate-200' };
             const incompletas = pals.filter(x => x.estado === 'Incompleta');
+            // Paletes que já saíram (saldo 0) ficam à parte; um saldo negativo é uma anomalia e continua visível
+            const palSaiu = x => Math.abs(x.saldo) <= 0.005;
+            const palsAtivas = pals.filter(x => !palSaiu(x));
+            const palsSaidas = pals.filter(x => x.name && palSaiu(x));
+            const ultimaSaida = x => { const k = x.name.toLowerCase(); let u = null; for (const m of list) if (m.type !== 'entrada' && String(m.palete || '').trim().toLowerCase() === k) u = m; return u; };
+            const saidasHtml = palsSaidas.length ? `
+                    <details class="mt-1.5">
+                        <summary class="cursor-pointer text-[11px] font-semibold text-blue-700 hover:underline">Ver paletes já saídas (${palsSaidas.length})</summary>
+                        <div class="overflow-x-auto mt-1"><table class="w-full text-left"><thead><tr class="text-[11px] text-slate-400"><th class="py-1 px-2 font-semibold">Palete</th><th class="py-1 px-2 font-semibold text-right">Peso</th><th class="py-1 px-2 font-semibold text-right">Cones</th><th class="py-1 px-2 font-semibold">Última saída</th><th class="py-1 px-2 font-semibold">Entidade</th><th class="py-1 px-2 font-semibold text-right">Ações</th></tr></thead><tbody>
+                        ${palsSaidas.map(x => { const u = ultimaSaida(x); return `<tr class="border-t border-slate-200/70"><td class="py-1.5 px-2 text-xs font-semibold text-slate-600">${esc(x.name)}</td><td class="py-1.5 px-2 text-right text-xs text-slate-600">${formatKg(x.entrado)}</td><td class="py-1.5 px-2 text-right text-xs text-slate-600">${x.conesInicial != null ? x.conesInicial : '<span class="text-slate-300">-</span>'}</td><td class="py-1.5 px-2 text-xs text-slate-500 whitespace-nowrap">${u ? historyDateCell(u) : '-'}</td><td class="py-1.5 px-2 text-xs text-slate-600">${esc((u && u.entity_name) || '-')}</td><td class="py-1.5 px-2 text-right whitespace-nowrap"><button type="button" data-prod="${esc(l.product_id)}" data-lot="${esc(l.id)}" data-pal="${esc(x.name)}" onclick="abrirCalcPalete(this.dataset.prod, this.dataset.lot, this.dataset.pal)" title="Calculadora" aria-label="Calculadora" class="text-slate-400 hover:text-indigo-600 p-1"><i data-lucide="calculator" class="w-4 h-4"></i></button></td></tr>`; }).join('')}
+                        </tbody></table></div>
+                    </details>` : '';
             const pr = products.find(x => String(x.id) === String(l.product_id));
             const baseLoc = l.location || (pr && pr.location) || '-';
             // painel também com stock sem nome, para o poder transformar em palete
@@ -2806,9 +2845,10 @@
 
                 <div class="mb-3">
                     <div class="text-[11px] font-semibold text-slate-500 mb-1">Paletes${incompletas.length ? ` · <span class="text-amber-700">${incompletas.length} incompleta(s): ${incompletas.map(x => esc(x.name || 'sem palete') + ' ' + formatKg(x.saldo)).join(', ')}</span>` : ''}</div>
-                    <div class="overflow-x-auto"><table class="w-full text-left"><thead><tr class="text-[11px] text-slate-400"><th class="py-1 px-2 font-semibold">Palete</th><th class="py-1 px-2 font-semibold text-right">Inicial</th><th class="py-1 px-2 font-semibold text-right">Saído</th><th class="py-1 px-2 font-semibold text-right">Atual</th><th class="py-1 px-2 font-semibold text-right">Cones</th><th class="py-1 px-2 font-semibold">Localização</th><th class="py-1 px-2 font-semibold">Estado</th><th class="py-1 px-2 font-semibold text-right">Ações</th></tr></thead><tbody>
-                    ${pals.map(x => `<tr class="border-t border-slate-200/70"><td class="py-1.5 px-2 text-xs font-semibold text-slate-800">${esc(x.name || '(sem palete)')}</td><td class="py-1.5 px-2 text-right text-xs text-slate-600">${formatKg(x.inicial)}</td><td class="py-1.5 px-2 text-right text-xs text-rose-600">${x.saido ? '-' + formatKg(x.saido) : '-'}</td><td class="py-1.5 px-2 text-right text-xs font-bold text-slate-800">${formatKg(x.saldo)}</td><td class="py-1.5 px-2 text-right text-xs font-semibold text-slate-700" ${x.conesInicial != null && x.conesInicial !== x.cones ? `title="Entraram ${x.conesInicial}"` : ''}>${x.cones != null ? x.cones : '<span class="text-slate-300">-</span>'}</td><td class="py-1.5 px-2 text-xs ${x.local ? 'text-slate-700 font-medium' : 'text-slate-400 italic'}">${esc(x.local || baseLoc)}</td><td class="py-1.5 px-2"><span class="px-2 py-0.5 rounded-full text-[10px] font-semibold border ${badge[x.estado]}">${x.estado}</span></td><td class="py-1.5 px-2 text-right whitespace-nowrap"><button type="button" data-prod="${esc(l.product_id)}" data-lot="${esc(l.id)}" data-pal="${esc(x.name || '')}" onclick="abrirCalcPalete(this.dataset.prod, this.dataset.lot, this.dataset.pal)" title="Calculadora" aria-label="Calculadora" class="text-slate-400 hover:text-indigo-600 p-1"><i data-lucide="calculator" class="w-4 h-4"></i></button>${!x.name && x.saldo > 0.005 ? `<button type="button" onclick="nameLotPalete('${esc(l.id)}')" title="Dar nome a esta palete (ex.: P1) e indicar onde está" class="inline-flex items-center gap-1 text-[11px] font-semibold text-blue-700 hover:bg-blue-50 rounded-lg px-2 py-1"><i data-lucide="tag" class="w-3.5 h-3.5"></i>Dar nome</button>` : ''}${x.name && x.saldo > 0.005 ? `<button type="button" data-lot="${esc(l.id)}" data-pal="${esc(x.name)}" onclick="changePaleteLocal(this.dataset.lot, this.dataset.pal)" title="Mudar a localização ou os cones da palete ${esc(x.name)}" class="text-slate-400 hover:text-blue-600 p-1"><i data-lucide="map-pin" class="w-4 h-4"></i></button><button type="button" data-lot="${esc(l.id)}" data-pal="${esc(x.name)}" onclick="splitPalete(this.dataset.lot, this.dataset.pal)" title="Dividir a palete ${esc(x.name)} (passar parte do peso para uma palete nova)" class="text-slate-400 hover:text-blue-600 p-1"><i data-lucide="split" class="w-4 h-4"></i></button><button type="button" data-lot="${esc(l.id)}" data-pal="${esc(x.name)}" onclick="anularPalete(this.dataset.lot, this.dataset.pal)" title="Eliminar a palete ${esc(x.name)} e o seu stock (engano)" class="text-slate-400 hover:text-rose-600 p-1"><i data-lucide="trash-2" class="w-4 h-4"></i></button><button type="button" data-key="${esc('t:' + l.id + '|' + x.name)}" onclick="openLabelSheet([this.dataset.key])" title="Imprimir etiqueta da palete ${esc(x.name)} (para a saída)" class="text-slate-400 hover:text-indigo-600 p-1"><i data-lucide="printer" class="w-4 h-4"></i></button>` : ''}</td></tr>`).join('')}
-                    </tbody></table></div>
+                    ${!palsAtivas.length ? '<p class="text-xs text-slate-400 px-2 py-1">Nenhuma palete com stock.</p>' : `<div class="overflow-x-auto"><table class="w-full text-left"><thead><tr class="text-[11px] text-slate-400"><th class="py-1 px-2 font-semibold">Palete</th><th class="py-1 px-2 font-semibold text-right">Inicial</th><th class="py-1 px-2 font-semibold text-right">Saído</th><th class="py-1 px-2 font-semibold text-right">Atual</th><th class="py-1 px-2 font-semibold text-right">Cones</th><th class="py-1 px-2 font-semibold">Localização</th><th class="py-1 px-2 font-semibold">Estado</th><th class="py-1 px-2 font-semibold text-right">Ações</th></tr></thead><tbody>
+                    ${palsAtivas.map(x => `<tr class="border-t border-slate-200/70"><td class="py-1.5 px-2 text-xs font-semibold text-slate-800">${esc(x.name || '(sem palete)')}</td><td class="py-1.5 px-2 text-right text-xs text-slate-600">${formatKg(x.inicial)}</td><td class="py-1.5 px-2 text-right text-xs text-rose-600">${x.saido ? '-' + formatKg(x.saido) : '-'}</td><td class="py-1.5 px-2 text-right text-xs font-bold text-slate-800">${formatKg(x.saldo)}</td><td class="py-1.5 px-2 text-right text-xs font-semibold text-slate-700" ${x.conesInicial != null && x.conesInicial !== x.cones ? `title="Entraram ${x.conesInicial}"` : ''}>${x.cones != null ? x.cones : '<span class="text-slate-300">-</span>'}</td><td class="py-1.5 px-2 text-xs ${x.local ? 'text-slate-700 font-medium' : 'text-slate-400 italic'}">${esc(x.local || baseLoc)}</td><td class="py-1.5 px-2"><span class="px-2 py-0.5 rounded-full text-[10px] font-semibold border ${badge[x.estado]}">${x.estado}</span></td><td class="py-1.5 px-2 text-right whitespace-nowrap"><button type="button" data-prod="${esc(l.product_id)}" data-lot="${esc(l.id)}" data-pal="${esc(x.name || '')}" onclick="abrirCalcPalete(this.dataset.prod, this.dataset.lot, this.dataset.pal)" title="Calculadora" aria-label="Calculadora" class="text-slate-400 hover:text-indigo-600 p-1"><i data-lucide="calculator" class="w-4 h-4"></i></button>${!x.name && x.saldo > 0.005 ? `<button type="button" onclick="nameLotPalete('${esc(l.id)}')" title="Dar nome a esta palete (ex.: P1) e indicar onde está" class="inline-flex items-center gap-1 text-[11px] font-semibold text-blue-700 hover:bg-blue-50 rounded-lg px-2 py-1"><i data-lucide="tag" class="w-3.5 h-3.5"></i>Dar nome</button>` : ''}${x.name && x.saldo > 0.005 ? `<button type="button" data-lot="${esc(l.id)}" data-pal="${esc(x.name)}" onclick="changePaleteLocal(this.dataset.lot, this.dataset.pal)" title="Mudar a localização ou os cones da palete ${esc(x.name)}" class="text-slate-400 hover:text-blue-600 p-1"><i data-lucide="map-pin" class="w-4 h-4"></i></button><button type="button" data-lot="${esc(l.id)}" data-pal="${esc(x.name)}" onclick="splitPalete(this.dataset.lot, this.dataset.pal)" title="Dividir a palete ${esc(x.name)} (passar parte do peso para uma palete nova)" class="text-slate-400 hover:text-blue-600 p-1"><i data-lucide="split" class="w-4 h-4"></i></button><button type="button" data-lot="${esc(l.id)}" data-pal="${esc(x.name)}" onclick="anularPalete(this.dataset.lot, this.dataset.pal)" title="Eliminar a palete ${esc(x.name)} e o seu stock (engano)" class="text-slate-400 hover:text-rose-600 p-1"><i data-lucide="trash-2" class="w-4 h-4"></i></button><button type="button" data-key="${esc('t:' + l.id + '|' + x.name)}" onclick="openLabelSheet([this.dataset.key])" title="Imprimir etiqueta da palete ${esc(x.name)} (para a saída)" class="text-slate-400 hover:text-indigo-600 p-1"><i data-lucide="printer" class="w-4 h-4"></i></button>` : ''}</td></tr>`).join('')}
+                    </tbody></table></div>`}
+                    ${saidasHtml}
                 </div>` : '';
             return `<tr class="bg-white no-print"><td colspan="6" class="px-3 py-3 border-t border-slate-200">
                 <div class="text-xs font-semibold text-slate-600 mb-1">Movimentos do lote ${esc(l.lote)}</div>
@@ -2937,7 +2977,7 @@
                         </button>
                     </td>
                     <td class="py-3 px-1" data-label="Cat." data-m="off"><span class="inline-block max-w-[52px] px-1.5 py-0.5 rounded-md text-[9px] leading-tight font-medium bg-slate-100 text-slate-700 break-words">${esc(p.category || '-')}</span></td>
-                    <td class="py-3 px-2 text-xs text-slate-600 font-medium" data-label="Localização">${esc(p.location || '-')}</td>
+                    <td class="py-3 px-2 text-xs text-slate-600 font-medium" data-label="Localização">${productLocHtml(p)}</td>
                     <td class="py-3 px-2 text-center font-bold text-slate-800 whitespace-nowrap" data-label="Stock">${formatKg(p.qty)}</td>
                     <td class="py-3 px-2 text-center" data-label="Estado">
                         <span class="inline-block w-3.5 h-3.5 rounded-full align-middle ${p.qty <= 0 ? 'bg-rose-500' : p.qty <= p.min ? 'bg-amber-500' : 'bg-emerald-500'}" title="${p.qty <= 0 ? 'Esgotado' : p.qty <= p.min ? 'Stock Baixo' : 'Normal'}" aria-label="${p.qty <= 0 ? 'Esgotado' : p.qty <= p.min ? 'Stock Baixo' : 'Normal'}"></span>
@@ -3479,7 +3519,7 @@
         }
 
         function onMovementTypeChange() {
-            updatePaleteLocalField();
+            refreshPaleteOptions();
             const type = document.getElementById('movement-type').value;
             const header = document.getElementById('movement-modal-header');
             const title = document.getElementById('movement-modal-title');
@@ -3829,21 +3869,68 @@
             if (pal && pal.cones != null) { info.textContent = `A palete ${pal.name} tem agora ${conesTxt(pal.cones)}.`; info.classList.remove('hidden'); }
             else info.classList.add('hidden');
         }
+        // Próximo nome de palete de um lote: continua a numeração do último nome criado (P3 → P4, P09 → P10); sem histórico, P1
+        function proximaPalete(lot) {
+            const nomes = lot ? [...new Set(lotMovements(lot).map(m => String(m.palete || '').trim()).filter(Boolean))] : [];
+            const partes = nomes.map(n => n.match(/^(.*?)(\d{1,9})$/)).filter(Boolean);
+            const ult = partes[partes.length - 1];
+            const prefixo = ult ? ult[1] : 'P';
+            let max = 0, largura = 1;
+            for (const x of partes) if (x[1].toLowerCase() === prefixo.toLowerCase()) {
+                const n = Number(x[2]);
+                if (n > max) max = n;
+                if (x[2].startsWith('0')) largura = Math.max(largura, x[2].length);
+            }
+            const usados = new Set(nomes.map(n => n.toLowerCase()));
+            let n = max + 1, nome;
+            do { nome = prefixo + String(n++).padStart(largura, '0'); } while (usados.has(nome.toLowerCase()));
+            return nome;
+        }
+        // Palete com este nome que impede uma entrada (null = pode usar). Ao editar a entrada da própria palete, o nome mantém-se válido
+        function conflitoPalete(lot, nome, pId) {
+            const key = String(nome || '').trim().toLowerCase();
+            const pal = lot && key ? lotPallets(lot).find(x => x.name && x.name.toLowerCase() === key) : null;
+            if (!pal) return null;
+            const editId = document.getElementById('movement-edit-id').value;
+            const old = editId ? movements.find(x => String(x.id) === String(editId)) : null;
+            const mesma = old && old.type === 'entrada' && String(old.product_id) === String(pId)
+                && String(old.lote || '').trim().toLowerCase() === String(lot.lote || '').trim().toLowerCase()
+                && String(old.palete || '').trim().toLowerCase() === key;
+            return mesma ? null : pal;
+        }
+        function textoPaleteUsada(pal) {
+            return Math.abs(pal.saldo) <= 0.005 ? `A palete ${pal.name} já existiu neste lote e já saiu.` : `Já existe a palete ${pal.name} neste lote (${formatKg(pal.saldo)}).`;
+        }
+        function usarPaleteSugerida() {
+            const btn = document.getElementById('movement-palete-sugestao'), el = document.getElementById('movement-palete');
+            el.value = btn.dataset.nome || '';
+            el.dispatchEvent(new Event('input', { bubbles: true }));
+        }
         function refreshPaleteOptions() {
             updateConesField();
             const list = document.getElementById('movement-palete-list'), info = document.getElementById('movement-palete-info');
             if (!list || !info) return;
+            const sugestao = document.getElementById('movement-palete-sugestao');
+            const mostrarSugestao = nome => { sugestao.dataset.nome = nome || ''; sugestao.textContent = nome ? `Usar a próxima palete: ${nome}` : ''; sugestao.classList.toggle('hidden', !nome); };
+            const isEntrada = document.getElementById('movement-type').value === 'entrada';
+            document.getElementById('movement-palete').placeholder = isEntrada ? 'Nome da palete nova' : 'Escolha a palete que sai';
+            info.classList.remove('text-rose-600');
             updatePaleteLocalField();
             const pId = document.getElementById('movement-product-id').value;
             const lote = (document.getElementById('movement-lote').value || '').trim().toLowerCase();
             const lot = (lotsByProduct[pId] || []).find(x => String(x.lote || '').trim().toLowerCase() === lote);
-            if (!lot) { list.innerHTML = ''; info.classList.add('hidden'); return; }
-            if (!movementsFull) ensureAllMovements(true).then(() => { if (!document.getElementById('movement-modal').classList.contains('hidden')) refreshPaleteOptions(); });
+            const campoVazio = !(document.getElementById('movement-palete').value || '').trim();
+            if (!lot) { list.innerHTML = ''; info.classList.add('hidden'); mostrarSugestao(isEntrada && pId && lote && campoVazio ? 'P1' : ''); return; }
+            if (!movementsFull && !movementsLoadFailed) ensureAllMovements(true).then(() => { if (!document.getElementById('movement-modal').classList.contains('hidden')) refreshPaleteOptions(); });
             const pals = lotPallets(lot).filter(x => x.name);
-            list.innerHTML = pals.map(x => `<option value="${esc(x.name)}">${esc(formatKg(x.saldo))} · ${esc(x.estado)}</option>`).join('');
+            // Saída: só as paletes com stock. Entrada: nome novo, nada a escolher
+            list.innerHTML = isEntrada ? '' : pals.filter(x => x.saldo > 0.005).map(x => `<option value="${esc(x.name)}">${esc(formatKg(x.saldo))} · ${esc(x.estado)}</option>`).join('');
             const typed = (document.getElementById('movement-palete').value || '').trim().toLowerCase();
             const cur = typed && pals.find(x => x.name.toLowerCase() === typed);
-            if (cur) { info.textContent = `Palete ${cur.name}: ${formatKg(cur.saldo)} agora (entrada inicial ${formatKg(cur.inicial)}) · ${cur.estado}`; info.classList.remove('hidden'); }
+            const usada = isEntrada && movementsFull && typed ? conflitoPalete(lot, typed, pId) : null;
+            mostrarSugestao(isEntrada && movementsFull && (campoVazio || usada) ? proximaPalete(lot) : '');
+            if (usada) { info.textContent = `${textoPaleteUsada(usada)} Escolha outro nome.`; info.classList.add('text-rose-600'); info.classList.remove('hidden'); }
+            else if (cur) { info.textContent = `Palete ${cur.name}: ${formatKg(cur.saldo)} agora (entrada inicial ${formatKg(cur.inicial)}) · ${cur.estado}`; info.classList.remove('hidden'); }
             else if (typed && document.getElementById('movement-type').value === 'entrada' && semPaleteInfo(lot)) {
                 const sn = semPaleteInfo(lot);
                 info.textContent = `Atenção: este lote tem ${formatKg(sn.kg)} sem palete. Para os distinguir, feche esta janela e use o botão da etiqueta (Dar nome à palete) na linha do lote.`;
@@ -3980,14 +4067,14 @@
             document.getElementById('pal-cones-label').firstChild.textContent = 'Nº de cones que passam para a palete nova ';
             setConesHint(pal.cones != null ? `A palete ${pal.name} tem ${conesTxt(pal.cones)}; os que indicar passam para a nova.` : '');
             document.getElementById('pal-new-name-wrap').classList.remove('hidden');
-            document.getElementById('pal-new-name').value = '';
+            document.getElementById('pal-new-name').value = proximaPalete(lot);
             document.getElementById('pal-new-qty').value = '';
             document.getElementById('pal-new-qty-hint').textContent = `A palete ${pal.name} tem ${formatKg(pal.saldo)}. Indique o peso que passa para a palete nova; o resto fica na ${pal.name}. O stock do lote não muda.`;
             document.getElementById('pal-loc-info').textContent = `Lote ${lot.lote} · localização do lote: ${base}`;
             setLocInputs('pal', pal.local || '');
             refreshLocLists('');
             document.getElementById('pal-loc-modal').classList.remove('hidden');
-            document.getElementById('pal-new-name').focus();
+            document.getElementById('pal-new-name').select();
         }
         // Nº de cones: vazio = null; inteiro >= 0; outra coisa = NaN (erro)
         function lerCones(v) {
@@ -4056,14 +4143,14 @@
             document.getElementById('pal-cones-label').firstChild.textContent = 'Nº de cones desta palete ';
             setConesHint('');
             document.getElementById('pal-new-name-wrap').classList.remove('hidden');
-            document.getElementById('pal-new-name').value = '';
+            document.getElementById('pal-new-name').value = proximaPalete(lot);
             document.getElementById('pal-new-qty').value = Math.round(pal.kg * 1000) / 1000;
             document.getElementById('pal-new-qty-hint').textContent = `Por omissão, todo o stock sem palete (${formatKg(pal.kg)}). Para partir, indique só o peso desta palete: o resto continua sem palete e pode dar-lhe nome a seguir.`;
             document.getElementById('pal-loc-info').textContent = `Stock sem palete: ${formatKg(pal.kg)} · lote ${lot.lote} · localização do lote: ${base}` + (pal.tipo === 'acerto' ? '. Este stock não consta dos movimentos: será registada uma entrada de acerto (o stock do lote não muda).' : '');
             setLocInputs('pal', '');
             refreshLocLists('');
             document.getElementById('pal-loc-modal').classList.remove('hidden');
-            document.getElementById('pal-new-name').focus();
+            document.getElementById('pal-new-name').select();
         }
         // Explica porque é que não há stock sem palete: compara o stock do lote com o histórico de movimentos
         function mostrarDiagnosticoPaletes(lot) {
@@ -4176,6 +4263,7 @@
             const pal = semPaleteInfo(lot);
             if (!pal) return;
             document.getElementById('lot-sempalete-kg').textContent = formatKg(pal.kg);
+            document.getElementById('lot-sempalete-nome').placeholder = `Nome da palete (ex: ${proximaPalete(lot)}) — opcional`;
             wrap.classList.remove('hidden');
         }
         async function savePaleteLocal() {
@@ -4392,7 +4480,7 @@
                     <td style="${hd}">${esc(p.sku || '-')}${p.barcode ? `<br><span style="font-weight:400">${esc(p.barcode)}</span>` : ''}</td>
                     <td style="${hd}">${esc(p.name || '-')}</td>
                     <td style="${hd}">${esc(p.category || '-')}</td>
-                    <td style="${hd}">${esc(p.location || '-')}</td>
+                    <td style="${hd}">${productLocHtml(p)}</td>
                     <td class="num" style="${hd}">${formatKg(stockP)}</td>
                     <td class="num" style="${hd}">${formatKg(p.min)}</td>
                 </tr>`;
