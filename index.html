@@ -2556,10 +2556,8 @@
             }
             const rest = Math.round((total - used) * 1000) / 1000;
             const out = [...segs.values()];
-            if (rest > 0.005) {
-                const same = out.find(g => normLoc(g.loc) === normLoc(base));
-                if (same) same.qty += rest; else out.push({ loc: base, qty: rest, pals: [] });
-            }
+            // o resto fica sempre à parte: nunca soma ao peso de uma palete, mesmo que a localização seja igual
+            if (rest > 0.005) out.push({ loc: base, qty: rest, pals: [] });
             return out;
         }
         // Onde está o stock do artigo, somando os lotes e as paletes; sem stock em lotes, a localização da ficha do artigo
@@ -2683,7 +2681,7 @@
             let segs = lotSegments(p, l);
             if (F && F.active) segs = segs.filter(g => locMatches(g.loc, F));
             if (segs.length <= 1 && !(segs[0] && segs[0].pals.length)) return esc((segs[0] ? segs[0].loc : (l.location || p.location)) || '-');
-            return segs.map(g => `${esc(g.loc || '-')}<span style="font-weight:400"> (${g.pals.length ? 'palete ' + esc(g.pals.join(', ')) + ' · ' : ''}${formatKg(g.qty)})</span>`).join('<br>');
+            return segs.map(g => `${esc(g.loc || '-')}<span style="font-weight:400"> (${g.pals.length ? 'palete ' + esc(g.pals.join(', ')) : 'resto do lote'} · ${formatKg(g.qty)})</span>`).join('<br>');
         }
         // célula da localização na lista de lotes do ecrã
         function lotLocCell(p, l, F) {
@@ -2691,7 +2689,7 @@
             if (F.active) segs = segs.filter(g => locMatches(g.loc, F));
             const own = l.location ? 'text-slate-700 font-medium' : 'text-slate-400 italic';
             if (segs.length <= 1 && !(segs[0] && segs[0].pals.length)) return `<span class="${own}">${esc((segs[0] ? segs[0].loc : (l.location || p.location)) || '-')}</span>`;
-            return segs.map(g => `<div class="${g.pals.length ? 'text-slate-700 font-medium' : own}">${esc(g.loc || '-')} <span class="text-[10px] text-slate-400 font-normal">${g.pals.length ? 'palete ' + esc(g.pals.join(', ')) + ' · ' : ''}${formatKg(g.qty)}</span></div>`).join('');
+            return segs.map(g => `<div class="${g.pals.length ? 'text-slate-700 font-medium' : own}">${esc(g.loc || '-')} <span class="text-[10px] text-slate-400 font-normal">${g.pals.length ? 'palete ' + esc(g.pals.join(', ')) : 'resto do lote'} · ${formatKg(g.qty)}</span></div>`).join('');
         }
 
         function productOwnMatch(p, query, useSku = true) {
