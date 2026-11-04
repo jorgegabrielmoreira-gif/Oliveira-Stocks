@@ -1312,6 +1312,10 @@
                     <p class="text-[11px] mt-1">Selecionado: <strong id="lot-supplier-label" class="text-blue-700">—</strong></p>
                     <p class="text-[11px] text-slate-500 mt-1">Cada lote tem o seu fornecedor, mesmo que o produto seja comprado a vários.</p>
                 </div>
+                <div>
+                    <label class="block text-xs font-medium text-slate-700 mb-1">Observações</label>
+                    <textarea id="lot-notes" rows="3" class="w-full px-3 py-2 text-sm border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500/20 outline-none"></textarea>
+                </div>
                 <div class="pt-3 border-t border-slate-100">
                     <label class="block text-xs font-medium text-slate-700 mb-1">Mover para outro produto (opcional)</label>
                     <input type="text" id="lot-move-search" oninput="debouncedFilterLotMoveProducts()" placeholder="🔍 Pesquisar produto de destino..." class="w-full px-3 py-2 mb-2 text-sm bg-slate-50 border border-slate-200 rounded-xl">
@@ -1472,6 +1476,7 @@
             let field = null;
             if (code === '23505') field = 'lot-code';
             else if (code === '23514' || msg.includes('check constraint')) field = 'lot-qty';
+            else if (msg.includes("'notes' column")) field = 'lot-notes';
             else if (code === 'PGRST204' || msg.includes("'location' column")) field = 'lot-arm';
             if (field) setFieldError(field, friendlyLotError(error)); else showToast(friendlyLotError(error), 'error');
         }
@@ -1643,6 +1648,7 @@
             if (code === '23505') return 'Já existe um lote com esse código neste produto.';
             if (code === '23514' || msg.includes('check constraint')) return 'Stock insuficiente: a quantidade do lote não pode ficar negativa.';
             if (code === '23503') return 'Este lote tem movimentos no histórico e não pode ser eliminado. Pode deixá-lo com stock 0.';
+            if (msg.includes("'notes' column")) return 'Falta a coluna "notes" na tabela lots (executar: alter table lots add column notes text;).';
             if (code === 'PGRST204' || msg.includes("'location' column")) return 'Falta a coluna "location" na tabela lots (executar o SQL indicado no Supabase).';
             if (msg.includes("'supplier' column")) return 'Falta a coluna "supplier" na tabela lots (executar: alter table lots add column supplier text;).';
             if (code === 'PGRST202' || msg.includes('Could not find the function')) return 'Faltam as funções SQL dos lotes (executar funcoes_lotes.sql no Supabase).';
@@ -1663,6 +1669,7 @@
             prepararSemPalete(lot);
             document.getElementById('lot-supplier-search').value = '';
             filterLotSuppliers(lot.supplier || '');
+            document.getElementById('lot-notes').value = lot.notes || '';
             document.getElementById('lot-move-search').value = '';
             filterLotMoveProducts();
             document.getElementById('lot-modal').classList.remove('hidden');
@@ -1893,6 +1900,8 @@
             if (loc !== (lot.location || '')) patch.location = loc || null;
             const sup = document.getElementById('lot-supplier').value;
             if (sup !== (lot.supplier || '')) patch.supplier = sup || null;
+            const lotNotes = document.getElementById('lot-notes').value.trim();
+            if (lotNotes !== String(lot.notes || '').trim()) patch.notes = lotNotes || null;
             if (!error && Object.keys(patch).length) ({ error } = await db.from('lots').update(patch).eq('id', id));
             if (!error && dest) ({ error } = await db.rpc('move_lot', { p_lot: id, p_product: dest }));
             let nomeMsg = '';
@@ -2078,6 +2087,16 @@
             document.getElementById('note-text').textContent = String(p.notes || '').trim();
             document.getElementById('note-edit').classList.remove('hidden');
             document.getElementById('note-edit').onclick = () => { closeProductNote(); openProductModal(p.id); };
+            document.getElementById('note-modal').classList.remove('hidden');
+            scheduleIcons();
+        }
+        function showLotNote(id) {
+            const l = lots.find(x => String(x.id) === String(id));
+            if (!l) return;
+            document.getElementById('note-title').textContent = 'Lote ' + (l.lote || '');
+            document.getElementById('note-text').textContent = String(l.notes || '').trim();
+            document.getElementById('note-edit').classList.remove('hidden');
+            document.getElementById('note-edit').onclick = () => { closeProductNote(); openLotModal(l.id); };
             document.getElementById('note-modal').classList.remove('hidden');
             scheduleIcons();
         }
@@ -2843,7 +2862,7 @@
                 ? `<button onclick="toggleDepleted('${esc(p.id)}')" class="text-xs font-semibold text-blue-600 hover:text-blue-700">${showDepleted.has(p.id) ? 'Ocultar esgotados' : 'Mostrar esgotados (' + depleted + ')'}</button>` : '';
             const rows = list.map(l => `
                 <tr data-lid="${esc(l.id)}" class="border-t border-slate-200/70 ${l.id === highlightLotId ? 'row-flash' : ''}">
-                    <td class="py-2 px-3 font-mono text-xs font-semibold text-blue-700"><label class="inline-flex items-center gap-2 cursor-pointer"><input type="checkbox" class="lb-check no-print w-4 h-4 rounded border-slate-300 text-blue-600 cursor-pointer" data-key="l:${esc(l.id)}" ${labelChecked('l:' + l.id)} onchange="toggleLabelSel(this.dataset.key, this)" title="Selecionar para a folha de etiquetas">${esc(l.lote)}</label>${lotPalChips(l)}</td>
+                    <td class="py-2 px-3 font-mono text-xs font-semibold text-blue-700"><label class="inline-flex items-center gap-2 cursor-pointer"><input type="checkbox" class="lb-check no-print w-4 h-4 rounded border-slate-300 text-blue-600 cursor-pointer" data-key="l:${esc(l.id)}" ${labelChecked('l:' + l.id)} onchange="toggleLabelSel(this.dataset.key, this)" title="Selecionar para a folha de etiquetas">${esc(l.lote)}</label>${String(l.notes || '').trim() ? ` <button type="button" onclick="showLotNote('${esc(l.id)}')" title="${esc(String(l.notes).trim().slice(0, 200))}" aria-label="Ver observações do lote" class="no-print inline-flex align-middle ml-1 p-1 rounded-md text-amber-600 bg-amber-50 hover:bg-amber-100 transition"><i data-lucide="sticky-note" class="w-3.5 h-3.5"></i></button>` : ''}${lotPalChips(l)}</td>
                     <td class="py-2 px-3 text-right text-sm font-semibold ${l.qty <= 0 ? 'text-slate-400' : 'text-slate-800'}">${formatKg(F.active ? lotQtyIn(p, l, F) : l.qty)}${F.active && Math.abs(lotQtyIn(p, l, F) - l.qty) > 0.005 ? `<div class="text-[10px] font-normal text-slate-400">de ${formatKg(l.qty)}</div>` : ''}</td>
                     <td class="py-2 px-3 text-xs">${lotLocCell(p, l, F)}</td>
                     <td class="py-2 px-3 text-xs ${lotSupplier(l) ? 'text-slate-700 font-medium' : 'text-slate-400'}">${esc(lotSupplier(l) || '-')}</td>
