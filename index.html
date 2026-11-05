@@ -1000,6 +1000,7 @@
                 <button onclick="closeLabelModal()" class="text-slate-400 hover:text-slate-600 p-1"><i data-lucide="x" class="w-5 h-5"></i></button>
             </div>
             <div id="label-chips" class="flex flex-wrap gap-2"></div>
+            <label class="flex items-center gap-2 text-xs font-medium cursor-pointer"><input type="checkbox" class="label-sup-toggle w-4 h-4 rounded border-slate-300" onchange="setLabelSupplier(this.checked, refreshLabelModal)"> Mostrar o fornecedor na etiqueta</label>
             <div class="flex justify-center bg-slate-100 rounded-xl p-4 overflow-auto">
                 <div class="bg-white shadow ring-1 ring-slate-200 overflow-hidden shrink-0" style="--ls:.55; width: calc(198mm * var(--ls)); height: calc(285mm * var(--ls));">
                     <div id="label-sheet-preview" style="transform: scale(var(--ls)); transform-origin: 0 0;"></div>
@@ -1031,6 +1032,7 @@
                 <button type="button" onclick="closePaleteA5()" aria-label="Fechar" class="text-slate-400 hover:text-slate-600 p-1"><i data-lucide="x" class="w-5 h-5"></i></button>
             </div>
             <div id="a5-chips" class="flex flex-wrap gap-2"></div>
+            <label class="flex items-center gap-2 text-xs font-medium cursor-pointer"><input type="checkbox" class="label-sup-toggle w-4 h-4 rounded border-slate-300" onchange="setLabelSupplier(this.checked, refreshPaleteA5)"> Mostrar o fornecedor na etiqueta</label>
             <div id="a5-add-wrap" class="hidden">
                 <label for="a5-add" class="block text-xs font-medium mb-1">Segunda etiqueta da folha</label>
                 <select id="a5-add" onchange="juntarPaleteA5(this.value)" class="w-full px-3 py-2 text-sm border border-slate-200 rounded-xl"></select>
@@ -3212,13 +3214,22 @@
                 chip: `${p.sku || p.name} · ${lot.lote} · ${nome}`,
                 title: p.name, mono: false, sub: `SKU: ${p.sku} | Lote: ${lot.lote}`, badge: `Palete: ${nome}`,
                 lines: [
-                    `Fornecedor: ${lotSupplier(lot) || '-'}`,
+                    ...(labelShowSupplier ? [`Fornecedor: ${lotSupplier(lot) || '-'}`] : []),
                     `Entrada: ${ent ? formatDate(ent.date) : formatDate(lot.created_at)}${peso != null ? ' | Peso da palete: ' + formatKg(peso) : ''}${pal && pal.cones != null ? ' | Cones: ' + pal.cones : ''}`
                 ],
                 code: paleteCode(p, lot, nome), qr: paleteCode(p, lot, nome),
                 footL: `Loc: ${(pal && pal.local) || lot.location || p.location || 'Armazém'}`, footR: peso != null ? formatKg(peso) : ''
             };
         }
+        // Fornecedor nas etiquetas: desligado por omissão; a escolha fica guardada neste browser
+        let labelShowSupplier = false;
+        try { labelShowSupplier = localStorage.getItem('labelShowSupplier') === '1'; } catch (e) {}
+        function setLabelSupplier(on, refresh) {
+            labelShowSupplier = !!on;
+            try { localStorage.setItem('labelShowSupplier', on ? '1' : '0'); } catch (e) {}
+            refresh();
+        }
+        function syncLabelSupplierBoxes() { document.querySelectorAll('.label-sup-toggle').forEach(c => { c.checked = labelShowSupplier; }); }
         // ===== Etiqueta A5 de uma palete: usa o mesmo código da etiqueta pequena, por isso lê-se igual na saída =====
         function paleteA5Html(lot, pal) {
             const p = products.find(x => String(x.id) === String(lot.product_id));
@@ -3242,7 +3253,7 @@
                             ${parcial ? campo('Peso inicial', formatKg(pal.inicial)) : campo('Cones', pal.cones != null ? pal.cones : '')}
                             ${parcial ? campo('Cones', pal.cones != null ? pal.cones : '') : ''}
                             ${campo('Localização', pal.local || lot.location || p.location)}
-                            ${campo('Fornecedor', lotSupplier(lot))}
+                            ${labelShowSupplier ? campo('Fornecedor', lotSupplier(lot)) : ''}
                             ${campo('Data de entrada', ent ? formatDate(ent.date) : formatDate(lot.created_at))}
                         </div>
                     </div>
@@ -3273,6 +3284,7 @@
             });
         }
         function refreshPaleteA5() {
+            syncLabelSupplierBoxes();
             a5Queue = a5Queue.filter(a5Resolve);
             const n = a5Queue.length;
             if (!n) { closePaleteA5(); return; }
@@ -3337,7 +3349,7 @@
                 chip: lot ? `${p.sku || p.name} · ${lot.lote}` : (p.sku || p.name),
                 title: p.name, mono: false, sub: `SKU: ${p.sku}`, badge: `Lote: ${lot ? lot.lote : 'N/A'}`,
                 lines: [
-                    `Categoria: ${p.category || '-'} | Fornecedor: ${(lot && lotSupplier(lot)) || '-'}`,
+                    `Categoria: ${p.category || '-'}${labelShowSupplier ? ` | Fornecedor: ${(lot && lotSupplier(lot)) || '-'}` : ''}`,
                     lot ? `Entrada: ${formatDate(lot.created_at)} | Stock total do produto: ${formatKg(p.qty)}`
                         : `Lotes com stock: ${(lotsByProduct[p.id] || []).filter(l => l.qty > 0).length} | Stock mín.: ${formatKg(p.min)}`
                 ],
@@ -3395,6 +3407,7 @@
         }
 
         function refreshLabelModal() {
+            syncLabelSupplierBoxes();
             const n = labelQueue.length;
             document.getElementById('label-sheet-info').textContent = `${n} de ${LABEL_MAX} etiquetas · 2 × 4 por folha (99 × 71 mm cada)`;
             document.getElementById('label-chips').innerHTML = labelQueue.map(k => {
