@@ -1357,7 +1357,7 @@
                     <p class="text-[11px] text-slate-500 mt-1">Alterar aqui é um acerto de inventário e não fica registado nos movimentos.</p>
                 </div>
                 <div id="lot-sempalete-wrap" class="hidden p-3 rounded-xl border border-blue-200 bg-blue-50 space-y-2">
-                    <p class="text-xs text-blue-900"><b>Stock sem palete: <span id="lot-sempalete-kg"></span></b> — dê-lhe o nome de uma palete para o distinguir de outras entradas deste lote.</p>
+                    <p class="text-xs text-blue-900"><b>Paletes fechadas: <span id="lot-sempalete-kg"></span></b> — dê-lhe o nome de uma palete para o distinguir de outras entradas deste lote.</p>
                     <input type="text" id="lot-sempalete-nome" autocomplete="off" placeholder="Nome da palete (ex: P1) — opcional" class="w-full px-3 py-2 text-sm border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500/20 outline-none">
                     <input type="number" step="1" min="0" inputmode="numeric" id="lot-sempalete-cones" placeholder="Nº de cones — opcional" class="w-full px-3 py-2 text-sm border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500/20 outline-none">
                     <div class="grid grid-cols-2 gap-2"><div><select id="lp-arm-sel" onchange="onLocSel('lp','arm')" class="w-full px-3 py-2 text-sm border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500/20 outline-none"></select><input type="text" id="lp-arm" list="loc-arm-list" autocomplete="off" placeholder="Escreva o armazém" class="hidden mt-2 w-full px-3 py-2 text-sm border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500/20 outline-none"></div><div><select id="lp-fila-sel" onchange="onLocSel('lp','fila')" class="w-full px-3 py-2 text-sm border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500/20 outline-none"></select><input type="text" id="lp-fila" list="loc-fila-list" autocomplete="off" placeholder="Escreva a posição (ex: Corredor B)" class="hidden mt-2 w-full px-3 py-2 text-sm border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500/20 outline-none"></div></div>
@@ -2282,6 +2282,7 @@
             if (!(qty > 0)) { setFieldError('movement-qty', 'Indique uma quantidade válida.'); return; }
 
             // O stock do produto é atualizado pelo trigger na base de dados (ver supabase_setup.sql)
+            if (devolucaoAberta && !entity_name) { setFieldError('movement-entity-id', 'Escolha a entidade que devolveu.'); return; }
             const row = { date, type, product_id, product_name: targetProduct.name, lote, qty, entity_name, notes };
             // Palete: só enviada se preenchida (ou para limpar uma palete antiga), assim funciona mesmo sem a coluna na BD
             const palete = (document.getElementById('movement-palete')?.value || '').trim();
@@ -2321,7 +2322,7 @@
             if (saved) upsertLocalMovement(saved);
             await loadData({ products: true, lots: true, movements: !saved });
             // Entrada que cria um lote novo: o fornecedor do lote é a entidade desta 1.ª entrada (entradas seguintes não o alteram)
-            if (!editId && type === 'entrada' && entity_name && !lotExisted) {
+            if (!editId && type === 'entrada' && podeSerFornecedor(entity_name) && !lotExisted) {
                 const newLot = lots.find(l => l.product_id === product_id && String(l.lote).toLowerCase() === lote.trim().toLowerCase());
                 if (newLot && !newLot.supplier) {
                     const { error: supErr } = await db.from('lots').update({ supplier: entity_name }).eq('id', newLot.id);
@@ -2329,11 +2330,13 @@
                 }
             }
             refreshAll();
+            const eraDevolucao = devolucaoAberta;
             closeMovementModal();
             // Entrada com palete: oferece logo a etiqueta (QR/código de barras) para colar na palete e ler na saída
             if (!editId && type === 'entrada' && palete) {
                 const lt = lots.find(l => String(l.product_id) === String(product_id) && String(l.lote).toLowerCase() === lote.trim().toLowerCase());
-                if (lt && confirm(`Imprimir a etiqueta da palete ${palete}?`)) openLabelSheet(['t:' + lt.id + '|' + palete]);
+                if (lt && eraDevolucao) { if (confirm(`Palete ${palete} criada. Imprimir a etiqueta A5?`)) openPaleteA5(lt.id, palete); }
+                else if (lt && confirm(`Imprimir a etiqueta da palete ${palete}?`)) openLabelSheet(['t:' + lt.id + '|' + palete]);
             }
         }
 
@@ -2746,7 +2749,7 @@
             let segs = lotSegments(p, l);
             if (F && F.active) segs = segs.filter(g => locMatches(g.loc, F));
             if (segs.length <= 1 && !(segs[0] && segs[0].pals.length)) return esc((segs[0] ? segs[0].loc : (l.location || p.location)) || '-');
-            return segs.map(g => `${esc(g.loc || '-')}<span style="font-weight:400"> (${g.pals.length ? 'palete ' + esc(g.pals.join(', ')) : 'resto do lote'} · ${formatKg(g.qty)})</span>`).join('<br>');
+            return segs.map(g => `${esc(g.loc || '-')}<span style="font-weight:400"> (${g.pals.length ? 'palete ' + esc(g.pals.join(', ')) : 'paletes fechadas'} · ${formatKg(g.qty)})</span>`).join('<br>');
         }
         // célula da localização na lista de lotes do ecrã
         function lotLocCell(p, l, F) {
@@ -2754,7 +2757,7 @@
             if (F.active) segs = segs.filter(g => locMatches(g.loc, F));
             const own = l.location ? 'text-slate-700 font-medium' : 'text-slate-400 italic';
             if (segs.length <= 1 && !(segs[0] && segs[0].pals.length)) return `<span class="${own}">${esc((segs[0] ? segs[0].loc : (l.location || p.location)) || '-')}</span>`;
-            return segs.map(g => `<div class="${g.pals.length ? 'text-slate-700 font-medium' : own}">${esc(g.loc || '-')} <span class="text-[10px] text-slate-400 font-normal">${g.pals.length ? 'palete ' + esc(g.pals.join(', ')) : 'resto do lote'} · ${formatKg(g.qty)}</span></div>`).join('');
+            return segs.map(g => `<div class="${g.pals.length ? 'text-slate-700 font-medium' : own}">${esc(g.loc || '-')} <span class="text-[10px] text-slate-400 font-normal">${g.pals.length ? 'palete ' + esc(g.pals.join(', ')) : 'paletes fechadas'} · ${formatKg(g.qty)}</span></div>`).join('');
         }
 
         function productOwnMatch(p, query, useSku = true) {
@@ -2804,20 +2807,27 @@
             }
             renderProductsTable();
         }
+        // Uma entrada de acerto ou de uma entidade só de clientes (devolução) não indica quem forneceu o lote
+        function podeSerFornecedor(nome) {
+            const n = String(nome || '').trim().toLowerCase();
+            if (!n || n === 'acerto de inventário') return false;
+            const ent = entities.find(e => String(e.name || '').trim().toLowerCase() === n);
+            return !(ent && ent.type === 'Cliente');
+        }
         // Fornecedor do lote = entidade da PRIMEIRA entrada desse lote (nunca a do último movimento)
         let movVersion = 0, supCache = null, supCacheKey = '', supRefreshQueued = false;
         function firstEntrySuppliers() {
-            const key = movVersion + '|' + movements.length + '|' + (movements[0] ? movements[0].id : '');
+            const key = movVersion + '|' + movements.length + '|' + (movements[0] ? movements[0].id : '') + '|' + entities.length;
             if (supCache && supCacheKey === key) return supCache;
             const first = new Map();   // chave -> movimento de entrada mais antigo
             for (const m of movements) {
-                if (m.type !== 'entrada' || !String(m.entity_name || '').trim()) continue;
+                if (m.type !== 'entrada' || !podeSerFornecedor(m.entity_name)) continue;
                 const k = (m.lot_id != null && m.lot_id !== '') ? 'id:' + m.lot_id
                     : 'pl:' + m.product_id + '|' + String(m.lote || '').trim().toLowerCase();
                 const cur = first.get(k);
                 if (!cur || movAsc(m, cur) < 0) first.set(k, m);
             }
-            supCache = new Map([...first].map(([k, m]) => [k, m.entity_name]));
+            supCache = first;
             supCacheKey = key;
             return supCache;
         }
@@ -2829,10 +2839,11 @@
                 supRefreshQueued = true;
                 ensureAllMovements(true).then(() => { supRefreshQueued = false; if (movementsFull) renderProductsTable(); });
             }
+            // Os movimentos antigos podem não ter lot_id: compara os dois grupos para a entrada mais antiga mandar sempre
             const map = firstEntrySuppliers();
-            return map.get('id:' + l.id)
-                || map.get('pl:' + l.product_id + '|' + String(l.lote || '').trim().toLowerCase())
-                || '';
+            const porId = map.get('id:' + l.id), porNome = map.get('pl:' + l.product_id + '|' + String(l.lote || '').trim().toLowerCase());
+            const m = porId && porNome ? (movAsc(porNome, porId) < 0 ? porNome : porId) : (porId || porNome);
+            return m ? m.entity_name : '';
         }
         // Índice dos movimentos por lote: construído uma vez por versão dos movimentos (antes cada lote percorria TODOS os movimentos)
         let movIdx = null;
@@ -2891,7 +2902,10 @@
             const incompletas = pals.filter(x => x.estado === 'Incompleta');
             // Paletes que já saíram (saldo 0) ficam à parte; um saldo negativo é uma anomalia e continua visível
             const palSaiu = x => Math.abs(x.saldo) <= 0.005;
-            const palsAtivas = pals.filter(x => !palSaiu(x));
+            // Saídas antigas sem palete não aparecem como saldo negativo: o que não tem palete é o stock do lote menos as paletes
+            const palsAtivas = pals.filter(x => x.name && !palSaiu(x));
+            const fechadas = Math.max(0, Math.round(((Number(l.qty) || 0) - pals.reduce((t, x) => t + (x.name ? x.saldo : 0), 0)) * 1000) / 1000);
+            const fechadasHtml = fechadas > 0.005 ? `<tr class="border-t border-slate-200/70 bg-amber-50/60"><td class="py-1.5 px-2 text-xs font-semibold text-amber-900">Paletes fechadas</td><td class="py-1.5 px-2 text-right text-xs text-slate-400">-</td><td class="py-1.5 px-2 text-right text-xs text-slate-400">-</td><td class="py-1.5 px-2 text-right text-xs font-bold text-amber-900">${formatKg(fechadas)}</td><td class="py-1.5 px-2 text-right text-xs text-slate-300">-</td><td class="py-1.5 px-2 text-xs text-slate-600">${esc(l.location || (products.find(x => String(x.id) === String(l.product_id)) || {}).location || '-')}</td><td></td><td></td></tr>` : '';
             const palsSaidas = pals.filter(x => x.name && palSaiu(x));
             const ultimaSaida = x => { const k = x.name.toLowerCase(); let u = null; for (const m of list) if (m.type !== 'entrada' && String(m.palete || '').trim().toLowerCase() === k) u = m; return u; };
             const saidasHtml = palsSaidas.length ? `
@@ -2904,12 +2918,13 @@
             const pr = products.find(x => String(x.id) === String(l.product_id));
             const baseLoc = l.location || (pr && pr.location) || '-';
             // painel também com stock sem nome, para o poder transformar em palete
-            const palTable = (temPaletes || pals.some(x => !x.name && x.saldo > 0.005)) ? `
+            const palTable = (temPaletes || fechadasHtml) ? `
 
                 <div class="mb-3">
                     <div class="text-[11px] font-semibold text-slate-500 mb-1">Paletes${incompletas.length ? ` · <span class="text-amber-700">${incompletas.length} incompleta(s): ${incompletas.map(x => esc(x.name || 'sem palete') + ' ' + formatKg(x.saldo)).join(', ')}</span>` : ''}</div>
-                    ${!palsAtivas.length ? '<p class="text-xs text-slate-400 px-2 py-1">Nenhuma palete com stock.</p>' : `<div class="overflow-x-auto"><table class="w-full text-left"><thead><tr class="text-[11px] text-slate-400"><th class="py-1 px-2 font-semibold">Palete</th><th class="py-1 px-2 font-semibold text-right">Inicial</th><th class="py-1 px-2 font-semibold text-right">Saído</th><th class="py-1 px-2 font-semibold text-right">Atual</th><th class="py-1 px-2 font-semibold text-right">Cones</th><th class="py-1 px-2 font-semibold">Localização</th><th class="py-1 px-2 font-semibold">Estado</th><th class="py-1 px-2 font-semibold text-right">Ações</th></tr></thead><tbody>
+                    ${!palsAtivas.length && !fechadasHtml ? '<p class="text-xs text-slate-400 px-2 py-1">Nenhuma palete com stock.</p>' : `<div class="overflow-x-auto"><table class="w-full text-left"><thead><tr class="text-[11px] text-slate-400"><th class="py-1 px-2 font-semibold">Palete</th><th class="py-1 px-2 font-semibold text-right">Inicial</th><th class="py-1 px-2 font-semibold text-right">Saído</th><th class="py-1 px-2 font-semibold text-right">Atual</th><th class="py-1 px-2 font-semibold text-right">Cones</th><th class="py-1 px-2 font-semibold">Localização</th><th class="py-1 px-2 font-semibold">Estado</th><th class="py-1 px-2 font-semibold text-right">Ações</th></tr></thead><tbody>
                     ${palsAtivas.map(x => `<tr class="border-t border-slate-200/70"><td class="py-1.5 px-2 text-xs font-semibold text-slate-800">${esc(x.name || '(sem palete)')}</td><td class="py-1.5 px-2 text-right text-xs text-slate-600">${formatKg(x.inicial)}</td><td class="py-1.5 px-2 text-right text-xs text-rose-600">${x.saido ? '-' + formatKg(x.saido) : '-'}</td><td class="py-1.5 px-2 text-right text-xs font-bold text-slate-800">${formatKg(x.saldo)}</td><td class="py-1.5 px-2 text-right text-xs font-semibold text-slate-700" ${x.conesInicial != null && x.conesInicial !== x.cones ? `title="Entraram ${x.conesInicial}"` : ''}>${x.cones != null ? x.cones : '<span class="text-slate-300">-</span>'}</td><td class="py-1.5 px-2 text-xs ${x.local ? 'text-slate-700 font-medium' : 'text-slate-400 italic'}">${esc(x.local || baseLoc)}</td><td class="py-1.5 px-2"><span class="px-2 py-0.5 rounded-full text-[10px] font-semibold border ${badge[x.estado]}">${x.estado}</span></td><td class="py-1.5 px-2 text-right whitespace-nowrap"><button type="button" data-prod="${esc(l.product_id)}" data-lot="${esc(l.id)}" data-pal="${esc(x.name || '')}" onclick="abrirCalcPalete(this.dataset.prod, this.dataset.lot, this.dataset.pal)" title="Calculadora" aria-label="Calculadora" class="text-slate-400 hover:text-indigo-600 p-1"><i data-lucide="calculator" class="w-4 h-4"></i></button>${!x.name && x.saldo > 0.005 ? `<button type="button" onclick="nameLotPalete('${esc(l.id)}')" title="Dar nome a esta palete (ex.: P1) e indicar onde está" class="inline-flex items-center gap-1 text-[11px] font-semibold text-blue-700 hover:bg-blue-50 rounded-lg px-2 py-1"><i data-lucide="tag" class="w-3.5 h-3.5"></i>Dar nome</button>` : ''}${x.name && x.saldo > 0.005 ? `<button type="button" data-lot="${esc(l.id)}" data-pal="${esc(x.name)}" onclick="changePaleteLocal(this.dataset.lot, this.dataset.pal)" title="Editar a localização, o peso ou os cones da palete ${esc(x.name)}" class="text-slate-400 hover:text-blue-600 p-1"><i data-lucide="map-pin" class="w-4 h-4"></i></button><button type="button" data-lot="${esc(l.id)}" data-pal="${esc(x.name)}" onclick="splitPalete(this.dataset.lot, this.dataset.pal)" title="Dividir a palete ${esc(x.name)} (passar parte do peso para uma palete nova)" class="text-slate-400 hover:text-blue-600 p-1"><i data-lucide="split" class="w-4 h-4"></i></button><button type="button" data-lot="${esc(l.id)}" data-pal="${esc(x.name)}" onclick="anularPalete(this.dataset.lot, this.dataset.pal)" title="Eliminar a palete ${esc(x.name)} e o seu stock (engano)" class="text-slate-400 hover:text-rose-600 p-1"><i data-lucide="trash-2" class="w-4 h-4"></i></button><button type="button" data-key="${esc('t:' + l.id + '|' + x.name)}" onclick="openLabelSheet([this.dataset.key])" title="Etiqueta pequena da palete ${esc(x.name)} (folha A4 com até 8)" aria-label="Etiqueta pequena" class="text-slate-400 hover:text-indigo-600 p-1"><i data-lucide="printer" class="w-4 h-4"></i></button><button type="button" data-lot="${esc(l.id)}" data-pal="${esc(x.name)}" onclick="openPaleteA5(this.dataset.lot, this.dataset.pal)" title="Etiqueta A5 da palete ${esc(x.name)}, para colar na palete" aria-label="Etiqueta A5" class="text-slate-400 hover:text-indigo-600 p-1"><i data-lucide="ticket" class="w-4 h-4"></i></button>` : ''}</td></tr>`).join('')}
+                    ${fechadasHtml}
                     </tbody></table></div>`}
                     ${saidasHtml}
                 </div>` : '';
@@ -2933,10 +2948,10 @@
         function lotPalChips(l) {
             const s = lotPalSummary(l);
             if (!s) return '';
-            const chip = (txt, cls) => `<span class="inline-flex items-center px-1.5 py-0.5 rounded-md border text-[10px] font-semibold whitespace-nowrap ${cls}">${txt}</span>`;
+            const chip = (txt, cls) => `<span class="inline-flex items-center px-1.5 py-0.5 rounded-md border text-[11px] font-bold whitespace-nowrap ${cls}">${txt}</span>`;
             return `<button type="button" onclick="toggleLotHistory('${esc(l.id)}')" title="Ver as paletes e os movimentos deste lote" class="flex flex-wrap gap-1 mt-1 font-sans text-left">`
-                + s.named.map(x => chip(`${esc(x.name)} · ${formatKg(x.saldo)}${x.cones != null ? ' · ' + conesTxt(x.cones) : ''}`, 'bg-indigo-50 text-indigo-700 border-indigo-200')).join('')
-                + (s.rest ? chip(`sem palete · ${formatKg(s.rest)}`, 'bg-slate-50 text-slate-500 border-slate-200') : '')
+                + s.named.map(x => chip(`${esc(x.name)} · ${formatKg(x.saldo)}${x.cones != null ? ' · ' + conesTxt(x.cones) : ''}`, 'bg-indigo-600 text-white border-indigo-600')).join('')
+                + (s.rest ? chip(`paletes fechadas · ${formatKg(s.rest)}`, 'bg-amber-100 text-amber-900 border-amber-300') : '')
                 + '</button>';
         }
         function renderLotsDetail(p, query) {
@@ -2972,6 +2987,7 @@
                     <td class="py-2 px-3 text-xs text-slate-400">${formatDate(l.created_at)}</td>
                     <td class="py-2 px-3 text-right no-print whitespace-nowrap">
                         ${p.archived || l.archived ? '' : `<button onclick="openMovementForLot('entrada', '${esc(p.id)}', '${esc(l.id)}')" title="Registar entrada neste lote" aria-label="Registar entrada neste lote" class="inline-flex items-center justify-center w-7 h-7 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg shadow-sm transition"><i data-lucide="arrow-down-left" class="w-4 h-4"></i></button>`}
+                        ${p.archived || l.archived ? '' : `<button onclick="openDevolucao('${esc(p.id)}', '${esc(l.id)}')" title="Devolução: o que voltou da produção entra como palete nova, com etiqueta" aria-label="Devolução" class="inline-flex items-center justify-center w-7 h-7 ml-1 bg-amber-500 hover:bg-amber-600 text-white rounded-lg"><i data-lucide="undo-2" class="w-4 h-4"></i></button>`}
                         <button onclick="abrirCalcLote('${esc(p.id)}', '${esc(l.id)}')" title="Calculadora" aria-label="Calculadora" class="p-1.5 text-slate-400 hover:text-indigo-600 transition"><i data-lucide="calculator" class="w-4 h-4"></i></button>
                         ${l.qty > 0 ? `<button onclick="openMovementForLot('saida', '${esc(p.id)}', '${esc(l.id)}')" title="Registar saída deste lote" aria-label="Registar saída deste lote" class="inline-flex items-center justify-center w-7 h-7 bg-rose-600 hover:bg-rose-700 text-white rounded-lg shadow-sm transition"><i data-lucide="arrow-up-right" class="w-4 h-4"></i></button>` : ''}
                         ${l.qty > 0 && !p.archived && !l.archived ? `<button onclick="nameLotPalete('${esc(l.id)}')" title="Dar nome à palete (stock deste lote que ainda não tem palete)" aria-label="Dar nome à palete" class="p-1.5 text-slate-400 hover:text-blue-600 transition"><i data-lucide="tag" class="w-4 h-4"></i></button>` : ''}
@@ -3586,6 +3602,7 @@
         function closeEntityModal() { document.getElementById('entity-modal').classList.add('hidden'); }
 
         function openMovementModal(type = 'entrada', id = null) {
+            devolucaoAberta = false;
             document.getElementById('movement-form').reset();
             clearFieldErrors(document.getElementById('movement-form'));
             document.getElementById('movement-edit-id').value = id || '';
@@ -3881,6 +3898,20 @@
             if (sel.value !== '__new__') { sel.value = '__new__'; onMovementLoteSelect(true); }
             document.getElementById('movement-lote').focus();
         }
+        // Devolução: entrada no lote com o próximo número de palete; ao gravar, propõe a etiqueta A5
+        let devolucaoAberta = false;
+        async function openDevolucao(pid, lid) {
+            const l = lots.find(x => String(x.id) === String(lid)); if (!l) return;
+            if (!movementsFull) await ensureAllMovements();
+            openMovementForLot('entrada', pid, lid);
+            devolucaoAberta = true;
+            document.getElementById('movement-palete').value = proximaPalete(l);
+            document.getElementById('movement-notes').value = 'Devolução';
+            document.getElementById('movement-entity-id').value = '';   // a entidade que devolveu tem de ser escolhida
+            refreshPaleteOptions();
+            document.getElementById('movement-modal-title').textContent = `Devolução · lote ${l.lote}`;
+            document.getElementById('movement-qty').focus();
+        }
         // Abre uma Entrada / Saída já com o produto e o lote escolhidos (a partir da linha do lote)
         function openMovementForLot(type, pid, lid) {
             const p = products.find(x => String(x.id) === String(pid));
@@ -4082,7 +4113,7 @@
             const mostrarSugestao = nome => { sugestao.dataset.nome = nome || ''; sugestao.textContent = nome ? `Usar a próxima palete: ${nome}` : ''; sugestao.classList.toggle('hidden', !nome); };
             const isEntrada = document.getElementById('movement-type').value === 'entrada';
             document.getElementById('movement-palete').placeholder = isEntrada ? 'Nome da palete nova' : 'Escolha a palete que sai';
-            info.classList.remove('text-rose-600');
+            info.classList.remove('text-rose-600', 'text-amber-700');
             updatePaleteLocalField();
             const pId = document.getElementById('movement-product-id').value;
             const lote = (document.getElementById('movement-lote').value || '').trim().toLowerCase();
@@ -4102,6 +4133,10 @@
             else if (typed && document.getElementById('movement-type').value === 'entrada' && semPaleteInfo(lot)) {
                 const sn = semPaleteInfo(lot);
                 info.textContent = `Atenção: este lote tem ${formatKg(sn.kg)} sem palete. Para os distinguir, feche esta janela e use o botão da etiqueta (Dar nome à palete) na linha do lote.`;
+                info.classList.remove('hidden');
+            } else if (!isEntrada && !typed && pals.some(x => x.saldo > 0.005)) {
+                info.textContent = `Este lote tem paletes com etiqueta: ${pals.filter(x => x.saldo > 0.005).map(x => `${x.name} (${formatKg(x.saldo)})`).join(', ')}. Gaste estas primeiro: leia a etiqueta ou escolha a palete aqui.`;
+                info.classList.add('text-amber-700');
                 info.classList.remove('hidden');
             } else info.classList.add('hidden');
         }
@@ -4319,7 +4354,7 @@
             document.getElementById('pal-new-name').value = proximaPalete(lot);
             document.getElementById('pal-new-qty').value = Math.round(pal.kg * 1000) / 1000;
             document.getElementById('pal-new-qty-hint').textContent = `Por omissão, todo o stock sem palete (${formatKg(pal.kg)}). Para partir, indique só o peso desta palete: o resto continua sem palete e pode dar-lhe nome a seguir.`;
-            document.getElementById('pal-loc-info').textContent = `Stock sem palete: ${formatKg(pal.kg)} · lote ${lot.lote} · localização do lote: ${base}` + (pal.tipo === 'acerto' ? '. Este stock não consta dos movimentos: será registada uma entrada de acerto (o stock do lote não muda).' : '');
+            document.getElementById('pal-loc-info').textContent = `Paletes fechadas: ${formatKg(pal.kg)} · lote ${lot.lote} · localização do lote: ${base}` + (pal.tipo === 'acerto' ? '. Este stock não consta dos movimentos: será registada uma entrada de acerto (o stock do lote não muda).' : '');
             setLocInputs('pal', '');
             refreshLocLists('');
             document.getElementById('pal-loc-modal').classList.remove('hidden');
@@ -4354,7 +4389,8 @@
             const un = pals.find(x => !x.name && x.saldo > 0.005);
             if (un) return { tipo: 'nome', kg: un.saldo };
             const st = stock === undefined ? Number(lot.qty) || 0 : stock;
-            const soma = pals.reduce((t, x) => t + x.saldo, 0);
+            // Só contam as paletes com nome: saídas antigas sem palete não criam stock livre para novas paletes
+            const soma = pals.reduce((t, x) => t + (x.name ? x.saldo : 0), 0);
             const dif = Math.round((st - soma) * 1000) / 1000;
             return dif > 0.005 ? { tipo: 'acerto', kg: dif } : null;
         }
@@ -4681,7 +4717,7 @@
                 </tr>`;
                 const rows = ls.map(l => `<tr>
                     <td style="padding-left:10px !important;font-family:monospace;white-space:nowrap"><b>${esc(l.lote)}</b></td>
-                    <td>${esc(lotSupplier(l) || '-')}${(s => s ? `<span class="pal">Paletes: ${s.named.map(x => esc(x.name) + ' ' + formatKg(x.saldo) + (x.cones != null ? ' (' + conesTxt(x.cones) + ')' : '')).join(' · ')}${s.rest ? ' · sem palete ' + formatKg(s.rest) : ''}</span>` : '')(lotPalSummary(l))}</td>
+                    <td>${esc(lotSupplier(l) || '-')}${(s => s ? `<span class="pal">Paletes: ${s.named.map(x => esc(x.name) + ' ' + formatKg(x.saldo) + (x.cones != null ? ' (' + conesTxt(x.cones) + ')' : '')).join(' · ')}${s.rest ? ' · paletes fechadas ' + formatKg(s.rest) : ''}</span>` : '')(lotPalSummary(l))}</td>
                     <td style="white-space:nowrap">${esc(formatDate(l.created_at))}</td>
                     <td>${lotLocPrint(p, l, F)}</td>
                     <td class="num">${formatKg(F.active ? lotQtyIn(p, l, F) : l.qty)}</td>
