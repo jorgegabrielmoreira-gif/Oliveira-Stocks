@@ -210,6 +210,17 @@
         #printable-list-area { display: none; }
     
         /* ===== Vista móvel: lotes do stock e movimentos em cartões ===== */
+        /* Telemóvel: cada designação do Stock Atual passa a cartão (no computador a tabela fica igual) */
+        @media screen and (max-width: 767px) {
+            #stock-table { display: block; width: 100%; min-width: 0 !important; }
+            #stock-table > thead { display: none; }
+            #stock-table > tbody, #stock-table > tbody > tr, #stock-table > tbody > tr > td { display: block; width: 100%; box-sizing: border-box; }
+            #stock-table > tbody > tr.grp-row { background: #fff; border: 1px solid #dfe3f1; border-radius: 14px; margin-top: 10px; padding: 10px 12px; box-shadow: 0 1px 2px rgba(21,25,52,.05); }
+            #stock-table > tbody > tr.grp-row > td { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 5px 0 !important; border: 0 !important; background: transparent !important; text-align: right; }
+            #stock-table > tbody > tr.grp-row > td:first-child { font-size: 15px; font-weight: 700; text-align: left; padding-bottom: 7px !important; border-bottom: 1px solid #eef0f9 !important; margin-bottom: 2px; }
+            #stock-table > tbody > tr.grp-row > td[data-label]::before { content: attr(data-label); flex: none; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: .03em; color: #8e95b8; }
+            #stock-table > tbody > tr:not(.grp-row) > td { padding-left: 4px !important; padding-right: 4px !important; }
+        }
         @media screen and (max-width: 767px) {
             .lote-tbl, .mov-tbl { min-width: 0 !important; width: 100% !important; display: block; }
             .lote-tbl thead, .mov-tbl thead { display: none; }
@@ -824,7 +835,7 @@
                     </div>
                 </div>
                 <div class="overflow-x-auto rounded-xl border border-slate-200 custom-scrollbar">
-                    <table class="stick-head w-full text-left border-collapse min-w-[600px]">
+                    <table id="stock-table" class="stick-head w-full text-left border-collapse min-w-[600px]">
                         <thead>
                             <tr class="bg-slate-50 border-b border-slate-200 text-xs font-semibold text-slate-500 uppercase tracking-wider">
                                 <th class="py-3 px-3">Designação</th>
@@ -2376,16 +2387,16 @@
                 const rolos = g.ativos.reduce((t, l) => t + l.rolos, 0);
                 const peso = round2(g.ativos.reduce((t, l) => t + l.peso, 0));
                 return `
-                <tr class="hover:bg-slate-50/80 transition">
+                <tr class="grp-row hover:bg-slate-50/80 transition">
                     <td class="py-3 px-3 font-medium text-slate-900"><div class="flex items-center gap-1.5"><span>${esc(g.nome)}</span>${(() => { const n = g.lotes.filter(x => temNota(x) && (x.rolos > 0 || showDepletedMalha.has(g.key))).length; return n ? `<button type="button" onclick="toggleMalhaGrupo('${k}')" title="${n} ${n === 1 ? 'lote com observações' : 'lotes com observações'} (abrir)" aria-label="Lotes com observações" class="no-print inline-flex ml-1 p-1 rounded-md text-amber-600 bg-amber-50 hover:bg-amber-100 transition"><i data-lucide="sticky-note" class="w-3.5 h-3.5"></i></button>` : ''; })()}</div></td>
-                    <td class="py-3 px-3">
+                    <td class="py-3 px-3" data-label="Lotes">
                         <button onclick="toggleMalhaGrupo('${k}')" class="inline-flex items-center gap-1 text-xs font-semibold text-blue-700 hover:bg-blue-50 rounded-lg px-2 py-1 whitespace-nowrap">
                             <i data-lucide="${open ? 'chevron-down' : 'chevron-right'}" class="w-3.5 h-3.5"></i>
                             ${nAt} ${nAt === 1 ? 'lote' : 'lotes'}${nEsg > 0 ? ` <span class="text-slate-400 font-normal">(+${nEsg} esgot.)</span>` : ''}
                         </button>
                     </td>
-                    <td class="py-3 px-3 text-center font-bold text-slate-800 whitespace-nowrap">${rolos}</td>
-                    <td class="py-3 px-3 text-center font-bold text-slate-800 whitespace-nowrap">${esc(formatKg(peso))}</td>
+                    <td class="py-3 px-3 text-center font-bold text-slate-800 whitespace-nowrap" data-label="Rolos">${rolos}</td>
+                    <td class="py-3 px-3 text-center font-bold text-slate-800 whitespace-nowrap" data-label="Peso líq.">${esc(formatKg(peso))}</td>
                 </tr>${open ? detalhe(g) : ''}`;
             }).join('') || '<tr><td colspan="4" class="text-center py-6 text-slate-400">Nenhum lote em stock.</td></tr>') + moreStock;
             scheduleIcons();
