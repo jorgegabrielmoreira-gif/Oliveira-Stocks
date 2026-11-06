@@ -783,7 +783,7 @@
                         <span id="arquivar-aviso" class="hidden no-print text-xs text-amber-700 whitespace-nowrap" title="Execute arquivar.sql no Supabase para poder arquivar produtos e lotes sem stock">Arquivar indisponível (falta arquivar.sql)</span>
                         <span id="fila-summary" class="no-print text-xs font-medium text-slate-500 whitespace-nowrap"></span>
                         <label class="no-print inline-flex items-center gap-2 text-xs font-medium text-slate-600 cursor-pointer select-none whitespace-nowrap" title="A impressão sai igual ao que está no ecrã">
-                            <input type="checkbox" id="show-zero-stock" checked onchange="renderProductsTable()" class="w-4 h-4 rounded border-slate-300 text-blue-600">
+                            <input type="checkbox" id="show-zero-stock" onchange="renderProductsTable()" class="w-4 h-4 rounded border-slate-300 text-blue-600">
                             Mostrar esgotados
                         </label>
                         <label id="show-archived-wrap" class="no-print inline-flex items-center gap-2 text-xs font-medium text-slate-600 cursor-pointer select-none whitespace-nowrap" title="Mostra também os produtos e lotes arquivados">
