@@ -3244,6 +3244,15 @@
             const moreMovements = (filtered.length > shownMovements.length || !movementsFull)
                 ? `<tr><td colspan="9" class="text-center py-4"><button onclick="movementLimit += 200; renderMovementsTable()" class="px-4 py-2 text-sm font-medium text-blue-600 hover:bg-blue-50 rounded-lg">${movementsLoading ? 'A carregar histórico completo...' : `Mostrar mais (${shownMovements.length} de ${filtered.length}${movementsFull ? '' : '+'})`}</button></td></tr>` : '';
             
+            // Movimentos com o mesmo tipo, produto, entidade e data/hora (ex.: saída de várias paletes): cada um mostra o total
+            const grupoKey = m => [m.type, m.product_id, String(m.entity_name || '').trim().toLowerCase(), String(m.date || '')].join('|');
+            const grupos = new Map();
+            for (const m of movements) { const k = grupoKey(m); const g = grupos.get(k) || { n: 0, kg: 0 }; g.n++; g.kg += Number(m.qty) || 0; grupos.set(k, g); }
+            const totalHtml = m => {
+                const g = grupos.get(grupoKey(m));
+                if (!g || g.n < 2) return '';
+                return `<div class="text-[10px] font-semibold text-slate-500 whitespace-nowrap mt-0.5">${m.type === 'entrada' ? 'Entrada' : 'Saída'} total: ${formatKg(Math.round(g.kg * 1000) / 1000)} (${g.n} mov.)</div>`;
+            };
             tbody.innerHTML = shownMovements.map(m => `
                 <tr class="hover:bg-slate-50/80 transition">
                     <td class="py-3 px-4 text-slate-500 text-xs">${formatDateTime(m.date)}</td>
@@ -3256,7 +3265,7 @@
                     <td class="py-3 px-4 font-medium text-slate-900">${productNameLink(m)}</td>
                     <td class="py-3 px-4 font-mono text-xs font-semibold text-blue-700">${loteLink(m)}${m.palete ? `<div class="font-sans text-[10px] font-medium text-slate-500">Palete ${esc(m.palete)}${movCones(m) != null ? ' · ' + conesTxt(movCones(m)) : ''}</div>` : ''}</td>
                     <td class="py-3 px-4 text-center font-bold ${m.type === 'entrada' ? 'text-emerald-600' : 'text-rose-600'}">
-                        ${m.type === 'entrada' ? '+' : '-'}${formatKg(m.qty)}
+                        ${m.type === 'entrada' ? '+' : '-'}${formatKg(m.qty)}${totalHtml(m)}
                     </td>
                     <td class="py-3 px-4 text-slate-700 text-xs font-medium">${esc(m.entity_name || '-')}</td>
                     <td class="py-3 px-4 text-slate-500 text-xs">${esc(m.notes || '-')}</td>
