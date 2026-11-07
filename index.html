@@ -4566,7 +4566,7 @@
         async function dividirPalete(lot, origem, nome, kg, local, cones) {
             const prod = products.find(x => String(x.id) === String(lot.product_id));
             const base = { date: agoraLocal(), product_id: lot.product_id, product_name: prod ? prod.name : '', lote: lot.lote, qty: kg, entity_name: 'Acerto de inventário' };
-            const de = origem ? 'da palete ' + origem : 'do stock sem palete';
+            const de = origem ? 'da palete ' + origem : 'das paletes fechadas';
             // os cones só saem da palete de origem se ela tiver cones registados
             const po = origem ? lotPallets(lot).find(x => x.name && x.name.toLowerCase() === origem.toLowerCase()) : null;
             const tiraCones = cones != null && po && po.cones != null;
@@ -4648,8 +4648,8 @@
             document.getElementById('pal-new-name').value = '';
             setPalKind('palete');
             document.getElementById('pal-new-qty').value = Math.round(pal.kg * 1000) / 1000;
-            document.getElementById('pal-new-qty-hint').textContent = `Por omissão, todo o stock sem palete (${formatKg(pal.kg)}). Para partir, indique só o peso desta palete: o resto continua sem palete e pode dar-lhe nome a seguir.`;
-            document.getElementById('pal-loc-info').textContent = `Paletes fechadas: ${formatKg(pal.kg)} · lote ${lot.lote} · localização do lote: ${base}` + (pal.tipo === 'acerto' ? '. Este stock não consta dos movimentos: será registada uma entrada de acerto (o stock do lote não muda).' : '');
+            document.getElementById('pal-new-qty-hint').textContent = `Por omissão, todas as paletes fechadas (${formatKg(pal.kg)}). Indique só o peso desta palete ou saco: o resto continua em paletes fechadas.`;
+            document.getElementById('pal-loc-info').textContent = `Paletes fechadas: ${formatKg(pal.kg)} · lote ${lot.lote} · localização do lote: ${base}`;
             setLocInputs('pal', '');
             refreshLocLists('');
             document.getElementById('pal-loc-modal').classList.remove('hidden');
@@ -4681,13 +4681,15 @@
         // Stock do lote sem palete: 'nome' = entradas sem palete no histórico; 'acerto' = stock que não está nos movimentos
         function semPaleteInfo(lot, stock) {
             const pals = lotPallets(lot);
-            const un = pals.find(x => !x.name && x.saldo > 0.005);
-            if (un) return { tipo: 'nome', kg: un.saldo };
             const st = stock === undefined ? Number(lot.qty) || 0 : stock;
             // Só contam as paletes com nome: saídas antigas sem palete não criam stock livre para novas paletes
             const soma = pals.reduce((t, x) => t + (x.name ? x.saldo : 0), 0);
-            const dif = Math.round((st - soma) * 1000) / 1000;
-            return dif > 0.005 ? { tipo: 'acerto', kg: dif } : null;
+            const livre = Math.round((st - soma) * 1000) / 1000;   // = paletes fechadas
+            if (livre <= 0.005) return null;
+            // Nunca mais do que as paletes fechadas, mesmo que o histórico sem palete diga outra coisa
+            const un = pals.find(x => !x.name && x.saldo > 0.005);
+            if (un) return { tipo: 'nome', kg: Math.min(un.saldo, livre), todo: un.saldo };
+            return { tipo: 'acerto', kg: livre };
         }
         // Dá nome ao stock sem palete. 'nome': renomeia as entradas sem palete. 'acerto': regista uma entrada de acerto com a palete
         // e repõe o stock do lote (o trigger da BD soma a entrada, mas esse stock já lá estava). Devolve { error?, msg?, saldo?, aviso? }
@@ -4698,16 +4700,17 @@
             const pals = lotPallets(lot);
             if (pals.some(x => x.name && x.name.toLowerCase() === nome.toLowerCase())) return { msg: `Já existe uma palete "${nome}" neste lote. Escolha outro nome.` };
             const info = semPaleteInfo(lot, stock);
-            if (!info) return { msg: 'Este lote não tem stock sem palete.' };
+            if (!info) return { msg: 'Este lote não tem paletes fechadas: todo o stock já está em paletes identificadas.' };
             let kg = info.kg;
             if (kgParte !== undefined && String(kgParte).trim() !== '') {
                 kg = lerKg(kgParte);
                 if (!(kg > 0)) return { msg: 'Indique uma quantidade válida.' };
-                if (kg > info.kg + 0.0005) return { msg: `Só há ${formatKg(info.kg)} sem palete neste lote.` };
+                if (kg > info.kg + 0.0005) return { msg: `Só há ${formatKg(info.kg)} em paletes fechadas neste lote.` };
             }
             if (kg >= info.kg - 0.0005) kg = info.kg;
             // só uma parte, e essa parte está nos movimentos: divide (o resto continua sem palete)
-            if (info.tipo === 'nome' && kg < info.kg) return dividirPalete(lot, '', nome, kg, local, cones);
+            // Renomear o histórico só quando a palete fica com todo o stock sem nome dos movimentos; senão, divide
+            if (info.tipo === 'nome' && kg < info.todo - 0.0005) return dividirPalete(lot, '', nome, kg, local, cones);
             if (info.tipo === 'nome') {
                 const semNome = lotMovements(lot).filter(m => !String(m.palete || '').trim());
                 const entradas = semNome.filter(m => m.type === 'entrada'), outros = semNome.filter(m => m.type !== 'entrada');
@@ -4719,28 +4722,9 @@
                 rows.forEach(upsertLocalMovement);
                 return { saldo: info.kg };
             }
-            // acerto
-            const alvo = stock === undefined ? Number(lot.qty) || 0 : stock;
-            const prod = products.find(x => String(x.id) === String(lot.product_id));
-            const qtyProdAntes = prod ? Number(prod.qty) : null;
-            const hoje = new Date(); const dia = `${hoje.getFullYear()}-${String(hoje.getMonth() + 1).padStart(2, '0')}-${String(hoje.getDate()).padStart(2, '0')}`;
-            const row = { date: dia, type: 'entrada', product_id: lot.product_id, product_name: prod ? prod.name : '', lote: lot.lote, qty: kg,
-                entity_name: 'Acerto de inventário', notes: 'Stock que já existia, identificado como palete', palete: nome, palete_local: local || null };
-            if (cones != null) row.cones = cones;
-            const ins = await db.from('movements').insert([row]).select();
-            if (ins.error) return { error: ins.error };
-            (ins.data || []).forEach(upsertLocalMovement);
-            await loadData({ products: true, lots: true });
-            const l2 = lots.find(x => String(x.id) === String(lot.id));
-            let aviso = '';
-            if (l2 && Math.abs(Number(l2.qty) - alvo) > 0.0005) {
-                const up = await db.from('lots').update({ qty: alvo }).eq('id', lot.id);
-                if (up.error) return { error: up.error };
-                await loadData({ products: true, lots: true });
-            }
-            const p2 = products.find(x => String(x.id) === String(lot.product_id));
-            if (qtyProdAntes !== null && p2 && Math.abs(Number(p2.qty) - qtyProdAntes) > 0.0005) aviso = `Confirme o stock do produto: era ${formatKg(qtyProdAntes)} e ficou ${formatKg(p2.qty)}.`;
-            return { saldo: kg, aviso };
+            // Stock sem movimentos que o expliquem: entrada na palete nova + saída das paletes fechadas (como uma divisão).
+            // O stock do lote e do artigo não muda e não há alterações diretas à tabela de lotes.
+            return dividirPalete(lot, '', nome, kg, local, cones);
         }
         async function savePaleteNome(lot) {
             const cones = lerCones(document.getElementById('pal-cones').value);
