@@ -2921,7 +2921,7 @@
                 <tr class="${movPositivo(m) ? 'mov-in' : 'mov-out'} hover:bg-slate-50/80 transition">
                     <td class="py-3 px-4 text-xs" data-label="Data">${dataHoraHtml(m.date)}</td>
                     <td class="py-3 px-4" data-label="Tipo">${tipoBadge(tipoMov(m))}</td>
-                    <td class="py-3 px-4 text-xs font-medium text-slate-700" data-label="Artigo">${movLink(m, 'artigo', artigoDoMov(m))}</td>
+                    <td class="py-3 px-4 text-xs font-medium text-slate-700" data-label="Artigo"><div>${movLink(m, 'artigo', artigoDoMov(m))}${(() => { const l = lotes.find(x => x.id === m.malha_id); const f = l && fornecedorLote(l); return f ? `<div class="text-[10px] font-normal text-slate-500 mt-0.5">${esc(f)}</div>` : ''; })()}</div></td>
                     <td class="py-3 px-4 font-semibold text-slate-900" data-label="Lote">${movLink(m, 'lote', loteDoMov(m))}</td>
                     <td class="py-3 px-4 text-xs" data-label="OF">${esc(m.of_num || '-')}</td>
                     <td class="py-3 px-4 font-medium" data-label="Tear">${esc(m.tear || '-')}</td>
