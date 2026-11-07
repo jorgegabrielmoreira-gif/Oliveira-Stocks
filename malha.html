@@ -2860,6 +2860,31 @@
             const l = lotes.find(x => x.id === m.malha_id);
             return (l && l.tipo_malha) || '-';
         }
+        // Artigo e lote nos movimentos: ligação ao Stock Atual, só quando há stock para mostrar
+        const artigoTemStock = l => { const k = malhaKey(l); return lotes.some(x => malhaKey(x) === k && x.rolos > 0 && !x.archived); };
+        function movLink(m, tipo, texto) {
+            const l = lotes.find(x => x.id === m.malha_id);
+            const ok = l && (tipo === 'lote' ? (l.rolos > 0 || artigoTemStock(l)) : artigoTemStock(l));
+            if (!ok || texto === '-') return esc(texto);
+            const tit = tipo === 'lote' && l.rolos > 0 ? 'Ver este lote no Stock Atual' : 'Ver o stock deste artigo';
+            return `<button type="button" onclick="${tipo === 'lote' ? 'irParaLoteMov' : 'irParaArtigoMov'}('${esc(l.id)}')" title="${tit}" class="text-left text-blue-700 hover:underline">${esc(texto)}</button>`;
+        }
+        function irParaArtigoMov(id) {
+            const l = lotes.find(x => String(x.id) === String(id)); if (!l) return;
+            if (!artigoTemStock(l)) { showToast('Este artigo não tem stock.', 'error'); return; }
+            const k = malhaKey(l);
+            switchTab('stock');
+            document.getElementById('search-stock').value = malhaNome(l);
+            STOCK_DIMS.forEach(d => { const e = document.getElementById(d.id); if (e) e.value = ''; });
+            expandedMalha.add(k);
+            renderStock();
+            const row = document.querySelector('#stock-table-body tr.grp-row');
+            if (row) { row.scrollIntoView({ block: 'center', behavior: 'smooth' }); row.classList.add('row-flash'); setTimeout(() => row.classList.remove('row-flash'), 3000); }
+        }
+        function irParaLoteMov(id) {
+            const l = lotes.find(x => String(x.id) === String(id)); if (!l) return;
+            if (l.rolos > 0) mostrarLoteNoStock(l); else irParaArtigoMov(id);
+        }
         function loteDoMov(m) {
             const l = lotes.find(x => x.id === m.malha_id);
             return (l && l.lote_fio) || '-';
@@ -2896,8 +2921,8 @@
                 <tr class="${movPositivo(m) ? 'mov-in' : 'mov-out'} hover:bg-slate-50/80 transition">
                     <td class="py-3 px-4 text-xs" data-label="Data">${dataHoraHtml(m.date)}</td>
                     <td class="py-3 px-4" data-label="Tipo">${tipoBadge(tipoMov(m))}</td>
-                    <td class="py-3 px-4 text-xs font-medium text-slate-700" data-label="Artigo">${esc(artigoDoMov(m))}</td>
-                    <td class="py-3 px-4 font-semibold text-slate-900" data-label="Lote">${esc(loteDoMov(m))}</td>
+                    <td class="py-3 px-4 text-xs font-medium text-slate-700" data-label="Artigo">${movLink(m, 'artigo', artigoDoMov(m))}</td>
+                    <td class="py-3 px-4 font-semibold text-slate-900" data-label="Lote">${movLink(m, 'lote', loteDoMov(m))}</td>
                     <td class="py-3 px-4 text-xs" data-label="OF">${esc(m.of_num || '-')}</td>
                     <td class="py-3 px-4 font-medium" data-label="Tear">${esc(m.tear || '-')}</td>
                     <td class="py-3 px-4 text-xs text-slate-600" data-label="Entidade">${esc(m.entity_name || '-')}</td>
