@@ -750,6 +750,12 @@
                         <button onclick="openScanner()" class="inline-flex items-center space-x-1.5 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-medium px-3.5 py-2.5 rounded-xl transition shadow-sm no-print">
                             <i data-lucide="scan-barcode" class="w-4 h-4"></i><span>Ler código</span>
                         </button>
+                        <button onclick="openMovementModal('entrada')" title="Registar uma entrada" class="inline-flex items-center space-x-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-medium px-3.5 py-2.5 rounded-xl transition shadow-sm no-print">
+                            <i data-lucide="arrow-down-left" class="w-4 h-4"></i><span>Entrada</span>
+                        </button>
+                        <button onclick="openMovementModal('saida')" title="Registar uma saída" class="inline-flex items-center space-x-1.5 bg-rose-600 hover:bg-rose-700 text-white text-xs font-medium px-3.5 py-2.5 rounded-xl transition shadow-sm no-print">
+                            <i data-lucide="arrow-up-right" class="w-4 h-4"></i><span>Saída</span>
+                        </button>
                         <button onclick="exportProductsFiltered()" title="Exporta a lista tal como está no ecrã (pesquisa e filtros), com uma linha por lote e localização" class="bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200 text-xs font-medium px-3.5 py-2.5 rounded-xl transition flex items-center space-x-1.5 shadow-sm no-print">
                             <i data-lucide="file-spreadsheet" class="w-4 h-4"></i> <span>Exportar CSV</span>
                         </button>
@@ -862,8 +868,8 @@
         <div id="content-movimentos" class="space-y-6 hidden">
             <div class="bg-white p-6 rounded-2xl border border-slate-200 shadow-xs space-y-4">
                 <div class="stick-bar flex flex-col lg:flex-row lg:items-end justify-between gap-4 no-print">
-                    <div class="grid grid-cols-1 sm:grid-cols-3 md:grid-cols-6 gap-3 flex-1 items-end">
-                        <div class="sm:col-span-2">
+                    <div class="flex flex-wrap gap-3 flex-1 items-end">
+                        <div class="flex-1 min-w-[220px]">
                             <span class="block text-[10px] font-semibold uppercase mb-0.5 ml-1 invisible" aria-hidden="true">.</span>
                             <div class="relative">
                                 <span class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
@@ -873,7 +879,7 @@
                             </div>
                         </div>
 
-                        <div>
+                        <div class="w-28 shrink-0">
                             <span class="block text-[10px] text-slate-400 font-semibold uppercase mb-0.5 ml-1">Tipo</span>
                             <select id="filter-movement-type" onchange="renderMovementsTable()" class="w-full h-9 px-3 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/20">
                                 <option value="">Todos</option>
@@ -882,32 +888,30 @@
                             </select>
                         </div>
 
-                        <div>
+                        <label class="shrink-0 flex items-center gap-2 h-9 px-3 self-end text-sm font-semibold text-slate-700 bg-slate-50 hover:bg-slate-100 border-2 border-slate-400 rounded-xl cursor-pointer whitespace-nowrap" title="Esconde os movimentos de “Acerto de inventário” (divisões, identificação de paletes, acertos de peso) no ecrã e na impressão">
+                            <input type="checkbox" id="hide-acertos" onchange="setHideAcertos(this.checked)" class="w-5 h-5 rounded border-slate-300"> Ocul. acert.
+                        </label>
+
+                        <div class="shrink-0">
                             <span class="block text-[10px] text-slate-400 font-semibold uppercase mb-0.5 ml-1">De</span>
-                            <input type="date" id="filter-movement-start-date" onchange="renderMovementsTable()" class="w-full h-9 px-3 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 text-slate-700">
+                            <input type="date" id="filter-movement-start-date" onchange="renderMovementsTable()" class="w-[7.75rem] h-9 px-3 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 text-slate-700">
                         </div>
 
-                        <div>
+                        <div class="shrink-0">
                             <span class="block text-[10px] text-slate-400 font-semibold uppercase mb-0.5 ml-1">Até</span>
-                            <input type="date" id="filter-movement-end-date" onchange="renderMovementsTable()" class="w-full h-9 px-3 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 text-slate-700">
+                            <div class="flex gap-1.5">
+                                <input type="date" id="filter-movement-end-date" onchange="renderMovementsTable()" class="w-[7.75rem] h-9 px-3 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 text-slate-700">
+                                <button onclick="clearDateFilter()" title="Limpar intervalo de datas" aria-label="Limpar datas" class="h-9 shrink-0 px-2.5 text-sm font-semibold bg-slate-50 hover:bg-slate-100 text-slate-700 border-2 border-slate-400 rounded-xl transition flex items-center gap-1.5 whitespace-nowrap"><i data-lucide="x-circle" class="w-4 h-4"></i><span>Limp. data</span></button>
+                            </div>
                         </div>
 
-                        <div>
-                            <span class="block text-[10px] font-semibold uppercase mb-0.5 ml-1 invisible" aria-hidden="true">.</span>
-                            <button onclick="clearDateFilter()" title="Limpar intervalo de datas" class="w-full h-9 px-3 text-xs bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-xl transition flex items-center justify-center space-x-1 font-medium">
-                                <i data-lucide="x-circle" class="w-3.5 h-3.5"></i>
-                                <span>Limpar Datas</span>
-                            </button>
-                        </div>
                     </div>
 
                     <div>
                         <span class="block text-[10px] font-semibold uppercase mb-0.5 ml-1 invisible" aria-hidden="true">.</span>
                         <div class="flex gap-2">
-                        <button onclick="openMovementModal('entrada')" class="h-9 flex-1 lg:flex-none bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-medium px-3.5 rounded-xl transition flex items-center justify-center space-x-1.5 shadow-sm whitespace-nowrap"><i data-lucide="arrow-down-left" class="w-4 h-4"></i> <span>Entrada</span></button>
-                        <button onclick="openMovementModal('saida')" class="h-9 flex-1 lg:flex-none bg-rose-600 hover:bg-rose-700 text-white text-xs font-medium px-3.5 rounded-xl transition flex items-center justify-center space-x-1.5 shadow-sm whitespace-nowrap"><i data-lucide="arrow-up-right" class="w-4 h-4"></i> <span>Saída</span></button>
-                        <button onclick="printMovementsPDF()" class="h-9 flex-1 lg:flex-none bg-slate-800 hover:bg-slate-900 text-white text-xs font-medium px-3.5 rounded-xl transition flex items-center justify-center space-x-1.5 shadow-sm whitespace-nowrap">
-                            <i data-lucide="printer" class="w-4 h-4"></i> <span>Imprimir / PDF</span>
+                        <button onclick="printMovementsPDF()" class="h-9 flex-1 lg:flex-none bg-slate-800 hover:bg-slate-900 text-white text-xs font-medium px-3.5 rounded-xl transition flex items-center justify-center space-x-1.5 shadow-sm">
+                            <i data-lucide="printer" class="w-4 h-4"></i> <span class="leading-tight text-center">Imprimir<br>PDF</span>
                         </button>
                         </div>
                     </div>
@@ -3219,9 +3223,18 @@
             return html;
         }
 
+        // "Ocultar acertos": esconde os movimentos de Acerto de inventário no ecrã e na impressão (a escolha fica neste browser)
+        const isAcerto = m => String(m.entity_name || '').trim().toLowerCase() === 'acerto de inventário';
+        function setHideAcertos(on) {
+            try { localStorage.setItem('hideAcertos', on ? '1' : '0'); } catch (e) {}
+            renderMovementsTable();
+        }
+        try { if (localStorage.getItem('hideAcertos') === '1') document.addEventListener('DOMContentLoaded', () => { const c = document.getElementById('hide-acertos'); if (c) c.checked = true; }); } catch (e) {}
         function filterMovements(search, startDate, endDate, type = '') {
+            const semAcertos = !!document.getElementById('hide-acertos')?.checked;
             return movements.filter(m => {
                 if (type && m.type !== type) return false;
+                if (semAcertos && isAcerto(m)) return false;
                 const matchesSearch = !search || [m.product_name, m.lote, m.entity_name, m.palete, m.palete_local, m.notes, m.created_by, m.updated_by]
                     .some(v => v && String(v).toLowerCase().includes(search));
                 let matchesDate = true;
@@ -4466,6 +4479,20 @@
                 const mm = String(entDiv.notes).match(/da palete (.+?) passam para a palete /);
                 return devolverDivisao(lot, pal, mm ? mm[1] : '');
             }
+            // Palete identificada a partir de stock que já existia (versões anteriores): eliminar = voltar às paletes fechadas.
+            // Tira-se o nome às entradas dessa identificação; o stock do lote e do artigo não muda.
+            const identificada = soAcerto && daPalete.every(m => /^Stock que já existia/.test(m.notes || ''));
+            if (identificada) {
+                if (!confirm(`Eliminar a palete ${pal.name} do lote ${lot.lote}?\n\nOs ${formatKg(pal.saldo)} voltam às paletes fechadas. O stock do lote não muda (${formatKg(lot.qty)}).`)) return;
+                const ids = daPalete.map(m => m.id);
+                const { data, error } = await db.from('movements').update({ palete: null, palete_local: null, ...(daPalete.some(m => m.cones != null) ? { cones: null } : {}) }).in('id', ids).select();
+                if (error) { showMovementError(error); return; }
+                (data || []).forEach(upsertLocalMovement);
+                await loadData({ products: true, lots: true });
+                showToast(`Palete ${pal.name} eliminada: ${formatKg(pal.saldo)} voltaram às paletes fechadas.`);
+                refreshAll();
+                return;
+            }
             const fica = Math.round(((Number(lot.qty) || 0) - pal.saldo) * 1000) / 1000;
             const msg = `Eliminar a palete ${pal.name} do lote ${lot.lote}?
 
@@ -4506,7 +4533,7 @@
         // Anula uma divisão: o que está na palete criada pela divisão volta à palete de origem ('' = stock sem palete).
         // Regista uma saída da palete e uma entrada na origem, iguais, num só pedido: o stock do lote e do produto não muda.
         async function devolverDivisao(lot, pal, origem) {
-            const destino = origem ? 'a palete ' + origem : 'o stock sem palete';
+            const destino = origem ? 'a palete ' + origem : 'as paletes fechadas';
             if (!confirm(`Eliminar a palete ${pal.name} do lote ${lot.lote}?\n\nEsta palete foi criada por uma divisão: os ${formatKg(pal.saldo)} que tem voltam para ${destino}.\nO stock do lote não muda.\n\nFica registado nos movimentos (pode anulá-lo depois).`)) return;
             const prod = products.find(x => String(x.id) === String(lot.product_id));
             const base = { date: agoraLocal(), product_id: lot.product_id, product_name: prod ? prod.name : '', lote: lot.lote, qty: pal.saldo, entity_name: 'Acerto de inventário' };
@@ -5046,7 +5073,7 @@
                 <colgroup><col style="width:13%"><col style="width:10%"><col style="width:29%"><col style="width:14%"><col style="width:13%"><col style="width:21%"></colgroup>
                 <thead><tr><th>Data</th><th>Tipo</th><th>Produto</th><th>Lote</th><th class="num">Peso</th><th>Entidade</th></tr></thead>
                 <tbody>${body}</tbody></table>
-                <p style="margin-top:8px;font-size:11px;color:#475569;"><span style="display:inline-block;width:14px;height:10px;vertical-align:middle;border:1px solid #888;background:#d0d0d0;-webkit-print-color-adjust:exact;print-color-adjust:exact"></span> Entrada (fundo cinzento) · sem fundo: Saída · ${list.length} ${list.length === 1 ? 'movimento' : 'movimentos'}</p>`;
+                <p style="margin-top:8px;font-size:11px;color:#475569;"><span style="display:inline-block;width:14px;height:10px;vertical-align:middle;border:1px solid #888;background:#d0d0d0;-webkit-print-color-adjust:exact;print-color-adjust:exact"></span> Entrada (fundo cinzento) · sem fundo: Saída · ${list.length} ${list.length === 1 ? 'movimento' : 'movimentos'}${document.getElementById('hide-acertos')?.checked ? ' · acertos de inventário ocultos' : ''}</p>`;
 
             setPrintHeader('Oliveira & Gonçalves - Relatório de Movimentos de Armazém');   // também limpa o modo etiquetas
             const dateElem = document.getElementById('print-report-date');
