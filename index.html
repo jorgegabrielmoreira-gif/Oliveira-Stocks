@@ -5009,8 +5009,11 @@
 
             const body = list.map(m => {
                 const isIn = m.type === 'entrada';
-                return `<tr>
+                // Entradas com fundo cinzento e letra a negrito: distinguem-se numa impressora laser a preto e branco
+                const st = isIn ? ' style="background:#d0d0d0;-webkit-print-color-adjust:exact;print-color-adjust:exact;font-weight:700"' : '';
+                return `<tr${st}>
                     <td style="white-space:nowrap">${esc(formatDateTime(String(m.date || '').slice(0, 16)))}</td>
+                    <td style="white-space:nowrap">${isIn ? '▼ ENTRADA' : '▲ Saída'}</td>
                     <td>${esc(m.product_name || '-')}</td>
                     <td style="word-break:break-all">${esc(m.lote || '-')}</td>
                     <td class="num">${isIn ? '+' : '-'}${formatKg(m.qty)}</td>
@@ -5018,10 +5021,10 @@
                 </tr>`;
             }).join('');
             document.getElementById('printable-list-area').innerHTML = `<table style="table-layout:fixed;width:100%">
-                <colgroup><col style="width:14%"><col style="width:34%"><col style="width:16%"><col style="width:14%"><col style="width:22%"></colgroup>
-                <thead><tr><th>Data</th><th>Produto</th><th>Lote</th><th class="num">Peso</th><th>Entidade</th></tr></thead>
+                <colgroup><col style="width:13%"><col style="width:10%"><col style="width:29%"><col style="width:14%"><col style="width:13%"><col style="width:21%"></colgroup>
+                <thead><tr><th>Data</th><th>Tipo</th><th>Produto</th><th>Lote</th><th class="num">Peso</th><th>Entidade</th></tr></thead>
                 <tbody>${body}</tbody></table>
-                <p style="margin-top:8px;font-size:11px;color:#475569;">${list.length} ${list.length === 1 ? 'movimento' : 'movimentos'}</p>`;
+                <p style="margin-top:8px;font-size:11px;color:#475569;"><span style="display:inline-block;width:14px;height:10px;vertical-align:middle;border:1px solid #888;background:#d0d0d0;-webkit-print-color-adjust:exact;print-color-adjust:exact"></span> Entrada (fundo cinzento) · sem fundo: Saída · ${list.length} ${list.length === 1 ? 'movimento' : 'movimentos'}</p>`;
 
             setPrintHeader('Oliveira & Gonçalves - Relatório de Movimentos de Armazém');   // também limpa o modo etiquetas
             const dateElem = document.getElementById('print-report-date');

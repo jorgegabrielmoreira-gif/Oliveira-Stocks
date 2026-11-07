@@ -112,6 +112,9 @@
             body.printing-mov #content-movimentos td * { font-size: inherit !important; }
             body.printing-mov #content-movimentos .text-\[10px\] { font-size: 8px !important; }
             body.printing-mov .print-header { margin-bottom: 8px; padding-bottom: 6px; }
+            /* Entradas (e ajustes que somam) com fundo cinzento e negrito: distinguem-se numa impressora a preto e branco */
+            body.printing-mov #content-movimentos tr.mov-in > td { background: #d0d0d0 !important; font-weight: 700 !important; }
+            body.printing-mov #content-movimentos tr.mov-in > td * { font-weight: 700 !important; }
             body.printing-mov .print-header h1 { font-size: 16px !important; }
             body.printing-mov #content-movimentos *, body.printing-mov #content-movimentos *::before {
                 -webkit-print-color-adjust: exact; print-color-adjust: exact;
@@ -2890,7 +2893,7 @@
             const moreMov = todos.length > shownMov.length
                 ? `<tr><td colspan="11" class="text-center py-4"><button onclick="movLimit += 200; renderMovimentos()" class="px-4 py-2 text-sm font-medium text-blue-600 hover:bg-blue-50 rounded-lg">Mostrar mais (${shownMov.length} de ${todos.length})</button></td></tr>` : '';
             document.getElementById('mov-table-body').innerHTML = (shownMov.map(m => `
-                <tr class="hover:bg-slate-50/80 transition">
+                <tr class="${movPositivo(m) ? 'mov-in' : 'mov-out'} hover:bg-slate-50/80 transition">
                     <td class="py-3 px-4 text-xs" data-label="Data">${dataHoraHtml(m.date)}</td>
                     <td class="py-3 px-4" data-label="Tipo">${tipoBadge(tipoMov(m))}</td>
                     <td class="py-3 px-4 text-xs font-medium text-slate-700" data-label="Artigo">${esc(artigoDoMov(m))}</td>
