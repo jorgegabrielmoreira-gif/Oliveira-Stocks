@@ -1112,9 +1112,16 @@
             <p id="pal-loc-info" class="text-xs text-slate-500"></p>
             <input type="hidden" id="pal-loc-lot"><input type="hidden" id="pal-loc-name"><input type="hidden" id="pal-loc-mode" value="loc">
             <div id="pal-new-name-wrap" class="hidden">
-                <label class="block text-xs font-medium mb-1">Nome da palete *</label>
+                <div class="mb-3">
+                    <span class="block text-xs font-medium mb-1">O que vai identificar? *</span>
+                    <div class="grid grid-cols-2 gap-2" role="radiogroup" aria-label="Palete ou saco">
+                        <button type="button" id="pal-kind-palete" onclick="setPalKind('palete')" role="radio" class="px-3 py-2 text-sm font-semibold rounded-xl border-2">Palete</button>
+                        <button type="button" id="pal-kind-saco" onclick="setPalKind('saco')" role="radio" class="px-3 py-2 text-sm font-semibold rounded-xl border-2">Saco <span class="font-normal text-xs">(quantidade pequena)</span></button>
+                    </div>
+                </div>
+                <label id="pal-new-name-label" class="block text-xs font-medium mb-1">Nome da palete *</label>
                 <input type="text" id="pal-new-name" autocomplete="off" placeholder="Ex: P1" class="w-full px-3 py-2 text-sm border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500/20 outline-none">
-                <label class="block text-xs font-medium mb-1 mt-3">Quantidade desta palete (kg) *</label>
+                <label id="pal-new-qty-label" class="block text-xs font-medium mb-1 mt-3">Quantidade desta palete (kg) *</label>
                 <input type="number" step="0.001" min="0.001" id="pal-new-qty" class="w-full px-3 py-2 text-sm border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500/20 outline-none">
                 <p id="pal-new-qty-hint" class="text-[11px] text-slate-500 mt-1"></p>
             </div>
@@ -3080,7 +3087,7 @@
                         ${p.archived || l.archived ? '' : `<button onclick="openDevolucao('${esc(p.id)}', '${esc(l.id)}')" title="Devolução: o que voltou da produção entra como palete nova, com etiqueta" aria-label="Devolução" class="inline-flex items-center justify-center w-7 h-7 ml-1 bg-amber-500 hover:bg-amber-600 text-white rounded-lg"><i data-lucide="undo-2" class="w-4 h-4"></i></button>`}
                         <button onclick="abrirCalcLote('${esc(p.id)}', '${esc(l.id)}')" title="Calculadora" aria-label="Calculadora" class="p-1.5 text-slate-400 hover:text-indigo-600 transition"><i data-lucide="calculator" class="w-4 h-4"></i></button>
                         ${l.qty > 0 ? `<button onclick="openMovementForLot('saida', '${esc(p.id)}', '${esc(l.id)}')" title="Registar saída deste lote" aria-label="Registar saída deste lote" class="inline-flex items-center justify-center w-7 h-7 bg-rose-600 hover:bg-rose-700 text-white rounded-lg shadow-sm transition"><i data-lucide="arrow-up-right" class="w-4 h-4"></i></button>` : ''}
-                        ${l.qty > 0 && !p.archived && !l.archived ? `<button onclick="nameLotPalete('${esc(l.id)}')" title="Dar nome à palete (stock deste lote que ainda não tem palete)" aria-label="Dar nome à palete" class="p-1.5 text-slate-400 hover:text-blue-600 transition"><i data-lucide="tag" class="w-4 h-4"></i></button>` : ''}
+                        ${l.qty > 0 && !p.archived && !l.archived ? `<button onclick="nameLotPalete('${esc(l.id)}')" title="Identificar uma palete ou um saco (a partir das paletes fechadas)" aria-label="Identificar palete ou saco" class="p-1.5 text-slate-400 hover:text-blue-600 transition"><i data-lucide="tag" class="w-4 h-4"></i></button>` : ''}
                         <button onclick="toggleLotHistory('${esc(l.id)}')" title="Ver movimentos do lote" class="p-1.5 transition ${openLotHistory.has(String(l.id)) ? 'text-blue-600' : 'text-slate-400 hover:text-blue-600'}"><i data-lucide="history" class="w-4 h-4"></i></button>
                         <button onclick="openLabelModal('${esc(p.id)}', '${esc(l.id)}')" title="Imprimir Etiqueta do Lote" class="p-1.5 text-slate-400 hover:text-slate-900 transition"><i data-lucide="qr-code" class="w-4 h-4"></i></button>
                         <button onclick="openLotModal('${esc(l.id)}')" title="Editar Lote" class="p-1.5 text-slate-400 hover:text-blue-600 transition"><i data-lucide="edit-3" class="w-4 h-4"></i></button>
@@ -3337,12 +3344,12 @@
             const campo = (k, v) => `<div><div class="a5-k">${esc(k)}</div><div class="a5-v">${esc(v == null || v === '' ? '-' : v)}</div></div>`;
             const parcial = Math.abs(pal.saldo - pal.inicial) > 0.005;
             return `<div class="a5-label">
-                <div class="a5-head"><span class="a5-brand"><img src="logo.png" alt="" onerror="this.remove()"><span>Oliveira &amp; Gonçalves · Etiqueta de palete</span></span><span>Impresso em ${esc(new Date().toLocaleDateString('pt-PT'))}</span></div>
+                <div class="a5-head"><span class="a5-brand"><img src="logo.png" alt="" onerror="this.remove()"><span>Oliveira &amp; Gonçalves · Etiqueta de ${ehSaco(pal.name) ? 'saco' : 'palete'}</span></span><span>Impresso em ${esc(new Date().toLocaleDateString('pt-PT'))}</span></div>
                 <div class="a5-hero">
                     <div><div class="a5-k">Lote</div><div class="a5-lote${String(lot.lote).length > 14 ? ' longo' : ''}">${esc(lot.lote)}</div></div>
                     <div class="a5-hero-row">
                         <div><div class="a5-k">Peso</div><div class="a5-peso${formatKg(pal.saldo).length > 11 ? ' longo' : ''}">${esc(formatKg(pal.saldo))}</div></div>
-                        <div><div class="a5-k">Palete</div><div class="a5-pal">${esc(pal.name)}</div></div>
+                        <div><div class="a5-k">${ehSaco(pal.name) ? 'Saco' : 'Palete'}</div><div class="a5-pal">${esc(ehSaco(pal.name) ? pal.name.replace(/^saco\s*/i, '') || pal.name : pal.name)}</div></div>
                     </div>
                 </div>
                 <div class="a5-body">
@@ -4182,9 +4189,11 @@
             else info.classList.add('hidden');
         }
         // Próximo nome de palete de um lote: continua a numeração do último nome criado (P3 → P4, P09 → P10); sem histórico, P1
+        const ehSaco = nome => /^saco\b/i.test(String(nome || '').trim());
         function proximaPalete(lot) {
             const nomes = lot ? [...new Set(lotMovements(lot).map(m => String(m.palete || '').trim()).filter(Boolean))] : [];
-            const partes = nomes.map(n => n.match(/^(.*?)(\d{1,9})$/)).filter(Boolean);
+            // Sacos ("Saco 1"…) têm numeração própria e não mudam o número sugerido para as paletes
+            const partes = nomes.filter(n => !ehSaco(n)).map(n => n.match(/^(.*?)(\d{1,9})$/)).filter(Boolean);
             const ult = partes[partes.length - 1];
             const prefixo = ult ? ult[1] : 'P';
             let max = 0, largura = 1;
@@ -4228,7 +4237,7 @@
             const somaPal = Math.round(pals.reduce((t, x) => t + x.saldo, 0) * 1000) / 1000;
             const rawFech = Math.round(((Number(l.qty) || 0) - somaPal) * 1000) / 1000;   // pode ser negativo se as paletes somam mais do que o lote
             acertoLot = l;
-            acertoItems = [{ pal: '', label: 'Paletes fechadas', atual: rawFech, mostra: Math.max(0, rawFech) }, ...pals.map(x => ({ pal: x.name, label: 'Palete ' + x.name, atual: x.saldo, mostra: Math.max(0, x.saldo) }))];
+            acertoItems = [{ pal: '', label: 'Paletes fechadas', atual: rawFech, mostra: Math.max(0, rawFech) }, ...pals.map(x => ({ pal: x.name, label: ehSaco(x.name) ? x.name : 'Palete ' + x.name, atual: x.saldo, mostra: Math.max(0, x.saldo) }))];
             const p = products.find(x => String(x.id) === String(l.product_id));
             document.getElementById('acerto-info').textContent = `${p ? p.name + ' · ' : ''}lote ${l.lote} · stock atual ${formatKg(l.qty)}`;
             document.getElementById('acerto-aviso').innerHTML = rawFech < -0.005 ? `<p class="text-xs text-rose-700 bg-rose-50 border border-rose-200 rounded-lg p-2">As paletes somam ${formatKg(somaPal)}, mais ${formatKg(-rawFech)} do que o stock do lote. Indique o que existe e a app acerta tudo.</p>` : '';
@@ -4323,7 +4332,7 @@
             const fech = Math.max(0, Math.round(((Number(lot.qty) || 0) - somaPal) * 1000) / 1000);
             const items = [];
             if (fech > 0.005) items.push({ pal: '', label: 'Paletes fechadas', max: fech, local: lot.location || '' });
-            pals.forEach(x => items.push({ pal: x.name, label: 'Palete ' + x.name, max: x.saldo, local: x.local || '' }));
+            pals.forEach(x => items.push({ pal: x.name, label: ehSaco(x.name) ? x.name : 'Palete ' + x.name, max: x.saldo, local: x.local || '' }));
             wrap._items = items;
             const aviso = somaPal > (Number(lot.qty) || 0) + 0.005 ? `<p class="text-[11px] text-rose-600 font-semibold mb-1">As paletes somam ${formatKg(somaPal)}, mais do que o stock do lote (${formatKg(lot.qty)}). Corrija primeiro com “Acertar lote”.</p>` : '';
             document.getElementById('msl-rows').innerHTML = aviso + items.map((it, i) => {
@@ -4531,7 +4540,8 @@
             setConesHint(pal.cones != null ? `A palete ${pal.name} tem ${conesTxt(pal.cones)}; os que indicar passam para a nova.` : '');
             document.getElementById('pal-new-name-wrap').classList.remove('hidden');
             document.getElementById('pal-peso-wrap').classList.add('hidden');
-            document.getElementById('pal-new-name').value = proximaPalete(lot);
+            document.getElementById('pal-new-name').value = '';
+            setPalKind('palete');
             document.getElementById('pal-new-qty').value = '';
             document.getElementById('pal-new-qty-hint').textContent = `A palete ${pal.name} tem ${formatKg(pal.saldo)}. Indique o peso que passa para a palete nova; o resto fica na ${pal.name}. O stock do lote não muda.`;
             document.getElementById('pal-loc-info').textContent = `Lote ${lot.lote} · localização do lote: ${base}`;
@@ -4591,6 +4601,33 @@
             refreshAll();
         }
         // Dá nome a uma palete que entrou sem nome (ex.: o stock que já existia antes de se usarem paletes)
+        // Palete ou saco: muda o nome sugerido e os textos da janela (um saco é uma "palete" com nome "Saco N")
+        function proximoSaco(lot) {
+            const nomes = lot ? lotMovements(lot).map(m => String(m.palete || '').trim()).filter(ehSaco) : [];
+            const usados = new Set(nomes.map(n => n.toLowerCase()));
+            let n = Math.max(0, ...nomes.map(x => Number((x.match(/(\d+)\s*$/) || [])[1]) || 0)) + 1;
+            while (usados.has('saco ' + n)) n++;
+            return 'Saco ' + n;
+        }
+        function setPalKind(kind) {
+            const lot = lots.find(l => String(l.id) === String(document.getElementById('pal-loc-lot').value));
+            const saco = kind === 'saco';
+            [['palete', !saco], ['saco', saco]].forEach(([k, on]) => {
+                const b = document.getElementById('pal-kind-' + k);
+                b.setAttribute('aria-checked', on ? 'true' : 'false');
+                b.className = 'px-3 py-2 text-sm font-semibold rounded-xl border-2 ' + (on ? 'border-indigo-600 bg-indigo-600 text-white' : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50');
+            });
+            const nome = document.getElementById('pal-new-name');
+            const atual = nome.value.trim();
+            const sugerido = !atual || atual === nome.dataset.sugerido;
+            const novo = saco ? proximoSaco(lot) : proximaPalete(lot);
+            if (sugerido) { nome.value = novo; nome.dataset.sugerido = novo; }
+            nome.placeholder = saco ? 'Ex: Saco 1' : 'Ex: P1';
+            document.getElementById('pal-new-name-label').textContent = saco ? 'Nome do saco *' : 'Nome da palete *';
+            document.getElementById('pal-new-qty-label').textContent = saco ? 'Quantidade deste saco (kg) *' : 'Quantidade desta palete (kg) *';
+            if (document.getElementById('pal-loc-mode').value === 'name') document.getElementById('pal-loc-title').textContent = saco ? 'Identificar um saco' : 'Identificar uma palete';
+            document.getElementById('pal-cones-label').firstChild.textContent = saco ? 'Nº de cones deste saco ' : 'Nº de cones desta palete ';
+        }
         async function nameLotPalete(lotId) {
             const lot = lots.find(l => String(l.id) === String(lotId)); if (!lot) return;
             clearFieldErrors(document.getElementById('pal-loc-modal'));
@@ -4608,7 +4645,8 @@
             setConesHint('');
             document.getElementById('pal-new-name-wrap').classList.remove('hidden');
             document.getElementById('pal-peso-wrap').classList.add('hidden');
-            document.getElementById('pal-new-name').value = proximaPalete(lot);
+            document.getElementById('pal-new-name').value = '';
+            setPalKind('palete');
             document.getElementById('pal-new-qty').value = Math.round(pal.kg * 1000) / 1000;
             document.getElementById('pal-new-qty-hint').textContent = `Por omissão, todo o stock sem palete (${formatKg(pal.kg)}). Para partir, indique só o peso desta palete: o resto continua sem palete e pode dar-lhe nome a seguir.`;
             document.getElementById('pal-loc-info').textContent = `Paletes fechadas: ${formatKg(pal.kg)} · lote ${lot.lote} · localização do lote: ${base}` + (pal.tipo === 'acerto' ? '. Este stock não consta dos movimentos: será registada uma entrada de acerto (o stock do lote não muda).' : '');
