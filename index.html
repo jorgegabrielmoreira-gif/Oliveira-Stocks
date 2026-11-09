@@ -1248,6 +1248,16 @@
                     </div>
                 </div>
 
+                <div id="merge-wrap" class="hidden pt-3 border-t border-slate-100">
+                    <label class="block text-xs font-medium text-slate-700 mb-1">Fundir com outro produto (opcional)</label>
+                    <p class="text-[11px] text-slate-500 mb-2">Para quando o mesmo fio foi criado duas vezes (ex.: designação com as palavras trocadas). Todos os lotes deste produto, com os movimentos e as paletes, passam para o produto escolhido. Este produto fica vazio e é arquivado.</p>
+                    <input type="text" id="merge-search" oninput="filterMergeProducts()" placeholder="🔍 Pesquisar o produto que fica..." class="w-full px-3 py-2 mb-2 text-sm bg-slate-50 border border-slate-200 rounded-xl">
+                    <div class="flex gap-2">
+                        <select id="merge-product" class="flex-1 min-w-0 px-3 py-2 text-sm border border-slate-200 rounded-xl"></select>
+                        <button type="button" id="merge-btn" onclick="mergeProduct()" class="shrink-0 px-4 py-2 text-sm font-semibold text-white bg-amber-600 hover:bg-amber-700 rounded-xl">Fundir</button>
+                    </div>
+                </div>
+
                 <div class="pt-3 flex justify-end space-x-3 border-t shrink-0">
                     <button type="button" onclick="closeProductModal()" class="px-4 py-2 text-sm rounded-xl hover:bg-slate-100 font-medium">Cancelar</button>
                     <button type="submit" class="px-5 py-2 text-sm text-white bg-blue-600 rounded-xl hover:bg-blue-700 font-medium">Guardar</button>
@@ -3712,9 +3722,60 @@
             }
             refreshLocLists('');
             renderModalCodes();
+            document.getElementById('merge-wrap').classList.toggle('hidden', !id);
+            document.getElementById('merge-search').value = '';
+            if (id) filterMergeProducts();
             document.getElementById('product-modal').classList.remove('hidden');
         }
 
+        // ===== Fundir produtos: move todos os lotes (com movimentos) para o produto que fica e arquiva o que fica vazio =====
+        function filterMergeProducts() {
+            const src = document.getElementById('product-edit-id').value;
+            const term = document.getElementById('merge-search').value.toLowerCase().trim();
+            const list = products.filter(p => String(p.id) !== String(src) && !p.archived && (!term || productOwnMatch(p, term) || productLotMatch(p, term))).slice(0, 200);
+            document.getElementById('merge-product').innerHTML = '<option value="">— Escolha o produto que fica —</option>'
+                + list.map(p => `<option value="${esc(p.id)}">${esc(p.sku || '')} · ${esc(p.name)} (${formatKg(p.qty)})</option>`).join('');
+        }
+        async function mergeProduct() {
+            const srcId = document.getElementById('product-edit-id').value, destId = document.getElementById('merge-product').value;
+            const src = products.find(p => String(p.id) === String(srcId)), dest = products.find(p => String(p.id) === String(destId));
+            if (!src) return;
+            if (!dest) { setFieldError('merge-product', 'Escolha o produto que fica.'); return; }
+            if (!movementsFull) await ensureAllMovements();
+            if (!movementsFull) { setFieldError('merge-product', 'O histórico ainda não carregou. Tente de novo.'); return; }
+            const srcLots = lots.filter(l => String(l.product_id) === String(src.id));
+            const destCodes = new Set(lots.filter(l => String(l.product_id) === String(dest.id)).map(l => String(l.lote || '').trim().toLowerCase()));
+            const repetidos = srcLots.filter(l => destCodes.has(String(l.lote || '').trim().toLowerCase())).map(l => l.lote);
+            if (repetidos.length) { setFieldError('merge-product', `O lote ${repetidos.join(', ')} existe nos dois produtos. Mude o código de um deles em “Editar lote” antes de fundir.`); return; }
+            const semLote = movements.filter(m => String(m.product_id) === String(src.id) && !String(m.lote || '').trim()).length;
+            if (semLote) { setFieldError('merge-product', `Este produto tem ${semLote} movimento(s) sem lote, que não podem ser movidos automaticamente. Fale com o administrador.`); return; }
+            if (!srcLots.length && !(Number(src.qty) > 0.0005)) {
+                if (!confirm(`“${src.name}” não tem lotes nem stock. Arquivar este produto?`)) return;
+                await archiveProduct(src.id, true, true); closeProductModal(); return;
+            }
+            const kg = srcLots.reduce((t, l) => t + (Number(l.qty) || 0), 0);
+            if (!confirm(`Fundir produtos?\n\nDe: ${src.sku || ''} · ${src.name}\nPara: ${dest.sku || ''} · ${dest.name}\n\n${srcLots.length} lote(s) (${formatKg(kg)}), com os movimentos e as paletes, passam para o produto que fica. “${src.name}” fica vazio e é arquivado.\n\nNão pode ser desfeito de uma vez (só lote a lote, em “Editar lote”).`)) return;
+            const btn = document.getElementById('merge-btn'); btn.disabled = true;
+            let movidos = 0, erro = null;
+            for (const l of srcLots) {
+                const { error } = await db.rpc('move_lot', { p_lot: l.id, p_product: dest.id });
+                if (error) { erro = { error, lote: l.lote }; break; }
+                movidos++;
+            }
+            btn.disabled = false;
+            await loadData({ products: true, lots: true, movements: true });
+            if (erro) {
+                refreshAll();
+                showToast(`Fusão parada no lote ${erro.lote}: ${movidos} de ${srcLots.length} lote(s) já passaram. ${friendlyLotError ? friendlyLotError(erro.error) : (erro.error.message || '')}`, 'error');
+                return;
+            }
+            const restante = products.find(p => String(p.id) === String(src.id));
+            closeProductModal();
+            if (restante && Math.abs(Number(restante.qty) || 0) <= 0.0005 && archiveSupported !== false) await archiveProduct(src.id, true, true);
+            else if (restante && Math.abs(Number(restante.qty) || 0) > 0.0005) showToast(`Lotes movidos, mas “${src.name}” ainda mostra ${formatKg(restante.qty)} de stock. Confirme o stock dos dois produtos.`, 'error');
+            refreshAll();
+            showToast(`Fusão feita: ${movidos} lote(s) passaram para “${dest.name}”.`);
+        }
         function closeProductModal() { document.getElementById('product-modal').classList.add('hidden'); }
 
         function openEntityModal(id = null) {
