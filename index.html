@@ -188,9 +188,15 @@
         .a5-label .a5-head { align-items: center; }
         .a5-label .a5-qr { width: 44mm; height: 44mm; }
         .a5-label .a5-barcode { height: 17mm; }
+        /* Etiquetas de lote e de artigo: 4 por folha A4 deitada (148 × 105 mm cada), o mesmo desenho reduzido a 70% */
+        .a6-sheet { width: 297mm; height: 209mm; display: grid; grid-template-columns: 148.5mm 148.5mm; grid-template-rows: 104.5mm 104.5mm; background: #fff; }
+        .a6-cell { position: relative; overflow: hidden; box-sizing: border-box; outline: 0.2mm dashed #94a3b8; outline-offset: -0.1mm; }
+        .a6-cell > .a5-label { position: absolute; left: 0.5mm; top: 0.3mm; transform: scale(0.7); transform-origin: 0 0; }
+        .a6-cell > .a5-empty { width: 100%; height: 100%; padding: 8mm; font-size: 12pt; }
         .a5-label, .a5-label * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
         @media print {
             body.printing-a5 #printable-label-area { padding: 0 !important; }
+            body.printing-a6 #printable-label-area { width: 297mm !important; height: 209mm !important; }
             .a5-empty { visibility: hidden; }
         }
 
@@ -1052,7 +1058,7 @@
         <div class="bg-white rounded-2xl shadow-xl max-w-lg w-full max-h-[94vh] overflow-y-auto border border-slate-200 p-6 space-y-4">
             <div class="flex items-start justify-between border-b border-slate-100 pb-3">
                 <div>
-                    <h3 class="font-bold text-slate-900 text-base">Etiquetas de palete · A5</h3>
+                    <h3 class="font-bold text-slate-900 text-base">Etiquetas A5</h3>
                     <p id="a5-info" class="text-xs text-slate-500 mt-0.5"></p>
                 </div>
                 <button type="button" onclick="closePaleteA5()" aria-label="Fechar" class="text-slate-400 hover:text-slate-600 p-1"><i data-lucide="x" class="w-5 h-5"></i></button>
@@ -1064,12 +1070,12 @@
                 <select id="a5-add" onchange="juntarPaleteA5(this.value)" class="w-full px-3 py-2 text-sm border border-slate-200 rounded-xl"></select>
                 <p class="text-[11px] text-slate-500 mt-1">Para juntar uma palete de outro lote, feche esta janela e carregue no ícone da etiqueta A5 dessa palete.</p>
             </div>
-            <div class="flex justify-center bg-slate-100 rounded-xl p-4 overflow-auto">
-                <div class="bg-white shadow ring-1 ring-slate-200 overflow-hidden shrink-0" style="--ls:.5; width: calc(210mm * var(--ls)); height: calc(296mm * var(--ls));">
+            <div class="flex bg-slate-100 rounded-xl p-4 overflow-auto">
+                <div id="a5-frame" class="bg-white shadow ring-1 ring-slate-200 overflow-hidden shrink-0" style="margin: 0 auto; --ls:.5; width: calc(210mm * var(--ls)); height: calc(296mm * var(--ls));">
                     <div id="a5-preview" style="transform: scale(var(--ls)); transform-origin: 0 0;"></div>
                 </div>
             </div>
-            <p class="text-[11px] text-slate-500">Na janela de impressão escolha papel <strong>A4</strong>, orientação <strong>vertical</strong> e escala <strong>100%</strong> (sem “ajustar à página”). Corte a folha pela linha tracejada.</p>
+            <p id="a5-dica" class="text-[11px] text-slate-500">Na janela de impressão escolha papel <strong>A4</strong>, orientação <strong>vertical</strong> e escala <strong>100%</strong> (sem “ajustar à página”). Corte a folha pela linha tracejada.</p>
             <div class="flex justify-end space-x-3 pt-2">
                 <button type="button" onclick="closePaleteA5()" class="px-4 py-2 text-sm rounded-xl hover:bg-slate-100 font-medium">Fechar</button>
                 <button type="button" onclick="executePrintA5()" class="px-5 py-2 text-sm text-white bg-slate-900 rounded-xl hover:bg-slate-800 font-medium flex items-center space-x-2">
@@ -2015,7 +2021,9 @@
             const list = products.filter(p => (!lot || p.id !== lot.product_id) && (!term || productOwnMatch(p, term) || productLotMatch(p, term))).slice(0, 200);
             document.getElementById('lot-move-product').innerHTML =
                 '<option value="">— Manter neste produto —</option>' +
-                list.map(p => `<option value="${esc(p.id)}">${esc(p.name)} (${formatKg(p.qty)})</option>`).join('');
+                list.map(p => `<option value="${esc(p.id)}">${esc(p.sku || '')} · ${esc(p.name)} (${formatKg(p.qty)})</option>`).join('');
+            // Pesquisa com um só resultado: fica logo escolhido (antes ficava "Manter neste produto" e o lote não mudava)
+            if (term && list.length === 1) document.getElementById('lot-move-product').value = list[0].id;
         }
 
         async function handleLotSubmit(e) {
@@ -2031,6 +2039,7 @@
             if (!code) { setFieldError('lot-code', 'Indique o código do lote.'); return; }
             if (Number.isNaN(lerCones(document.getElementById('lot-sempalete-cones').value))) { setFieldError('lot-sempalete-cones', 'Indique um número inteiro de cones.'); return; }
             if (!(qty >= 0)) { setFieldError('lot-qty', 'Indique uma quantidade válida.'); return; }
+            if (!dest && document.getElementById('lot-move-search').value.trim()) { setFieldError('lot-move-product', 'Pesquisou um produto de destino mas não o escolheu na lista. Escolha-o, ou apague a pesquisa para manter o lote neste produto.'); return; }
 
             const btn = document.getElementById('lot-submit-btn');
             btn.disabled = true;
@@ -3391,19 +3400,63 @@
                 <svg class="a5-barcode" data-a5-code="${code}"></svg>
             </div>`;
         }
-        // Fila da folha A4: até 2 paletes, como { lotId, name }. Fica guardada ao fechar a janela, para juntar paletes de lotes diferentes
-        const A5_MAX = 2;
-        let a5Queue = [];
-        const a5Key = x => x.lotId + '|' + x.name.toLowerCase();
-        function a5Resolve(x) {
-            const lot = lots.find(l => String(l.id) === String(x.lotId));
-            const pal = lot && lotPallets(lot).find(y => y.name && y.name.toLowerCase() === x.name.toLowerCase() && y.saldo > 0.005);
-            return pal ? { lot, pal } : null;
+        // Etiqueta A5 de um lote ou de um artigo (a partir da lista de produtos): mesmo desenho da etiqueta da palete
+        function a5GenericHtml(o) {
+            const campo = (k, v) => `<div><div class="a5-k">${esc(k)}</div><div class="a5-v">${esc(v == null || v === '' ? '-' : v)}</div></div>`;
+            const p = o.p;
+            return `<div class="a5-label">
+                <div class="a5-head"><span class="a5-brand"><img src="logo.png" alt="" onerror="this.remove()"><span>Oliveira &amp; Gonçalves · ${esc(o.titulo)}</span></span><span>Impresso em ${esc(new Date().toLocaleDateString('pt-PT'))}</span></div>
+                <div class="a5-hero">
+                    <div><div class="a5-k">${esc(o.k1)}</div><div class="a5-lote${String(o.v1).length > 14 ? ' longo' : ''}">${esc(o.v1)}</div></div>
+                    <div class="a5-hero-row">
+                        <div><div class="a5-k">${esc(o.kPeso)}</div><div class="a5-peso${formatKg(o.peso).length > 11 ? ' longo' : ''}">${esc(formatKg(o.peso))}</div></div>
+                        <div><div class="a5-k">${esc(o.k3)}</div><div class="a5-pal">${esc(o.v3)}</div></div>
+                    </div>
+                </div>
+                <div class="a5-body">
+                    <div class="a5-info">
+                        <div><div class="a5-prod">${esc(p.name || '-')}</div><div class="a5-sku">SKU: ${esc(p.sku || '-')}${p.category ? ' · ' + esc(p.category) : ''}</div></div>
+                        <div class="a5-grid">${o.campos.map(c => campo(c[0], c[1])).join('')}</div>
+                    </div>
+                    <div class="a5-qr" data-a5-qr="${esc(o.qr)}"></div>
+                </div>
+                <svg class="a5-barcode" data-a5-code="${esc(o.code)}"></svg>
+            </div>`;
         }
+        function loteA5Html(lot) {
+            const p = products.find(x => String(x.id) === String(lot.product_id)); if (!p) return '';
+            const pals = movementsFull ? lotPallets(lot).filter(x => x.name && x.saldo > 0.005).length : 0;
+            const code = lotCode(p, lot);
+            return a5GenericHtml({ p, titulo: 'Etiqueta de lote', k1: 'Lote', v1: lot.lote, kPeso: 'Stock do lote', peso: Number(lot.qty) || 0, k3: 'Paletes', v3: pals ? String(pals) : '-', code, qr: code,
+                campos: [['Localização', lot.location || p.location], ['Data de entrada', formatDate(lot.created_at)], ['Stock total do artigo', formatKg(p.qty)], ...(labelShowSupplier ? [['Fornecedor', lotSupplier(lot)]] : [])] });
+        }
+        function produtoA5Html(p) {
+            const nLotes = (lotsByProduct[p.id] || []).filter(l => l.qty > 0).length;
+            return a5GenericHtml({ p, titulo: 'Etiqueta de artigo', k1: 'SKU', v1: p.sku || '-', kPeso: 'Stock total', peso: Number(p.qty) || 0, k3: 'Lotes', v3: String(nLotes), code: p.barcode || p.sku || '', qr: p.sku || '',
+                campos: [['Localização', p.location], ['Stock mínimo', formatKg(p.min)], ...(labelShowSupplier ? [['Fornecedor', [...new Set((lotsByProduct[p.id] || []).filter(l => l.qty > 0).map(lotSupplier).filter(Boolean))].join(', ')]] : [])] });
+        }
+        // Fila da folha A4: até 2 paletes, como { lotId, name }. Fica guardada ao fechar a janela, para juntar paletes de lotes diferentes
+        // Paletes e sacos: 2 por folha (A5). Lotes e artigos: 4 por folha (A6, folha deitada)
+        const a5Modo = (q = a5Queue) => q.length && q[0].kind ? 'a6' : 'a5';
+        const a5Max = () => a5Modo() === 'a6' ? 4 : 2;
+        let a5Queue = [];
+        // Itens: palete { lotId, name }, lote { kind: 'lot', lotId } ou artigo { kind: 'prod', prodId }
+        const a5Key = x => x.kind === 'prod' ? 'p:' + x.prodId : x.kind === 'lot' ? 'l:' + x.lotId : x.lotId + '|' + x.name.toLowerCase();
+        function a5Resolve(x) {
+            if (x.kind === 'prod') { const p = products.find(y => String(y.id) === String(x.prodId)); return p ? { kind: 'prod', p, chip: p.sku || p.name } : null; }
+            const lot = lots.find(l => String(l.id) === String(x.lotId));
+            if (x.kind === 'lot') return lot ? { kind: 'lot', lot, chip: 'Lote ' + lot.lote } : null;
+            const pal = lot && lotPallets(lot).find(y => y.name && y.name.toLowerCase() === x.name.toLowerCase() && y.saldo > 0.005);
+            return pal ? { lot, pal, chip: lot.lote + ' · ' + pal.name } : null;
+        }
+        const a5CardHtml = r => r.kind === 'prod' ? produtoA5Html(r.p) : r.kind === 'lot' ? loteA5Html(r.lot) : paleteA5Html(r.lot, r.pal);
         function renderPaletesA5(box, comVazio) {
-            const cells = a5Queue.map(a5Resolve).filter(Boolean).map(r => `<div class="a5-cell">${paleteA5Html(r.lot, r.pal)}</div>`);
-            if (cells.length < A5_MAX) cells.push(`<div class="a5-cell"><div class="a5-empty">${comVazio ? 'Espaço livre: esta metade da folha fica em branco' : ''}</div></div>`);
-            box.innerHTML = `<div class="a5-sheet">${cells.join('')}</div>`;
+            const a6 = a5Modo() === 'a6', cell = a6 ? 'a6-cell' : 'a5-cell';
+            const cells = a5Queue.map(a5Resolve).filter(Boolean).map(r => `<div class="${cell}">${a5CardHtml(r)}</div>`);
+            while (cells.length < a5Max()) cells.push(`<div class="${cell}"><div class="a5-empty">${comVazio ? (a6 ? 'Espaço livre' : 'Espaço livre: esta metade da folha fica em branco') : ''}</div></div>`);
+            box.innerHTML = `<div class="${a6 ? 'a6-sheet' : 'a5-sheet'}">${cells.join('')}</div>`;
+            const fr = document.getElementById('a5-frame');
+            if (fr && box.id === 'a5-preview') { fr.style.setProperty('--ls', a6 ? '.36' : '.5'); fr.style.width = `calc(${a6 ? 297 : 210}mm * var(--ls))`; fr.style.height = `calc(${a6 ? 209 : 296}mm * var(--ls))`; }
             box.querySelectorAll('svg[data-a5-code]').forEach(svg => {
                 try { JsBarcode(svg, svg.dataset.a5Code, { format: 'CODE128', height: 70, width: 2, fontSize: 15, margin: 0 }); }
                 catch (e) { console.error(e); }
@@ -3417,15 +3470,18 @@
             a5Queue = a5Queue.filter(a5Resolve);
             const n = a5Queue.length;
             if (!n) { closePaleteA5(); return; }
-            document.getElementById('a5-info').textContent = `${n} de ${A5_MAX} etiquetas · 2 por folha A4 (210 × 148 mm cada)`;
+            document.getElementById('a5-dica').innerHTML = `Na janela de impressão escolha papel <strong>A4</strong>, orientação <strong>${a5Modo() === 'a6' ? 'horizontal' : 'vertical'}</strong> e escala <strong>100%</strong> (sem “ajustar à página”). Corte a folha pelas linhas tracejadas.`;
+            document.getElementById('a5-info').textContent = a5Modo() === 'a6' ? `${n} de 4 etiquetas · 4 por folha A4 deitada (148 × 105 mm cada)` : `${n} de 2 etiquetas · 2 por folha A4 (210 × 148 mm cada)`;
             document.getElementById('a5-chips').innerHTML = a5Queue.map((x, i) => {
                 const r = a5Resolve(x);
-                return `<span class="inline-flex items-center gap-1 text-xs bg-slate-100 border border-slate-200 rounded-lg pl-2 pr-1 py-1 font-mono">${esc(r.lot.lote + ' · ' + r.pal.name)}<button type="button" onclick="removerPaleteA5(${i})" title="Remover da folha" aria-label="Remover da folha" class="text-slate-400 hover:text-rose-600 px-1">×</button></span>`;
+                return `<span class="inline-flex items-center gap-1 text-xs bg-slate-100 border border-slate-200 rounded-lg pl-2 pr-1 py-1 font-mono">${esc(r.chip)}<button type="button" onclick="removerPaleteA5(${i})" title="Remover da folha" aria-label="Remover da folha" class="text-slate-400 hover:text-rose-600 px-1">×</button></span>`;
             }).join('');
             // Segunda etiqueta: propõe as outras paletes com stock do mesmo lote
             const wrap = document.getElementById('a5-add-wrap');
-            wrap.classList.toggle('hidden', n >= A5_MAX);
-            if (n < A5_MAX) {
+            wrap.classList.toggle('hidden', n >= a5Max());
+            if (n < a5Max() && a5Queue[0].kind) {
+                document.getElementById('a5-add').innerHTML = '<option value="">Para juntar outra etiqueta: feche e carregue na etiqueta de outro lote ou artigo</option>';
+            } else if (n < a5Max()) {
                 const lot = a5Resolve(a5Queue[0]).lot;
                 const outras = lotPallets(lot).filter(y => y.name && y.saldo > 0.005 && y.name.toLowerCase() !== a5Queue[0].name.toLowerCase());
                 document.getElementById('a5-add').innerHTML = `<option value="">${outras.length ? 'Escolha outra palete do lote ' + esc(lot.lote) : 'Este lote não tem mais paletes com stock'}</option>`
@@ -3441,16 +3497,26 @@
             if (!movementsFull) await ensureAllMovements();
             const item = { lotId: String(lotId), name: String(palName) };
             if (!a5Resolve(item)) { showToast('Esta palete já não tem stock.', 'error'); return; }
+            abrirA5(item);
+        }
+        // Etiqueta A5 de um lote ou artigo (botão de etiqueta na lista de produtos)
+        async function openItemA5(item) {
+            if (item.kind === 'lot' && !movementsFull) await ensureAllMovements();
+            if (!a5Resolve(item)) return;
+            abrirA5(item);
+        }
+        function abrirA5(item) {
             a5Queue = a5Queue.filter(a5Resolve);
+            if (a5Queue.length && a5Modo([item]) !== a5Modo()) a5Queue = [];   // palete (A5) e lote/artigo (A6) não vão na mesma folha
             if (!a5Queue.some(x => a5Key(x) === a5Key(item))) {
-                if (a5Queue.length >= A5_MAX) a5Queue = [];   // folha cheia: começa uma folha nova
+                if (a5Queue.length >= a5Max()) a5Queue = [];   // folha cheia: começa uma folha nova
                 a5Queue.push(item);
             }
             refreshPaleteA5();
             document.getElementById('a5-modal').classList.remove('hidden');
         }
         function juntarPaleteA5(name) {
-            if (!name || !a5Queue.length || a5Queue.length >= A5_MAX) return;
+            if (!name || !a5Queue.length || a5Queue.length >= a5Max()) return;
             a5Queue.push({ lotId: a5Queue[0].lotId, name });
             refreshPaleteA5();
         }
@@ -3461,8 +3527,9 @@
             renderPaletesA5(document.getElementById('printable-label-area'), false);   // a outra folha de etiquetas usa a mesma área
             let st = document.getElementById('label-page-style');
             if (!st) { st = document.createElement('style'); st.id = 'label-page-style'; document.head.appendChild(st); }
-            st.textContent = '@page { size: A4 portrait; margin: 0; }';   // só enquanto se imprimem as etiquetas
+            st.textContent = a5Modo() === 'a6' ? '@page { size: A4 landscape; margin: 0; }' : '@page { size: A4 portrait; margin: 0; }';   // só enquanto se imprimem as etiquetas
             document.body.classList.add('printing-label', 'printing-a5');
+            document.body.classList.toggle('printing-a6', a5Modo() === 'a6');
             window.print();
         }
         function labelInfo(key) {
@@ -3488,7 +3555,8 @@
         }
         // Botão da impressora numa linha: abre a folha só com essa etiqueta
         function openLabelModal(productId, lotId = null) {
-            openLabelSheet([lotId ? 'l:' + lotId : 'p:' + productId]);
+            // Etiqueta A5 (2 por folha A4), com o mesmo desenho da etiqueta da palete; a folha de 8 continua na seleção de lotes
+            openItemA5(lotId ? { kind: 'lot', lotId: String(lotId) } : { kind: 'prod', prodId: String(productId) });
         }
 
         function openLabelModalFromForm() {
@@ -3628,7 +3696,7 @@
             window.print();
         }
         function cleanupLabelPrint() {
-            document.body.classList.remove('printing-label', 'printing-list', 'printing-a5');
+            document.body.classList.remove('printing-label', 'printing-list', 'printing-a5', 'printing-a6');
             document.getElementById('label-page-style')?.remove();
         }
         window.addEventListener('afterprint', cleanupLabelPrint);
@@ -3735,6 +3803,7 @@
             const list = products.filter(p => String(p.id) !== String(src) && !p.archived && (!term || productOwnMatch(p, term) || productLotMatch(p, term))).slice(0, 200);
             document.getElementById('merge-product').innerHTML = '<option value="">— Escolha o produto que fica —</option>'
                 + list.map(p => `<option value="${esc(p.id)}">${esc(p.sku || '')} · ${esc(p.name)} (${formatKg(p.qty)})</option>`).join('');
+            if (term && list.length === 1) document.getElementById('merge-product').value = list[0].id;
         }
         async function mergeProduct() {
             const srcId = document.getElementById('product-edit-id').value, destId = document.getElementById('merge-product').value;
