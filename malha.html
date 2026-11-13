@@ -157,6 +157,57 @@
         .lb-foot { display: flex; justify-content: space-between; align-items: center; gap: 2mm; border-top: 0.25mm solid #cbd5e1; padding-top: 1.5mm; font-size: 8.5pt; font-weight: 500; color: #475569; }
         .lb-foot b { color: #0f172a; font-weight: 800; }
 
+        /* ===== ETIQUETA DE PALETE: A5 horizontal (210 × 148 mm), duas por folha A4 vertical, a preto e branco ===== */
+        .a5-sheet { width: 210mm; height: 296mm; background: #fff; }
+        .a5-cell { box-sizing: border-box; width: 210mm; height: 148mm; overflow: hidden; }
+        .a5-cell + .a5-cell { border-top: 0.2mm dashed #94a3b8; }
+        .a5-empty { height: 100%; display: flex; align-items: center; justify-content: center; text-align: center; padding: 20mm; box-sizing: border-box; color: #94a3b8; font-size: 16pt; }
+        .a5-label { box-sizing: border-box; width: 210mm; height: 148mm; padding: 8mm 9mm; background: #fff; color: #000; display: flex; flex-direction: column; gap: 2.5mm; overflow: hidden; font-family: 'Inter', Arial, sans-serif; }
+        .a5-head { display: flex; justify-content: space-between; align-items: baseline; gap: 3mm; border-bottom: 0.6mm solid #000; padding-bottom: 1.2mm; font-size: 10pt; font-weight: 700; }
+        .a5-head span:last-child { font-weight: 500; font-size: 8.5pt; }
+        .a5-body { flex: 1; min-height: 0; display: flex; gap: 6mm; }
+        .a5-info { flex: 1; min-width: 0; display: flex; flex-direction: column; justify-content: space-between; gap: 2mm; }
+        .a5-prod { font-size: 16pt; font-weight: 800; line-height: 1.12; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; word-break: break-word; }
+        .a5-sku { font-size: 10pt; font-weight: 500; margin-top: 0.8mm; word-break: break-word; }
+        .a5-ids { display: grid; grid-template-columns: 3fr 2fr; border: 0.5mm solid #000; border-radius: 2mm; }
+        .a5-ids > div { padding: 1.5mm 3mm; min-width: 0; }
+        .a5-ids > div + div { border-left: 0.5mm solid #000; }
+        .a5-k { font-size: 8pt; font-weight: 600; text-transform: uppercase; letter-spacing: .03em; }
+        .a5-big { font-size: 22pt; font-weight: 800; line-height: 1.1; overflow-wrap: anywhere; }
+        .a5-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1.5mm 5mm; }
+        .a5-v { font-size: 11.5pt; font-weight: 700; line-height: 1.2; overflow-wrap: anywhere; }
+        .a5-qr { flex: none; width: 58mm; height: 58mm; }
+        .a5-qr img, .a5-qr canvas { display: block; width: 100% !important; height: 100% !important; image-rendering: pixelated; }
+        .a5-barcode { flex: none; display: block; width: 100%; height: 24mm; }
+        /* Lote e peso em destaque, para encontrar a palete ao longe; o peso é o maior */
+        .a5-hero { border: 0.7mm solid #000; border-radius: 2.5mm; }
+        .a5-hero > div { padding: 1.5mm 3.5mm; min-width: 0; }
+        .a5-hero-row { display: grid; grid-template-columns: 3fr 2fr; border-top: 0.5mm solid #000; padding: 0 !important; }
+        .a5-hero-row > div { padding: 1.5mm 3.5mm; min-width: 0; }
+        .a5-hero-row > div + div { border-left: 0.5mm solid #000; }
+        .a5-lote { font-size: 36pt; font-weight: 900; line-height: 1.05; overflow-wrap: anywhere; letter-spacing: -0.01em; }
+        .a5-lote.longo { font-size: 29pt; }
+        .a5-peso { font-size: 40pt; font-weight: 900; line-height: 1.05; white-space: nowrap; letter-spacing: -0.01em; }
+        .a5-peso.longo { font-size: 33pt; }
+        .a5-pal { font-size: 28pt; font-weight: 800; line-height: 1.05; overflow-wrap: anywhere; }
+        .a5-label .a5-prod { font-size: 19pt; line-height: 1.1; -webkit-line-clamp: 2; }
+        .a5-brand { display: inline-flex; align-items: center; gap: 2.5mm; }
+        .a5-brand img { height: 9mm; width: auto; max-width: 40mm; object-fit: contain; }
+        .a5-label .a5-head { align-items: center; }
+        .a5-label .a5-qr { width: 44mm; height: 44mm; }
+        .a5-label .a5-barcode { height: 17mm; }
+        /* Etiquetas de lote e de artigo: 4 por folha A4 deitada (148 × 105 mm cada), o mesmo desenho reduzido a 70% */
+        .a6-sheet { width: 297mm; height: 209mm; display: grid; grid-template-columns: 148.5mm 148.5mm; grid-template-rows: 104.5mm 104.5mm; background: #fff; }
+        .a6-cell { position: relative; overflow: hidden; box-sizing: border-box; outline: 0.2mm dashed #94a3b8; outline-offset: -0.1mm; }
+        .a6-cell > .a5-label { position: absolute; left: 0.5mm; top: 0.3mm; transform: scale(0.7); transform-origin: 0 0; }
+        .a6-cell > .a5-empty { width: 100%; height: 100%; padding: 8mm; font-size: 12pt; }
+        .a5-label, .a5-label * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+        @media print {
+            body.printing-a5 #printable-label-area { padding: 0 !important; }
+            body.printing-a6 #printable-label-area { width: 297mm !important; height: 209mm !important; }
+            .a5-empty { visibility: hidden; }
+        }
+
         /* ===== TEMA VISUAL: fio & malha ===== */
         body { background: linear-gradient(180deg, #e9ecfb 0px, #f3f4fc 360px, #f7f8fd 100%) fixed; font-family: 'Inter', sans-serif; }
         h1, h2, h3, h4 { font-family: 'Manrope', 'Inter', sans-serif; }
@@ -758,10 +809,11 @@
                         <p id="tipo-info" class="text-[11px] text-slate-500 mt-1"></p>
                     </div>
 
-                    <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                         <div><label class="block text-xs font-medium text-slate-700 mb-1">Cor</label><input type="text" id="corMalha" placeholder="Ex: Cru, Branco, Preto" class="w-full px-3 py-2 text-sm border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500/20 outline-none"></div>
                         <div><label class="block text-xs font-medium text-slate-700 mb-1">Tear *</label><input type="text" id="tearNum" required placeholder="Ex: Tear 04" class="w-full px-3 py-2 text-sm border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500/20 outline-none"></div>
                         <div><label class="block text-xs font-medium text-slate-700 mb-1">Jogo *</label><input type="text" id="jogoFio" required placeholder="Ex: J-102" class="w-full px-3 py-2 text-sm border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500/20 outline-none"></div>
+                        <div><label class="block text-xs font-medium text-slate-700 mb-1">N.º OF / Encomenda <span class="text-slate-400 font-normal">(opcional)</span></label><input type="text" id="ofNum" placeholder="Ex: OF-2311" class="w-full px-3 py-2 text-sm border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500/20 outline-none"></div>
                     </div>
 
                     <div>
@@ -821,6 +873,9 @@
                         <button onclick="openBulkSupplierModal()" title="Trocar o nome do fornecedor em todos os lotes e entradas de uma vez" class="inline-flex items-center gap-1 text-[11px] font-medium text-slate-500 hover:text-amber-700 hover:bg-amber-50 border border-slate-200 px-2 py-1 rounded-lg transition no-print">
                             <i data-lucide="replace" class="w-3 h-3"></i><span>Trocar fornecedor</span>
                         </button>
+                        <button onclick="openBulkArtigoModal()" title="Corrigir o nome de um artigo em todos os lotes, ou juntar dois artigos que são o mesmo" class="inline-flex items-center gap-1 text-[11px] font-medium text-slate-500 hover:text-amber-700 hover:bg-amber-50 border border-slate-200 px-2 py-1 rounded-lg transition no-print">
+                            <i data-lucide="merge" class="w-3 h-3"></i><span>Renomear / juntar artigo</span>
+                        </button>
                     </div>
                     <div class="relative w-full">
                         <span class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400"><i data-lucide="search" class="w-4 h-4"></i></span>
@@ -832,6 +887,7 @@
                     <select id="filter-stock-arm" onchange="renderStock()" title="Filtrar por armazém" class="px-3 py-2 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:outline-none sm:w-44"></select>
                     <select id="filter-stock-fila" onchange="renderStock()" title="Filtrar pela fila" class="px-3 py-2 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:outline-none sm:w-36"></select>
                     <button id="btn-limpar-stock" type="button" onclick="limparFiltrosStock()" class="hidden no-print text-xs font-medium text-slate-500 hover:text-slate-800 px-2 py-2">Limpar filtros</button>
+                    <label class="no-print inline-flex items-center gap-1.5 text-xs font-medium text-slate-600 cursor-pointer" title="Mostra também os artigos e lotes sem stock"><input type="checkbox" id="show-zero-stock" onchange="renderStock()" class="w-4 h-4 rounded"> Mostrar esgotados</label>
                     <label id="lbl-arquivados" class="hidden no-print inline-flex items-center gap-1.5 text-xs font-medium text-slate-600 cursor-pointer"><input type="checkbox" id="show-archived" onchange="renderStock()" class="w-4 h-4 rounded"> Mostrar arquivados</label>
                     <span id="stock-arq-aviso" class="hidden no-print text-xs text-amber-700 whitespace-nowrap" title="Execute arquivar_malha.sql no Supabase para poder arquivar lotes esgotados">Arquivar indisponível (falta arquivar_malha.sql)</span>
                     <span id="stock-fila-summary" class="no-print text-xs font-medium text-slate-500 whitespace-nowrap"></span>
@@ -952,7 +1008,7 @@
             <div class="stick-panel bg-blue-50 border border-blue-200 p-6 rounded-2xl shadow-xs flex flex-col md:flex-row items-center justify-between gap-4 no-print">
                 <div>
                     <h3 class="font-bold text-blue-900 text-base flex items-center"><i data-lucide="database" class="w-5 h-5 mr-2 text-blue-600"></i> Exportar Dados</h3>
-                    <p class="text-xs text-blue-700 mt-0.5">Faça o download do stock e dos movimentos de malha.</p>
+                    <p class="text-xs text-blue-700 mt-0.5">Faça o download do stock e dos movimentos de malha. O backup repõe-se nos Fios, em Relatórios › Restaurar backup.</p>
                 </div>
                 <div class="flex flex-wrap items-center gap-3">
                     <button onclick="exportBackupJSON()" class="inline-flex items-center space-x-2 bg-blue-600 hover:bg-blue-700 text-white text-xs sm:text-sm font-medium px-4 py-2.5 rounded-xl transition shadow-xs">
@@ -1044,6 +1100,7 @@
                 <button onclick="closeLabelModal()" class="text-slate-400 hover:text-slate-600 p-1"><i data-lucide="x" class="w-5 h-5"></i></button>
             </div>
             <div id="label-chips" class="flex flex-wrap gap-2"></div>
+            <label class="flex items-center gap-2 text-xs font-medium cursor-pointer"><input type="checkbox" class="label-sup-toggle w-4 h-4 rounded border-slate-300" onchange="setLabelSupplier(this.checked, refreshLabelModal)"> Mostrar o fornecedor na etiqueta</label>
             <div class="flex justify-center bg-slate-100 rounded-xl p-4 overflow-auto">
                 <div class="bg-white shadow ring-1 ring-slate-200 overflow-hidden shrink-0" style="--ls:.55; width: calc(198mm * var(--ls)); height: calc(285mm * var(--ls));">
                     <div id="label-sheet-preview" style="transform: scale(var(--ls)); transform-origin: 0 0;"></div>
@@ -1059,6 +1116,42 @@
                 <button type="button" id="label-print-btn" onclick="executePrintLabel()" class="px-5 py-2 text-sm text-white bg-slate-900 rounded-xl hover:bg-slate-800 font-medium flex items-center space-x-2 disabled:opacity-40">
                     <i data-lucide="printer" class="w-4 h-4"></i>
                     <span id="label-print-text">Imprimir</span>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL ETIQUETA GRANDE (igual aos Fios): 2 por folha (A5) ou 4 por folha (A6) -->
+    <div id="a5-modal" class="fixed inset-0 bg-slate-900/50 backdrop-blur-xs z-50 flex items-center justify-center p-4 hidden no-print" onclick="if(event.target===this)closePaleteA5()">
+        <div class="bg-white rounded-2xl shadow-xl max-w-lg w-full max-h-[94vh] overflow-y-auto border border-slate-200 p-6 space-y-4">
+            <div class="flex items-start justify-between border-b border-slate-100 pb-3">
+                <div>
+                    <h3 class="font-bold text-slate-900 text-base">Etiquetas</h3>
+                    <p id="a5-info" class="text-xs text-slate-500 mt-0.5"></p>
+                </div>
+                <button type="button" onclick="closePaleteA5()" aria-label="Fechar" class="text-slate-400 hover:text-slate-600 p-1"><i data-lucide="x" class="w-5 h-5"></i></button>
+            </div>
+            <div>
+                <span class="block text-xs font-medium mb-1">Tamanho</span>
+                <div class="grid grid-cols-2 gap-2" role="radiogroup" aria-label="Etiquetas por folha">
+                    <button type="button" id="a5-t-a5" onclick="setA5Tamanho('a5')" role="radio" class="px-3 py-2 text-sm font-semibold rounded-xl border-2">2 por folha <span class="font-normal text-xs">(A5, maior)</span></button>
+                    <button type="button" id="a5-t-a6" onclick="setA5Tamanho('a6')" role="radio" class="px-3 py-2 text-sm font-semibold rounded-xl border-2">4 por folha <span class="font-normal text-xs">(A6)</span></button>
+                </div>
+            </div>
+            <div id="a5-chips" class="flex flex-wrap gap-2"></div>
+            <label class="flex items-center gap-2 text-xs font-medium cursor-pointer"><input type="checkbox" class="label-sup-toggle w-4 h-4 rounded border-slate-300" onchange="setLabelSupplier(this.checked, refreshPaleteA5)"> Mostrar o fornecedor na etiqueta</label>
+            <p class="text-[11px] text-slate-500">Para juntar outra etiqueta à folha, feche esta janela e carregue na impressora de outro lote.</p>
+            <div class="flex bg-slate-100 rounded-xl p-4 overflow-auto">
+                <div id="a5-frame" class="bg-white shadow ring-1 ring-slate-200 overflow-hidden shrink-0" style="margin: 0 auto; --ls:.5; width: calc(210mm * var(--ls)); height: calc(296mm * var(--ls));">
+                    <div id="a5-preview" style="transform: scale(var(--ls)); transform-origin: 0 0;"></div>
+                </div>
+            </div>
+            <p id="a5-dica" class="text-[11px] text-slate-500">Na janela de impressão escolha papel <strong>A4</strong>, orientação <strong>vertical</strong> e escala <strong>100%</strong> (sem “ajustar à página”). Corte a folha pela linha tracejada.</p>
+            <div class="flex justify-end space-x-3 pt-2">
+                <button type="button" onclick="closePaleteA5()" class="px-4 py-2 text-sm rounded-xl hover:bg-slate-100 font-medium">Fechar</button>
+                <button type="button" onclick="executePrintA5()" class="px-5 py-2 text-sm text-white bg-slate-900 rounded-xl hover:bg-slate-800 font-medium flex items-center space-x-2">
+                    <i data-lucide="printer" class="w-4 h-4"></i>
+                    <span id="a5-print-text">Imprimir</span>
                 </button>
             </div>
         </div>
@@ -1167,6 +1260,7 @@
                     <div><label class="block text-xs font-medium mb-1">Rolos a juntar *</label><input type="number" id="el-rolos" required min="1" step="1" class="w-full px-3 py-2 text-sm border rounded-xl"></div>
                     <div><label class="block text-xs font-medium mb-1">Peso líquido (kg) *</label><input type="number" id="el-peso" required min="0.01" step="0.01" class="w-full px-3 py-2 text-sm border rounded-xl"></div>
                 </div>
+                <div><label for="el-obs" class="block text-xs font-medium mb-1">Observações</label><textarea id="el-obs" rows="2" class="w-full px-3 py-2 text-sm border rounded-xl"></textarea></div>
                 <div class="pt-3 flex justify-end space-x-3 border-t shrink-0">
                     <button type="button" onclick="closeEntradaLoteModal()" class="px-4 py-2 text-sm rounded-xl hover:bg-slate-100 font-medium">Cancelar</button>
                     <button type="submit" id="el-btn" class="px-5 py-2 text-sm text-white bg-emerald-600 rounded-xl hover:bg-emerald-700 font-medium">Confirmar Entrada</button>
@@ -1196,6 +1290,7 @@
                     <div><div class="flex items-center justify-between gap-2 mb-1"><label class="block text-xs font-medium">Peso Líquido Retirado (kg) *</label><button type="button" onclick="abrirCalcSaida()" title="Abrir calculadora" aria-label="Abrir calculadora" class="inline-flex items-center gap-1 text-[11px] font-medium text-indigo-600 hover:text-indigo-800"><i data-lucide="calculator" class="w-3.5 h-3.5"></i>Calculadora</button></div><input type="number" id="saida-peso" required min="0.01" step="0.01" oninput="atualizarRestoSaida()" class="w-full px-3 py-2 text-sm border rounded-xl"><p id="saida-peso-disp" class="text-[11px] text-slate-500 mt-1"></p></div>
                 </div>
                 <p id="saida-resto" class="hidden text-[11px] text-amber-700 bg-amber-50 border border-amber-200 rounded-lg p-2"></p>
+                <div><label for="saida-obs" class="block text-xs font-medium mb-1">Observações</label><textarea id="saida-obs" rows="2" class="w-full px-3 py-2 text-sm border rounded-xl"></textarea></div>
                 <div class="pt-3 flex justify-end space-x-3 border-t shrink-0">
                     <button type="button" onclick="closeSaidaModal()" class="px-4 py-2 text-sm rounded-xl hover:bg-slate-100 font-medium">Cancelar</button>
                     <button type="submit" id="saida-btn" class="px-5 py-2 text-sm text-white bg-rose-600 rounded-xl hover:bg-rose-700 font-medium">Confirmar Saída</button>
@@ -1250,6 +1345,33 @@
         </div>
     </div>
 
+    <!-- MODAL: renomear / juntar artigos -->
+    <div id="bulk-artigo-modal" class="fixed inset-0 bg-slate-900/50 backdrop-blur-xs z-50 flex items-center justify-center p-4 hidden no-print">
+        <div class="bg-white rounded-2xl shadow-xl max-w-lg w-full border border-slate-200 max-h-[90vh] flex flex-col my-auto">
+            <div class="px-6 py-4 border-b border-slate-100 flex items-center justify-between bg-amber-50 shrink-0">
+                <h3 class="font-bold text-amber-900 text-base">Renomear / juntar artigo</h3>
+                <button type="button" onclick="closeBulkArtigoModal()" aria-label="Fechar" class="text-slate-400 hover:text-slate-600 p-1"><i data-lucide="x" class="w-5 h-5"></i></button>
+            </div>
+            <div class="p-6 space-y-4 overflow-y-auto custom-scrollbar flex-1">
+                <div>
+                    <label for="bulk-art-from" class="block text-xs font-medium mb-1">Artigo a corrigir (como está hoje)</label>
+                    <select id="bulk-art-from" onchange="updateBulkArtigoInfo()" class="w-full px-3 py-2 text-sm border rounded-xl bg-white"></select>
+                </div>
+                <div>
+                    <label for="bulk-art-to" class="block text-xs font-medium mb-1">Nome certo</label>
+                    <input type="text" id="bulk-art-to" list="bulk-art-list" autocomplete="off" oninput="updateBulkArtigoInfo()" placeholder="Escreva o nome ou escolha um artigo que já existe" class="w-full px-3 py-2 text-sm border border-slate-200 rounded-xl outline-none">
+                    <datalist id="bulk-art-list"></datalist>
+                </div>
+                <p id="bulk-art-info" class="text-xs text-slate-600 bg-slate-50 border border-slate-200 rounded-lg p-2.5"></p>
+                <p class="text-[11px] text-slate-500">Muda o artigo em todos os lotes que o têm, com ou sem stock. A cor, o stock e os movimentos não são alterados. Se o nome certo já existir, os lotes juntam-se a esse artigo.</p>
+                <div class="flex justify-end gap-2 pt-1">
+                    <button type="button" onclick="closeBulkArtigoModal()" class="px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-100 rounded-xl">Cancelar</button>
+                    <button type="button" id="bulk-art-btn" onclick="applyBulkArtigo()" class="px-4 py-2 text-sm font-medium text-white bg-amber-500 hover:bg-amber-600 rounded-xl disabled:opacity-50">Aplicar</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <div id="edit-mov-modal" class="fixed inset-0 bg-slate-900/50 backdrop-blur-xs z-50 flex items-center justify-center p-4 hidden no-print">
         <div class="bg-white rounded-2xl shadow-xl max-w-lg w-full border border-slate-200 max-h-[90vh] flex flex-col my-auto">
             <div class="px-6 py-4 border-b border-slate-100 flex items-center justify-between bg-blue-50 shrink-0">
@@ -1273,12 +1395,17 @@
                 </div>
                 <p class="text-[11px] text-slate-500 -mt-2">Artigo e lote pertencem ao lote de malha: a correção aplica-se a todos os movimentos deste lote.</p>
                 
-                <div><label class="block text-xs font-medium mb-1">N.º do Tear *</label><input type="text" id="edit-tear" required class="w-full px-3 py-2 text-sm border rounded-xl"></div>
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div><label class="block text-xs font-medium mb-1">N.º do Tear *</label><input type="text" id="edit-tear" required class="w-full px-3 py-2 text-sm border rounded-xl"></div>
+                    <div><label for="edit-mov-data" class="block text-xs font-medium mb-1">Data e hora *</label><input type="datetime-local" id="edit-mov-data" required class="w-full px-3 py-2 text-sm border rounded-xl"></div>
+                </div>
+                <p id="edit-mov-data-hint" class="hidden text-[11px] text-slate-500 -mt-2">Mudar a data desta entrada muda também a data de entrada do lote no Stock Atual.</p>
                 <div><label class="block text-xs font-medium mb-1">Entidade (Origem / Destino)</label><select id="edit-entidade" class="w-full px-3 py-2 text-sm border rounded-xl"></select></div>
                 <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div><label class="block text-xs font-medium mb-1">Rolos *</label><input type="number" id="edit-rolos" required min="1" step="1" class="w-full px-3 py-2 text-sm border rounded-xl"></div>
                     <div><label class="block text-xs font-medium mb-1">Peso Líquido (kg) *</label><input type="number" id="edit-peso" required min="0.01" step="0.01" class="w-full px-3 py-2 text-sm border rounded-xl"></div>
                 </div>
+                <div><label for="edit-mov-obs" class="block text-xs font-medium mb-1">Observações</label><textarea id="edit-mov-obs" rows="2" class="w-full px-3 py-2 text-sm border rounded-xl"></textarea></div>
                 <p class="text-[11px] text-slate-500">O stock do lote é recalculado com a diferença.</p>
                 <div class="pt-3 flex justify-end space-x-3 border-t shrink-0">
                     <button type="button" onclick="closeEditMovModal()" class="px-4 py-2 text-sm rounded-xl hover:bg-slate-100 font-medium">Cancelar</button>
@@ -1519,9 +1646,15 @@
         // ===== UTILIZADOR QUE MEXEU NO STOCK =====
         let currentUserEmail = '';
         // Grava o utilizador; se as colunas ainda não existirem no Supabase, grava sem elas (não bloqueia o trabalho)
+        function avisoObsFalta() { showToast('A nota não ficou gravada: falta a coluna "observacoes" nos movimentos de malha (executar malha_mov_observacoes.sql no Supabase).', 'error'); }
         async function insertMov(rows) {
             const withUser = rows.map(r => ({ ...r, created_by: currentUserEmail || null }));
             let res = await db.from('malha_movimentos').insert(withUser);
+            // A coluna das observações ainda não existe: grava o movimento sem a nota e avisa (não bloqueia o trabalho)
+            if (res.error && /observacoes/.test(res.error.message || '') && rows.some(r => 'observacoes' in r)) {
+                avisoObsFalta();
+                return insertMov(rows.map(({ observacoes, ...r }) => r));
+            }
             if (res.error && /created_by|updated_by/.test(res.error.message || '')) res = await db.from('malha_movimentos').insert(rows);
             return res;
         }
@@ -1570,15 +1703,15 @@
         }
         // VERIFICAR SESSÃO DE AUTENTICAÇÃO AO CARREGAR A PÁGINA
         // ===== PARTILHA DE SESSÃO ENTRE index.html E malha.html =====
-        // Normalmente a sessão é partilhada pelo armazenamento do browser. Se as duas páginas estiverem em
-        // origens diferentes (ex.: ficheiros locais), a sessão segue no link e é restaurada na página de destino.
+        // No site publicado a sessão é partilhada pelo armazenamento do browser e nada vai no endereço.
+        // Só quando as páginas são abertas como ficheiros locais (origens diferentes) é que a sessão segue no link.
         async function goToPage(ev, url) {
             if (ev && (ev.ctrlKey || ev.metaKey || ev.shiftKey || ev.button === 1)) return;   // novo separador: comportamento normal
             if (ev) ev.preventDefault();
             let target = url;
             try {
                 const { data: { session } } = await db.auth.getSession();
-                if (session) target += '#sb_at=' + encodeURIComponent(session.access_token) + '&sb_rt=' + encodeURIComponent(session.refresh_token);
+                if (session && window.location.protocol === 'file:') target += '#sb_at=' + encodeURIComponent(session.access_token) + '&sb_rt=' + encodeURIComponent(session.refresh_token);
             } catch (e) { console.error(e); }
             window.location.href = target;
         }
@@ -2074,7 +2207,7 @@
                 if (i > 0) await loadData();
                 const row = {
                     sku: generateNextSku(dia),
-                    of_num: null,
+                    of_num: val('ofNum') || null,
                     tear: val('tearNum'),
                     ne_fio: prod ? prod.name : '-',
                     jogo: val('jogoFio'),
@@ -2270,6 +2403,7 @@
             const fl = fillStockFilters();
             const arqOk = archiveSupported();
             const verArq = arqOk && !!document.getElementById('show-archived')?.checked;
+            const verEsg = !!document.getElementById('show-zero-stock')?.checked;
             const avisoArq = document.getElementById('stock-arq-aviso');
             if (avisoArq) avisoArq.classList.toggle('hidden', arqOk || !lotes.some(l => !(l.rolos > 0)));
             const lblArq = document.getElementById('lbl-arquivados'); if (lblArq) lblArq.classList.toggle('hidden', !arqOk);
@@ -2290,11 +2424,11 @@
             const lista = [];
             for (const g of grupos.values()) {
                 const ativos = g.lotes.filter(l => l.rolos > 0);
-                if (!ativos.length) continue;                       // designação sem stock não aparece
+                if (!ativos.length && !verEsg) continue;            // designação sem stock só aparece com "Mostrar esgotados"
                 const nomeMatch = !q || has([g.nome]);
                 const lotesMatch = q ? g.lotes.filter(l => has(loteSearchFields(l, mapa))) : [];
                 if (q && !nomeMatch && !lotesMatch.length) continue;
-                if (q && !nomeMatch && !lotesMatch.some(l => l.rolos > 0)) continue;
+                if (q && !nomeMatch && !verEsg && !lotesMatch.some(l => l.rolos > 0)) continue;
                 g.ativos = ativos;
                 g.soPorLote = q && !nomeMatch;
                 g.visiveis = g.soPorLote ? lotesMatch : g.lotes;
@@ -2337,6 +2471,7 @@
                         <button onclick="openEntradaLoteModal('${esc(l.id)}')" title="Dar entrada (juntar rolos e peso a este lote, ex.: devolução)" aria-label="Dar entrada" class="inline-flex items-center justify-center w-7 h-7 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg shadow-sm transition"><i data-lucide="arrow-down-left" class="w-4 h-4"></i></button>
                         ${l.rolos > 0 ? `<button onclick="openSaidaModal('${esc(l.id)}')" title="Dar saída" aria-label="Dar saída" class="inline-flex items-center justify-center w-7 h-7 bg-rose-600 hover:bg-rose-700 text-white rounded-lg shadow-sm transition"><i data-lucide="arrow-up-right" class="w-4 h-4"></i></button>` : ''}
                         ${arqOk && !(l.rolos > 0) ? `<button onclick="arquivarLotes(['${esc(l.id)}'], ${!l.archived})" title="${l.archived ? 'Repor (desarquivar)' : 'Arquivar lote esgotado'}" aria-label="Arquivar" class="p-1.5 text-slate-400 hover:text-amber-600 transition"><i data-lucide="${l.archived ? 'archive-restore' : 'archive'}" class="w-4 h-4"></i></button>` : ''}
+                        <button onclick="toggleLoteHist('${esc(l.id)}')" title="Ver movimentos do lote" aria-label="Ver movimentos do lote" class="p-1.5 transition ${openLoteHist.has(String(l.id)) ? 'text-blue-600' : 'text-slate-400 hover:text-blue-600'}"><i data-lucide="history" class="w-4 h-4"></i></button>
                         <button onclick="abrirCalcLote('${esc(l.id)}')" title="Calculadora" aria-label="Calculadora" class="p-1.5 text-slate-400 hover:text-indigo-600 transition"><i data-lucide="calculator" class="w-4 h-4"></i></button>
                         <button onclick="openLabelModal('${esc(l.id)}')" title="Etiqueta" class="p-1.5 text-slate-400 hover:text-blue-600 transition"><i data-lucide="printer" class="w-4 h-4"></i></button>
                         <button onclick="deleteLote('${esc(l.id)}')" title="Eliminar lote" aria-label="Eliminar lote" class="p-1.5 text-slate-400 hover:text-rose-600 transition"><i data-lucide="trash-2" class="w-4 h-4"></i></button>
@@ -2346,10 +2481,10 @@
             const detalhe = g => {
                 const k = malhaKeyAttr(g.key);
                 const esg = g.visiveis.filter(l => !(l.rolos > 0)).length;
-                const mostrarEsg = showDepletedMalha.has(g.key) || g.soPorLote;
+                const mostrarEsg = showDepletedMalha.has(g.key) || g.soPorLote || verEsg;
                 const rows = g.visiveis.filter(l => l.rolos > 0 || mostrarEsg)
                     .sort((a, b) => String(b.created_at).localeCompare(String(a.created_at)));
-                const toggle = esg > 0 && !g.soPorLote
+                const toggle = esg > 0 && !g.soPorLote && !verEsg
                     ? `<button onclick="toggleMalhaEsgotados('${k}')" class="text-xs font-semibold text-blue-600 hover:text-blue-700 no-print">${showDepletedMalha.has(g.key) ? 'Ocultar esgotados' : 'Mostrar esgotados (' + esg + ')'}</button>` : '';
                 const porArq = arqOk ? g.visiveis.filter(l => !(l.rolos > 0) && !l.archived) : [];
                 const btnArq = porArq.length
@@ -2368,10 +2503,11 @@
                             <tbody>${rows.map(loteRow).join('')}</tbody>
                         </table>
                     </div>
+                    ${rows.filter(l => openLoteHist.has(String(l.id))).map(loteHistHtml).join('')}
                 </td></tr>`;
             };
 
-            const stockKey = [q, fl.tear, fl.forn, fl.arm, fl.fila, verArq].join('|');
+            const stockKey = [q, fl.tear, fl.forn, fl.arm, fl.fila, verArq, verEsg].join('|');
             if (stockKey !== lastStockKey) { lastStockKey = stockKey; stockLimit = 100; }
             const filaSum = document.getElementById('stock-fila-summary');
             if (filaSum) {
@@ -2391,8 +2527,8 @@
                 const rolos = g.ativos.reduce((t, l) => t + l.rolos, 0);
                 const peso = round2(g.ativos.reduce((t, l) => t + l.peso, 0));
                 return `
-                <tr class="grp-row hover:bg-slate-50/80 transition">
-                    <td class="py-3 px-3 font-medium text-slate-900"><div class="flex items-center gap-1.5"><span>${esc(g.nome)}</span>${(() => { const n = g.lotes.filter(x => temNota(x) && (x.rolos > 0 || showDepletedMalha.has(g.key))).length; return n ? `<button type="button" onclick="toggleMalhaGrupo('${k}')" title="${n} ${n === 1 ? 'lote com observações' : 'lotes com observações'} (abrir)" aria-label="Lotes com observações" class="no-print inline-flex ml-1 p-1 rounded-md text-amber-600 bg-amber-50 hover:bg-amber-100 transition"><i data-lucide="sticky-note" class="w-3.5 h-3.5"></i></button>` : ''; })()}</div></td>
+                <tr class="grp-row ${nAt ? '' : 'opacity-60'} hover:bg-slate-50/80 transition">
+                    <td class="py-3 px-3 font-medium text-slate-900"><div class="flex items-center gap-1.5"><span>${esc(g.nome)}</span>${(() => { const n = g.lotes.filter(x => temNota(x) && (x.rolos > 0 || verEsg || showDepletedMalha.has(g.key))).length; return n ? `<button type="button" onclick="toggleMalhaGrupo('${k}')" title="${n} ${n === 1 ? 'lote com observações' : 'lotes com observações'} (abrir)" aria-label="Lotes com observações" class="no-print inline-flex ml-1 p-1 rounded-md text-amber-600 bg-amber-50 hover:bg-amber-100 transition"><i data-lucide="sticky-note" class="w-3.5 h-3.5"></i></button>` : ''; })()}</div></td>
                     <td class="py-3 px-3" data-label="Lotes">
                         <button onclick="toggleMalhaGrupo('${k}')" class="inline-flex items-center gap-1 text-xs font-semibold text-blue-700 hover:bg-blue-50 rounded-lg px-2 py-1 whitespace-nowrap">
                             <i data-lucide="${open ? 'chevron-down' : 'chevron-right'}" class="w-3.5 h-3.5"></i>
@@ -2406,6 +2542,70 @@
             scheduleIcons();
         }
 
+
+        // ===== HISTÓRICO (igual aos Fios): movimentos de um lote, do mais antigo para o mais recente, com o saldo do peso =====
+        const openLoteHist = new Set(), openEntHist = new Set();
+        function toggleLoteHist(id) { id = String(id); if (openLoteHist.has(id)) openLoteHist.delete(id); else openLoteHist.add(id); renderStock(); }
+        function toggleEntHist(id) { id = String(id); if (openEntHist.has(id)) openEntHist.delete(id); else openEntHist.add(id); renderEntities(); }
+        const movAsc = (a, b) => String(a.date || '').localeCompare(String(b.date || '')) || String(a.created_at || '').localeCompare(String(b.created_at || ''));
+        const obsHtml = m => String(m.observacoes || '').trim() ? `<div class="text-[10px] font-normal text-slate-500 whitespace-pre-wrap break-words">${esc(String(m.observacoes).trim())}</div>` : '';
+        const histTh = (t, c) => `<th class="py-1 px-2 font-semibold ${c || ''}">${t}</th>`;
+        function loteHistHtml(l) {
+            const list = movimentos.filter(m => String(m.malha_id) === String(l.id)).sort(movAsc);
+            let saldo = 0, entrado = 0, saido = 0;
+            const rows = list.map(m => {
+                const pos = movPositivo(m), p = Number(m.peso) || 0;
+                saldo = round2(saldo + (pos ? p : -p));
+                if (pos) entrado += p; else saido += p;
+                return `<tr class="border-t border-slate-200/70">
+                    <td class="py-1.5 px-2 text-xs text-slate-500 whitespace-nowrap">${esc(formatDateTime(m.date))}</td>
+                    <td class="py-1.5 px-2">${tipoBadge(tipoMov(m))}</td>
+                    <td class="py-1.5 px-2 text-xs text-slate-600">${esc(m.entity_name || '-')}${obsHtml(m)}</td>
+                    <td class="py-1.5 px-2 text-right text-xs font-semibold text-slate-700 whitespace-nowrap">${pos ? '+' : '-'}${esc(m.rolos)}</td>
+                    <td class="py-1.5 px-2 text-right text-xs font-semibold whitespace-nowrap ${pos ? 'text-emerald-600' : 'text-rose-600'}">${pos ? '+' : '-'}${esc(formatKg(p))}</td>
+                    <td class="py-1.5 px-2 text-right text-xs font-bold text-slate-800 whitespace-nowrap">${esc(formatKg(saldo))}</td>
+                    <td class="py-1.5 px-2 text-xs">${userCell(m)}</td>
+                </tr>`;
+            }).join('');
+            const warn = list.length && Math.abs(saldo - l.peso) > 0.01
+                ? `<p class="text-[11px] text-amber-700 bg-amber-50 border border-amber-200 rounded-lg p-2 mt-2">O saldo dos movimentos (${esc(formatKg(saldo))}) difere do stock do lote (${esc(formatKg(l.peso))}). Acontece quando um ajuste mexeu nos rolos e no peso em sentidos diferentes, ou em lotes anteriores ao registo dos ajustes.</p>` : '';
+            return `<div class="mt-3 bg-white border border-slate-200 rounded-xl p-3 no-print">
+                <div class="flex items-center justify-between gap-3 mb-1">
+                    <div class="text-xs font-semibold text-slate-600">Movimentos do lote <span class="font-mono text-blue-700">${esc(l.sku || '')}</span></div>
+                    <button type="button" onclick="toggleLoteHist('${esc(l.id)}')" class="text-xs font-semibold text-blue-600 hover:text-blue-700">Fechar</button>
+                </div>
+                ${list.length ? `<p class="text-[11px] text-slate-500 mb-1">${list.length} movimento(s) &nbsp;|&nbsp; Entrado ${esc(formatKg(entrado))} · Saído ${esc(formatKg(saido))} · <strong>Saldo ${esc(formatKg(saldo))}</strong> · agora ${esc(l.rolos)} rolos</p>
+                <div class="overflow-x-auto"><table class="w-full text-left"><thead><tr class="text-[11px] text-slate-400">${histTh('Data') + histTh('Tipo') + histTh('Entidade') + histTh('Rolos', 'text-right') + histTh('Peso', 'text-right') + histTh('Saldo', 'text-right') + histTh('Utilizador')}</tr></thead><tbody>${rows}</tbody></table></div>`
+                    : '<p class="text-xs text-slate-400 py-1">Sem movimentos registados para este lote.</p>'}
+                ${warn}
+            </div>`;
+        }
+        // Movimentos de uma entidade (como origem ou destino), incluindo as entradas extra "Entrada (+) · entidade"
+        const origemExtra = m => String(m.entity_name || '').replace(/^Entrada \(\+\)(?: · )?/, '');
+        function entHistHtml(e) {
+            const nome = String(e.name || '').trim().toLowerCase();
+            const list = movimentos.filter(m => String(ehEntradaExtra(m) ? origemExtra(m) : (m.entity_name || '')).trim().toLowerCase() === nome).sort(movAsc);
+            let entrado = 0, saido = 0;
+            const rows = list.map(m => {
+                const pos = movPositivo(m), p = Number(m.peso) || 0;
+                if (pos) entrado += p; else saido += p;
+                return `<tr class="border-t border-slate-200/70">
+                    <td class="py-1.5 px-2 text-xs text-slate-500 whitespace-nowrap">${esc(formatDateTime(m.date))}</td>
+                    <td class="py-1.5 px-2">${tipoBadge(tipoMov(m))}</td>
+                    <td class="py-1.5 px-2 text-xs font-medium text-slate-800">${movLink(m, 'artigo', artigoDoMov(m))}${obsHtml(m)}</td>
+                    <td class="py-1.5 px-2 font-mono text-xs font-semibold">${movLink(m, 'lote', m.sku || '-')}</td>
+                    <td class="py-1.5 px-2 text-right text-xs font-semibold text-slate-700">${esc(m.rolos)}</td>
+                    <td class="py-1.5 px-2 text-right text-xs font-semibold whitespace-nowrap ${pos ? 'text-emerald-600' : 'text-rose-600'}">${pos ? '+' : '-'}${esc(formatKg(p))}</td>
+                </tr>`;
+            }).join('');
+            return `<tr class="bg-white no-print"><td colspan="7" class="px-4 py-3 border-t border-slate-200">
+                <div class="max-w-5xl">
+                    <div class="text-xs font-semibold text-slate-600 mb-1">Movimentos de malha de ${esc(e.name)}</div>
+                    ${list.length ? `<p class="text-[11px] text-slate-500 mb-1">${list.length} movimento(s) &nbsp;|&nbsp; Entrado ${esc(formatKg(entrado))} · Saído ${esc(formatKg(saido))}</p>
+                    <div class="overflow-x-auto"><table class="w-full text-left"><thead><tr class="text-[11px] text-slate-400">${histTh('Data') + histTh('Tipo') + histTh('Artigo') + histTh('Lote') + histTh('Rolos', 'text-right') + histTh('Peso', 'text-right')}</tr></thead><tbody>${rows}</tbody></table></div>`
+                        : '<p class="text-xs text-slate-400 py-1">Sem movimentos de malha registados.</p>'}
+                </div></td></tr>`;
+        }
 
         // ===== arquivar =====
         function archiveSupported() { return lotes.length > 0 && Object.prototype.hasOwnProperty.call(lotes[0], 'archived'); }
@@ -2549,11 +2749,125 @@
                         `Lote Fio: ${l.lote_fio} | Rolos: ${l.rolos} | Peso Líq.: ${formatKg(l.peso)}`],
                 code: l.sku, qr: l.sku,
                 footL: `Loc: ${locDisplay(l)}`,
-                footR: fornecedorLote(l) || ''
+                footR: labelShowSupplier ? (fornecedorLote(l) || '-') : formatKg(l.peso)
             };
         }
-        // Botão da impressora numa linha (ou após a entrada): abre a folha só com essa etiqueta
-        function openLabelModal(id) { openLabelSheet(['l:' + id]); }
+        // Botão da impressora numa linha (ou após a entrada): etiqueta grande, com o mesmo desenho dos Fios.
+        // A folha de 8 etiquetas pequenas continua na seleção de lotes (caixas de seleção + "Imprimir etiquetas").
+        function openLabelModal(id) { abrirA5(id); }
+
+        // Fornecedor nas etiquetas: desligado por omissão; a escolha fica guardada neste browser (é a mesma dos Fios)
+        let labelShowSupplier = false;
+        try { labelShowSupplier = localStorage.getItem('labelShowSupplier') === '1'; } catch (e) {}
+        function setLabelSupplier(on, refresh) {
+            labelShowSupplier = !!on;
+            try { localStorage.setItem('labelShowSupplier', on ? '1' : '0'); } catch (e) {}
+            refresh();
+        }
+        function syncLabelSupplierBoxes() { document.querySelectorAll('.label-sup-toggle').forEach(c => { c.checked = labelShowSupplier; }); }
+
+        // ===== ETIQUETA GRANDE: 2 por folha A4 (A5) ou 4 por folha A4 deitada (A6); o browser lembra o tamanho =====
+        let a5Tamanho = 'a5';
+        try { if (localStorage.getItem('etiquetaTamanho') === 'a6') a5Tamanho = 'a6'; } catch (e) {}
+        const a5Modo = () => a5Tamanho;
+        const a5Max = () => a5Modo() === 'a6' ? 4 : 2;
+        let a5Queue = [];   // ids dos lotes de malha na folha; fica guardada ao fechar a janela, para juntar outros lotes
+        const a5Lote = id => lotes.find(l => String(l.id) === String(id)) || null;
+        function malhaA5Html(l) {
+            // largo = ocupa duas das três colunas; linhas = máximo de linhas do valor (o resto é cortado com reticências)
+            const campo = (k, v, largo, linhas = 1) => `<div${largo ? ' style="grid-column:span 2"' : ''}><div class="a5-k">${esc(k)}</div><div class="a5-v" style="overflow:hidden;display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:${linhas}">${esc(v == null || v === '' ? '-' : v)}</div></div>`;
+            const code = esc(l.sku || '');
+            const of = String(l.of_num || '').trim();
+            return `<div class="a5-label">
+                <div class="a5-head"><span class="a5-brand"><img src="logo.png" alt="" onerror="this.remove()"><span>Oliveira &amp; Gonçalves · Etiqueta de malha</span></span><span>Impresso em ${esc(new Date().toLocaleDateString('pt-PT'))}</span></div>
+                <div class="a5-hero">
+                    <div><div class="a5-k">Lote</div><div class="a5-lote${String(l.sku || '').length > 14 ? ' longo' : ''}">${esc(l.sku || '-')}</div></div>
+                    <div class="a5-hero-row">
+                        <div><div class="a5-k">Peso líquido</div><div class="a5-peso${formatKg(l.peso).length > 11 ? ' longo' : ''}">${esc(formatKg(l.peso))}</div></div>
+                        <div><div class="a5-k">Rolos</div><div class="a5-pal">${esc(l.rolos)}</div></div>
+                    </div>
+                </div>
+                <div class="a5-body">
+                    <div class="a5-info">
+                        <div><div class="a5-prod">${esc(malhaNome(l))}</div><div class="a5-sku" style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis">NE: ${esc(l.ne_fio || '-')}</div></div>
+                        <div class="a5-grid" style="grid-template-columns:1fr 1fr 1fr">
+                            ${campo('Lote do fio', l.lote_fio)}
+                            ${campo('Jogo', l.jogo)}
+                            ${campo('Tear', l.tear)}
+                            ${campo('Localização', locDisplay(l), true, 2)}
+                            ${campo('Data de entrada', fmtData(l.created_at))}
+                            ${of ? campo('OF', of) : ''}
+                            ${labelShowSupplier ? campo('Fornecedor', fornecedorLote(l), true) : ''}
+                        </div>
+                    </div>
+                    <div class="a5-qr" data-a5-qr="${code}"></div>
+                </div>
+                <svg class="a5-barcode" data-a5-code="${code}"></svg>
+            </div>`;
+        }
+        function renderPaletesA5(box, comVazio) {
+            const a6 = a5Modo() === 'a6', cell = a6 ? 'a6-cell' : 'a5-cell';
+            const cells = a5Queue.map(a5Lote).filter(Boolean).map(l => `<div class="${cell}">${malhaA5Html(l)}</div>`);
+            while (cells.length < a5Max()) cells.push(`<div class="${cell}"><div class="a5-empty">${comVazio ? (a6 ? 'Espaço livre' : 'Espaço livre: esta metade da folha fica em branco') : ''}</div></div>`);
+            box.innerHTML = `<div class="${a6 ? 'a6-sheet' : 'a5-sheet'}">${cells.join('')}</div>`;
+            const fr = document.getElementById('a5-frame');
+            if (fr && box.id === 'a5-preview') { fr.style.setProperty('--ls', a6 ? '.36' : '.5'); fr.style.width = `calc(${a6 ? 297 : 210}mm * var(--ls))`; fr.style.height = `calc(${a6 ? 209 : 296}mm * var(--ls))`; }
+            box.querySelectorAll('svg[data-a5-code]').forEach(svg => {
+                try { JsBarcode(svg, svg.dataset.a5Code, { format: 'CODE128', height: 70, width: 2, fontSize: 15, margin: 0 }); }
+                catch (e) { console.error(e); }
+            });
+            box.querySelectorAll('[data-a5-qr]').forEach(el => {
+                try { new QRCode(el, { text: el.dataset.a5Qr, width: 512, height: 512 }); } catch (e) { console.error(e); }
+            });
+        }
+        function refreshPaleteA5() {
+            syncLabelSupplierBoxes();
+            ['a5', 'a6'].forEach(t => {
+                const b = document.getElementById('a5-t-' + t), on = a5Modo() === t;
+                b.setAttribute('aria-checked', on ? 'true' : 'false');
+                b.className = 'px-3 py-2 text-sm font-semibold rounded-xl border-2 ' + (on ? 'border-indigo-600 bg-indigo-600 text-white' : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50');
+            });
+            a5Queue = a5Queue.filter(a5Lote);
+            const n = a5Queue.length;
+            if (!n) { closePaleteA5(); return; }
+            document.getElementById('a5-dica').innerHTML = `Na janela de impressão escolha papel <strong>A4</strong>, orientação <strong>${a5Modo() === 'a6' ? 'horizontal' : 'vertical'}</strong> e escala <strong>100%</strong> (sem “ajustar à página”). Corte a folha pelas linhas tracejadas.`;
+            document.getElementById('a5-info').textContent = a5Modo() === 'a6' ? `${n} de 4 etiquetas · 4 por folha A4 deitada (148 × 105 mm cada)` : `${n} de 2 etiquetas · 2 por folha A4 (210 × 148 mm cada)`;
+            document.getElementById('a5-chips').innerHTML = a5Queue.map((id, i) =>
+                `<span class="inline-flex items-center gap-1 text-xs bg-slate-100 border border-slate-200 rounded-lg pl-2 pr-1 py-1 font-mono">${esc(a5Lote(id).sku)}<button type="button" onclick="removerPaleteA5(${i})" title="Remover da folha" aria-label="Remover da folha" class="text-slate-400 hover:text-rose-600 px-1">×</button></span>`).join('');
+            document.getElementById('a5-print-text').textContent = n === 1 ? 'Imprimir 1 etiqueta' : `Imprimir ${n} etiquetas`;
+            renderPaletesA5(document.getElementById('a5-preview'), true);
+            renderPaletesA5(document.getElementById('printable-label-area'), false);   // pronta antes de imprimir
+            if (window.lucide) lucide.createIcons();
+        }
+        function abrirA5(id) {
+            id = String(id);
+            if (!a5Lote(id)) return;
+            a5Queue = a5Queue.filter(a5Lote);
+            if (!a5Queue.includes(id)) {
+                if (a5Queue.length >= a5Max()) a5Queue = [];   // folha cheia: começa uma folha nova
+                a5Queue.push(id);
+            }
+            refreshPaleteA5();
+            document.getElementById('a5-modal').classList.remove('hidden');
+        }
+        function setA5Tamanho(t) {
+            a5Tamanho = t === 'a6' ? 'a6' : 'a5';
+            try { localStorage.setItem('etiquetaTamanho', a5Tamanho); } catch (e) {}
+            if (a5Queue.length > a5Max()) { showToast('Com 2 por folha só cabem 2 etiquetas: ficaram as 2 primeiras.'); a5Queue = a5Queue.slice(0, a5Max()); }
+            refreshPaleteA5();
+        }
+        function removerPaleteA5(i) { a5Queue.splice(i, 1); refreshPaleteA5(); }
+        function closePaleteA5() { document.getElementById('a5-modal').classList.add('hidden'); }
+        function executePrintA5() {
+            if (!a5Queue.length) return;
+            renderPaletesA5(document.getElementById('printable-label-area'), false);   // a folha de 8 usa a mesma área
+            let st = document.getElementById('label-page-style');
+            if (!st) { st = document.createElement('style'); st.id = 'label-page-style'; document.head.appendChild(st); }
+            st.textContent = a5Modo() === 'a6' ? '@page { size: A4 landscape; margin: 0; }' : '@page { size: A4 portrait; margin: 0; }';   // só enquanto se imprimem as etiquetas
+            document.body.classList.add('printing-label', 'printing-a5');
+            document.body.classList.toggle('printing-a6', a5Modo() === 'a6');
+            window.print();
+        }
 
         // ===== ETIQUETAS: folha A4 com até 8 (2 colunas × 4 linhas) =====
         // As etiquetas identificam-se por chave: "p:<id>" (produto) ou "l:<id>" (lote).
@@ -2591,6 +2905,7 @@
         }
 
         function refreshLabelModal() {
+            syncLabelSupplierBoxes();
             const n = labelQueue.length;
             document.getElementById('label-sheet-info').textContent = `${n} de ${LABEL_MAX} etiquetas · 2 × 4 por folha (99 × 71 mm cada)`;
             document.getElementById('label-chips').innerHTML = labelQueue.map(k => {
@@ -2660,7 +2975,7 @@
             const totRolos = rows.reduce((a, l) => a + (Number(l.rolos) || 0), 0);
             const totPeso = rows.reduce((a, l) => a + (Number(l.peso) || 0), 0);
             document.getElementById('printable-list-area').innerHTML = `<table>
-                <thead><tr><th>Código de Barras</th><th>Artigo / Cor</th><th>OF</th><th>Tear / NE</th><th>Jogo / Lote Fio</th><th>Fornecedor</th><th class="num">Rolos</th><th class="num">Peso Líq.</th><th>Localização</th><th>Qualidade</th></tr></thead>
+                <thead><tr><th>Código de Barras</th><th>Artigo / Cor</th><th>OF</th><th>Tear / NE</th><th>Jogo / Lote Fio</th><th>Fornecedor</th><th class="num">Rolos</th><th class="num">Peso Líq.</th><th>Localização</th></tr></thead>
                 <tbody>${body}</tbody></table>
                 <p style="margin-top:8px;font-size:11px;color:#475569;">${rows.length} ${rows.length === 1 ? 'lote' : 'lotes'} · ${totRolos} rolos · ${esc(formatKg(totPeso))}</p>`;
             document.querySelectorAll('#printable-list-area svg[data-code]').forEach(svg => {
@@ -2674,6 +2989,7 @@
 
         function executePrintLabel() {
             if (!labelQueue.length) return;
+            renderLabelSheet(document.getElementById('printable-label-area'), labelQueue, false);
             let st = document.getElementById('label-page-style');
             if (!st) { st = document.createElement('style'); st.id = 'label-page-style'; document.head.appendChild(st); }
             st.textContent = '@page { size: A4 portrait; margin: 0; }';   // só enquanto se imprimem etiquetas
@@ -2681,7 +2997,7 @@
             window.print();
         }
         function cleanupLabelPrint() {
-            document.body.classList.remove('printing-label', 'printing-list', 'printing-mov');
+            document.body.classList.remove('printing-label', 'printing-list', 'printing-mov', 'printing-a5', 'printing-a6');
             document.getElementById('label-page-style')?.remove();
         }
         window.addEventListener('afterprint', cleanupLabelPrint);
@@ -2766,6 +3082,7 @@
             const peso = round2(document.getElementById('el-peso').value);
             if (!(rolos > 0) || !(peso > 0)) { setFieldError('el-peso', 'Indique rolos e peso superiores a 0.'); return; }
             const origem = document.getElementById('el-origem').value;
+            const obsEntrada = document.getElementById('el-obs').value.trim();
             const novosRolos = l.rolos + rolos, novoPeso = round2(l.peso + peso);
             const btn = document.getElementById('el-btn');
             btn.disabled = true;
@@ -2776,7 +3093,8 @@
             if (!error) {
                 ({ error } = await insertMov([{
                     malha_id: l.id, sku: l.sku, of_num: l.of_num, tear: l.tear,
-                    type: 'ajuste', entity_name: origem ? `Entrada (+) · ${origem}` : 'Entrada (+)', rolos, peso, date: dataEscolhida('el-data').toISOString()
+                    type: 'ajuste', entity_name: origem ? `Entrada (+) · ${origem}` : 'Entrada (+)', rolos, peso, date: dataEscolhida('el-data').toISOString(),
+                    ...(obsEntrada ? { observacoes: obsEntrada } : {})
                 }]));
                 if (error) await updateLote(l.id, { rolos: l.rolos, peso: l.peso });   // desfaz
             }
@@ -2829,6 +3147,7 @@
             const rolos = parseInt(document.getElementById('saida-rolos').value);
             const peso = round2(document.getElementById('saida-peso').value);
             const entidade = document.getElementById('saida-cliente').value;
+            const obsSaida = document.getElementById('saida-obs').value.trim();
             if (rolos > l.rolos) { setFieldError('saida-rolos', `Só existem ${l.rolos} rolos disponíveis.`); return; }
             if (peso > l.peso + 0.004) { setFieldError('saida-peso', `Só existem ${formatKg(l.peso)} disponíveis.`); return; }
 
@@ -2843,7 +3162,8 @@
             if (!error) {
                 ({ error } = await insertMov([{
                     malha_id: l.id, sku: l.sku, of_num: l.of_num, tear: l.tear,
-                    type: 'saida', entity_name: entidade, rolos, peso, date: dataEscolhida('saida-data').toISOString()
+                    type: 'saida', entity_name: entidade, rolos, peso, date: dataEscolhida('saida-data').toISOString(),
+                    ...(obsSaida ? { observacoes: obsSaida } : {})
                 }]));
                 if (error) await updateLote(l.id, { rolos: l.rolos, peso: l.peso });   // desfaz
             }
@@ -2865,16 +3185,15 @@
         const artigoTemStock = l => { const k = malhaKey(l); return lotes.some(x => malhaKey(x) === k && x.rolos > 0 && !x.archived); };
         function movLink(m, tipo, texto) {
             const l = lotes.find(x => x.id === m.malha_id);
-            const ok = l && (tipo === 'lote' ? (l.rolos > 0 || artigoTemStock(l)) : artigoTemStock(l));
-            if (!ok || texto === '-') return esc(texto);
-            const tit = tipo === 'lote' && l.rolos > 0 ? 'Ver este lote no Stock Atual' : 'Ver o stock deste artigo';
+            if (!l || texto === '-') return esc(texto);
+            const tit = tipo === 'lote' ? 'Ver este lote no Stock Atual' : 'Ver este artigo no Stock Atual';
             return `<button type="button" onclick="${tipo === 'lote' ? 'irParaLoteMov' : 'irParaArtigoMov'}('${esc(l.id)}')" title="${tit}" class="text-left text-blue-700 hover:underline">${esc(texto)}</button>`;
         }
         function irParaArtigoMov(id) {
             const l = lotes.find(x => String(x.id) === String(id)); if (!l) return;
-            if (!artigoTemStock(l)) { showToast('Este artigo não tem stock.', 'error'); return; }
             const k = malhaKey(l);
             switchTab('stock');
+            if (!artigoTemStock(l)) mostrarEscondidos({ rolos: 0, archived: l.archived });
             document.getElementById('search-stock').value = malhaNome(l);
             STOCK_DIMS.forEach(d => { const e = document.getElementById(d.id); if (e) e.value = ''; });
             expandedMalha.add(k);
@@ -2884,7 +3203,7 @@
         }
         function irParaLoteMov(id) {
             const l = lotes.find(x => String(x.id) === String(id)); if (!l) return;
-            if (l.rolos > 0) mostrarLoteNoStock(l); else irParaArtigoMov(id);
+            mostrarLoteNoStock(l);
         }
         function loteDoMov(m) {
             const l = lotes.find(x => x.id === m.malha_id);
@@ -2926,7 +3245,7 @@
                     <td class="py-3 px-4 font-semibold text-slate-900" data-label="Lote">${movLink(m, 'lote', loteDoMov(m))}</td>
                     <td class="py-3 px-4 text-xs" data-label="OF">${esc(m.of_num || '-')}</td>
                     <td class="py-3 px-4 font-medium" data-label="Tear">${esc(m.tear || '-')}</td>
-                    <td class="py-3 px-4 text-xs text-slate-600" data-label="Entidade">${esc(m.entity_name || '-')}</td>
+                    <td class="py-3 px-4 text-xs text-slate-600" data-label="Entidade"><div>${esc(m.entity_name || '-')}${obsHtml(m)}</div></td>
                     <td class="py-3 px-4 text-center font-bold" data-label="Rolos">${m.rolos}</td>
                     <td class="py-3 px-4 text-center font-bold ${movPositivo(m) ? 'text-emerald-600' : 'text-rose-600'}" data-label="Peso líq.">${movPositivo(m) ? '+' : '-'}${esc(formatKg(m.peso))}</td>
                     <td class="py-3 px-4 text-xs" data-label="Utilizador">${userCell(m)}</td>
@@ -2947,14 +3266,29 @@
             renderMovimentos();
         }
 
+        // Data ISO → valor de um campo datetime-local (hora local)
+        function isoParaInput(iso) {
+            const d = new Date(iso);
+            if (isNaN(d)) return '';
+            const p = n => String(n).padStart(2, '0');
+            return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}T${p(d.getHours())}:${p(d.getMinutes())}`;
+        }
+        // É a entrada que criou o lote? (a mais antiga das entradas desse lote)
+        function entradaInicial(m) {
+            if (m.type !== 'entrada') return false;
+            const es = movimentos.filter(x => x.malha_id === m.malha_id && x.type === 'entrada')
+                .sort((a, b) => String(a.date || '').localeCompare(String(b.date || '')));
+            return !!es.length && es[0].id === m.id;
+        }
         function openEditMovModal(id) {
             const m = movimentos.find(x => x.id === id);
             if (!m) return;
-            if (m.type === 'ajuste') { showToast('Os ajustes manuais não se editam. Altera o lote no Stock Atual.', 'error'); return; }
+            const extra = ehEntradaExtra(m);
+            if (m.type === 'ajuste' && !extra) { showToast('Os ajustes manuais não se editam. Altera o lote no Stock Atual.', 'error'); return; }
             document.getElementById('edit-mov-form').reset();
             clearFieldErrors(document.getElementById('edit-mov-form'));
             document.getElementById('edit-mov-id').value = id;
-            document.getElementById('edit-mov-info').textContent = `${m.type === 'entrada' ? 'Entrada' : 'Saída'} · ${m.sku}`;
+            document.getElementById('edit-mov-info').textContent = `${extra ? 'Entrada extra (ex.: devolução)' : m.type === 'entrada' ? 'Entrada' : 'Saída'} · ${m.sku}`;
             const lotMov = lotes.find(x => x.id === m.malha_id);
             fillEditArtigo(lotMov ? lotMov.tipo_malha : '');
             document.getElementById('edit-lote').value = lotMov ? (lotMov.lote_fio || '') : '';
@@ -2962,9 +3296,14 @@
                 .sort((a, b) => String(a).localeCompare(String(b), 'pt', { numeric: true }))
                 .map(v => `<option value="${esc(v)}"></option>`).join('');
             document.getElementById('edit-tear').value = m.tear || '';
+            const dEl = document.getElementById('edit-mov-data');
+            dEl.value = isoParaInput(m.date);
+            dEl.dataset.orig = dEl.value;
+            document.getElementById('edit-mov-data-hint').classList.toggle('hidden', !entradaInicial(m));
             document.getElementById('edit-rolos').value = m.rolos;
             document.getElementById('edit-peso').value = m.peso;
-            fillEntitySelect('edit-entidade', null, m.type === 'entrada' ? ['Fornecedor', 'Ambos'] : ['Cliente', 'Ambos'], m.entity_name || '');
+            fillEntitySelect('edit-entidade', null, extra ? null : m.type === 'entrada' ? ['Fornecedor', 'Ambos'] : ['Cliente', 'Ambos'], extra ? origemExtra(m) : (m.entity_name || ''));
+            document.getElementById('edit-mov-obs').value = String(m.observacoes || '');
             document.getElementById('edit-mov-modal').classList.remove('hidden');
         }
         // ===== LEITOR DE CÓDIGOS (câmara do telemóvel) =====
@@ -3009,6 +3348,12 @@
             const sc = scanner; scanner = null;
             if (sc) { try { await sc.stop(); } catch (e) {} try { sc.clear(); } catch (e) {} }
         }
+        // Esc fecha a janela aberta (a calculadora e o leitor de códigos têm o seu próprio Esc e fecham primeiro)
+        document.addEventListener('keydown', e => {
+            if (e.key !== 'Escape' || !document.getElementById('scanner-modal').classList.contains('hidden')) return;
+            ['a5-modal', 'label-modal', 'edit-lote-modal', 'pick-saida-modal', 'note-modal', 'del-lote-modal', 'entrada-lote-modal', 'saida-modal',
+             'bulk-supplier-modal', 'bulk-artigo-modal', 'edit-mov-modal', 'entity-modal'].forEach(id => document.getElementById(id)?.classList.add('hidden'));
+        });
         function scannerManual() {
             const v = document.getElementById('scanner-manual').value;
             if (v.trim()) handleCodigoLido(v);
@@ -3036,12 +3381,17 @@
             const l = lotes.find(x => String(x.sku || '').trim().toUpperCase() === code);
             if (!l) { scanStatus(`Código "${code}" não encontrado.`, true); return; }
             if (navigator.vibrate) try { navigator.vibrate(80); } catch (e) {}
-            if (!(l.rolos > 0)) { scanStatus(`O lote ${l.sku} está esgotado (sem stock).`, true); return; }
             closeScanner();
             mostrarLoteNoStock(l);
         }
+        // Liga "Mostrar esgotados" / "Mostrar arquivados" quando o que se quer ver está escondido
+        function mostrarEscondidos(l) {
+            if (!(l.rolos > 0)) { const z = document.getElementById('show-zero-stock'); if (z) z.checked = true; }
+            if (l.archived) { const a = document.getElementById('show-archived'); if (a) a.checked = true; }
+        }
         function mostrarLoteNoStock(l) {
             switchTab('stock');
+            mostrarEscondidos(l);
             document.getElementById('search-stock').value = l.sku;   // mostra só este lote
             STOCK_DIMS.forEach(d => { const e = document.getElementById(d.id); if (e) e.value = ''; });
             renderStock();
@@ -3050,7 +3400,7 @@
             row.scrollIntoView({ block: 'center', behavior: 'smooth' });
             row.classList.add('row-flash');
             setTimeout(() => row.classList.remove('row-flash'), 3000);
-            showToast(`Lote ${l.sku} encontrado.`);
+            showToast(l.rolos > 0 ? `Lote ${l.sku} encontrado.` : `Lote ${l.sku} encontrado (esgotado).`);
         }
 
         // Artigo no modal de edição: todas as opções disponíveis + "Outro (escrever)…"
@@ -3119,6 +3469,54 @@
             closeBulkSupplierModal();
         }
 
+        // ===== RENOMEAR / JUNTAR ARTIGOS (o artigo é texto livre: um erro de escrita criava um artigo à parte) =====
+        const artNome = l => String(l.tipo_malha || '').trim();
+        function openBulkArtigoModal() {
+            const nomes = new Map();
+            for (const l of lotes) { const t = artNome(l); if (t) nomes.set(t, (nomes.get(t) || 0) + 1); }
+            const list = [...nomes.keys()].sort((a, b) => a.localeCompare(b, 'pt', { numeric: true, sensitivity: 'base' }));
+            document.getElementById('bulk-art-from').innerHTML = '<option value="">— Selecione —</option>' + list.map(n => `<option value="${esc(n)}">${esc(n)}  (${nomes.get(n)} ${nomes.get(n) === 1 ? 'lote' : 'lotes'})</option>`).join('');
+            document.getElementById('bulk-art-list').innerHTML = list.map(n => `<option value="${esc(n)}"></option>`).join('');
+            document.getElementById('bulk-art-to').value = '';
+            updateBulkArtigoInfo();
+            document.getElementById('bulk-artigo-modal').classList.remove('hidden');
+            scheduleIcons();
+        }
+        function closeBulkArtigoModal() { document.getElementById('bulk-artigo-modal').classList.add('hidden'); }
+        // Devolve { from, to, ids, junta } ou null; se o nome certo já existe com outras maiúsculas/acentos, usa a grafia existente
+        function bulkArtigoPlano() {
+            const from = document.getElementById('bulk-art-from').value;
+            let to = document.getElementById('bulk-art-to').value.trim().replace(/\s+/g, ' ');
+            if (!from || !to) return null;
+            const existente = lotes.map(artNome).find(n => n && n !== from && normTxt(n) === normTxt(to));
+            if (existente) to = existente;
+            return { from, to, junta: !!existente, ids: lotes.filter(l => artNome(l) === from).map(l => l.id) };
+        }
+        function updateBulkArtigoInfo() {
+            const info = document.getElementById('bulk-art-info'), btn = document.getElementById('bulk-art-btn');
+            const p = bulkArtigoPlano();
+            if (!p) { info.textContent = 'Escolha o artigo a corrigir e escreva o nome certo.'; btn.disabled = true; return; }
+            if (p.from === p.to) { info.textContent = 'Os dois nomes são iguais.'; btn.disabled = true; return; }
+            info.innerHTML = `<strong>${esc(p.from)}</strong> → <strong>${esc(p.to)}</strong><br>${p.ids.length} lote(s) ${p.junta ? 'juntam-se ao artigo que já existe' : 'passam a ter este nome'}.`;
+            btn.disabled = !p.ids.length;
+        }
+        async function applyBulkArtigo() {
+            const p = bulkArtigoPlano();
+            if (!p || p.from === p.to || !p.ids.length) return;
+            if (!confirm(`${p.junta ? 'Juntar' : 'Renomear'} "${p.from}" ${p.junta ? 'a' : 'para'} "${p.to}" em ${p.ids.length} lote(s)?`)) return;
+            const btn = document.getElementById('bulk-art-btn');
+            btn.disabled = true;
+            let error = null;
+            // sem updated_by/updated_at: não passa a constar como "último utilizador" de todos os lotes
+            for (let i = 0; i < p.ids.length && !error; i += 150) ({ error } = await db.from('malha').update({ tipo_malha: p.to }).in('id', p.ids.slice(i, i + 150)));
+            btn.disabled = false;
+            if (error) { console.error(error); showToast('Erro ao mudar o artigo: ' + (error.message || '') + ' Parte dos lotes pode já ter mudado.', 'error'); await loadData(); refreshAll(); return; }
+            showToast(`Artigo ${p.junta ? 'junto' : 'renomeado'} em ${p.ids.length} lote(s).`);
+            await loadData();
+            refreshAll();
+            closeBulkArtigoModal();
+        }
+
         function closeEditMovModal() { document.getElementById('edit-mov-modal').classList.add('hidden'); }
 
         async function handleEditMovSubmit(e) {
@@ -3136,11 +3534,29 @@
             const tipoMalha = artSel === OUTRO ? document.getElementById('edit-artigo-outro').value.trim() : artSel;
             const loteFio = document.getElementById('edit-lote').value.trim();
 
+            // Data: só é gravada se foi alterada (mantém os segundos do registo original)
+            const dEl = document.getElementById('edit-mov-data');
+            let novaData = null;
+            if (dEl.value && dEl.value !== dEl.dataset.orig) {
+                const [dia, hora] = dEl.value.split('T');
+                const [y, mo, d] = dia.split('-').map(Number), [hh, mm] = (hora || '00:00').split(':').map(Number);
+                const o = new Date(m.date);
+                const nd = new Date(y, mo - 1, d, hh, mm, isNaN(o) ? 0 : o.getSeconds());
+                if (isNaN(nd)) { setFieldError(dEl, 'Indique uma data válida.'); return; }
+                novaData = nd.toISOString();
+            }
+
             const patch = { tear };
             if (l) { patch.tipo_malha = tipoMalha; patch.lote_fio = loteFio; }
+            if (l && novaData && entradaInicial(m)) patch.created_at = novaData;   // a data de entrada do lote acompanha a da sua entrada
             if (l) {
                 const dR = rolos - m.rolos, dP = round2(peso - m.peso);
                 if (m.type === 'saida') { patch.rolos = l.rolos - dR; patch.peso = round2(l.peso - dP); }
+                else if (ehEntradaExtra(m)) {   // entrada extra: soma ao stock; o total inicial só sobe se for ultrapassado
+                    patch.rolos = l.rolos + dR; patch.peso = round2(l.peso + dP);
+                    if (patch.rolos > (l.rolos_inicial || 0)) patch.rolos_inicial = patch.rolos;
+                    if (patch.peso > (l.peso_inicial || 0)) patch.peso_inicial = patch.peso;
+                }
                 else { patch.rolos = l.rolos + dR; patch.rolos_inicial = l.rolos_inicial + dR; patch.peso = round2(l.peso + dP); patch.peso_inicial = round2(l.peso_inicial + dP); }
                 if (patch.rolos < 0 || patch.peso < -0.004) { setFieldError('edit-rolos', 'Stock insuficiente para esta alteração.'); return; }
                 patch.peso = Math.max(0, patch.peso);
@@ -3151,7 +3567,14 @@
             btn.disabled = true;
             let error = null;
             if (l) ({ error } = await updateLote(l.id, patch, { rolos: l.rolos, peso: l.peso }));
-            if (!error) ({ error } = await db.from('malha_movimentos').update({ rolos, peso, entity_name: entidade || null }).eq('id', m.id));
+            const nomeEnt = ehEntradaExtra(m) ? (entidade ? `Entrada (+) · ${entidade}` : 'Entrada (+)') : (entidade || null);
+            const movPatch = { rolos, peso, entity_name: nomeEnt, ...(novaData ? { date: novaData } : {}) };
+            const obsNova = document.getElementById('edit-mov-obs').value.trim();
+            const mudaObs = obsNova !== String(m.observacoes || '').trim();
+            if (!error) {
+                ({ error } = await db.from('malha_movimentos').update(mudaObs ? { ...movPatch, observacoes: obsNova || null } : movPatch).eq('id', m.id));
+                if (error && mudaObs && /observacoes/.test(error.message || '')) { avisoObsFalta(); ({ error } = await db.from('malha_movimentos').update(movPatch).eq('id', m.id)); }
+            }
             if (!error && l) ({ error } = await db.from('malha_movimentos').update({ tear }).eq('malha_id', l.id));
             btn.disabled = false;
             if (error) { showToast(friendlyDbError(error), 'error'); await loadData(); refreshAll(); return; }
@@ -3166,7 +3589,18 @@
             if (!m) return;
             const l = lotes.find(x => x.id === m.malha_id);
             let error = null;
-            if (m.type === 'ajuste') {
+            if (ehEntradaExtra(m) && l) {
+                // Entrada extra (ex.: devolução): eliminar tira do lote o que ela lá pôs
+                if (l.rolos < m.rolos || l.peso < m.peso - 0.004) { showToast(`Não é possível eliminar: o lote já só tem ${l.rolos} rolo(s) e ${formatKg(l.peso)}, menos do que esta entrada (${m.rolos} · ${formatKg(m.peso)}). Corrija o stock em “Editar lote”.`, 'error'); return; }
+                if (!confirm(`Eliminar esta entrada? Saem do stock do lote ${m.rolos} rolo(s) e ${formatKg(m.peso)}.`)) return;
+                let novosRolos = l.rolos - m.rolos, novoPeso = Math.max(0, round2(l.peso - m.peso));
+                if (novoPeso <= 0.004) { novoPeso = 0; novosRolos = 0; } else if (novosRolos === 0) novosRolos = 1;   // a mesma regra das saídas
+                ({ error } = await updateLote(l.id, { rolos: novosRolos, peso: novoPeso }, { rolos: l.rolos, peso: l.peso }));
+                if (!error) {
+                    ({ error } = await db.from('malha_movimentos').delete().eq('id', m.id));
+                    if (error) await updateLote(l.id, { rolos: l.rolos, peso: l.peso });   // desfaz
+                }
+            } else if (m.type === 'ajuste') {
                 if (!confirm('Eliminar este registo de ajuste? O stock do lote NÃO é alterado, só desaparece o registo.')) return;
                 ({ error } = await db.from('malha_movimentos').delete().eq('id', m.id));
             } else if (m.type === 'saida') {
@@ -3208,11 +3642,12 @@
                     <td class="py-3 px-4 text-xs text-slate-500">${esc(e.address || '-')}</td>
                     <td class="py-3 px-4 text-center sticky-col-right bg-white shadow-xs border-l border-slate-100">
                         <div class="flex items-center justify-center space-x-1">
+                            <button onclick="toggleEntHist('${esc(e.id)}')" title="Ver movimentos da entidade" aria-label="Ver movimentos da entidade" class="p-1.5 transition ${openEntHist.has(String(e.id)) ? 'text-blue-600' : 'text-slate-400 hover:text-blue-600'}"><i data-lucide="history" class="w-4 h-4"></i></button>
                             <button onclick="openEntityModal('${esc(e.id)}')" title="Editar Entidade" class="p-1.5 text-slate-400 hover:text-blue-600 transition"><i data-lucide="edit-3" class="w-4 h-4"></i></button>
                             <button onclick="deleteEntity('${esc(e.id)}')" title="Eliminar Entidade" class="p-1.5 text-slate-400 hover:text-rose-600 transition"><i data-lucide="trash-2" class="w-4 h-4"></i></button>
                         </div>
                     </td>
-                </tr>`).join('') || '<tr><td colspan="7" class="text-center py-6 text-slate-400">Nenhuma entidade encontrada.</td></tr>') + moreEnt;
+                </tr>${openEntHist.has(String(e.id)) ? entHistHtml(e) : ''}`).join('') || '<tr><td colspan="7" class="text-center py-6 text-slate-400">Nenhuma entidade encontrada.</td></tr>') + moreEnt;
             scheduleIcons();
         }
         function openEntityModal(id = null) {
@@ -3404,8 +3839,12 @@
 
             const body = list.map(m => {
                 const hora = fmtHora(m.date).slice(0, 5);
-                return `<tr>
+                const pos = movPositivo(m), tp = tipoMov(m);
+                // Entradas com fundo cinzento e letra a negrito: distinguem-se numa impressora laser a preto e branco (igual aos Fios)
+                const st = pos ? ' style="background:#d0d0d0;-webkit-print-color-adjust:exact;print-color-adjust:exact;font-weight:700"' : '';
+                return `<tr${st}>
                     <td style="white-space:nowrap">${esc(fmtData(m.date))}${hora ? ' ' + esc(hora) : ''}</td>
+                    <td style="white-space:nowrap">${tp === 'ajuste' ? (pos ? 'Ajuste (+)' : 'Ajuste (−)') : pos ? '▼ ENTRADA' : '▲ Saída'}</td>
                     <td>${esc(artigoDoMov(m))}</td>
                     <td style="word-break:break-all">${esc(loteDoMov(m))}</td>
                     <td class="num">${movPositivo(m) ? '+' : '-'}${esc(formatKg(m.peso))}</td>
@@ -3413,10 +3852,10 @@
                 </tr>`;
             }).join('');
             document.getElementById('printable-list-area').innerHTML = `<table style="table-layout:fixed;width:100%">
-                <colgroup><col style="width:14%"><col style="width:34%"><col style="width:16%"><col style="width:14%"><col style="width:22%"></colgroup>
-                <thead><tr><th>Data</th><th>Artigo</th><th>Lote</th><th class="num">Peso</th><th>Entidade</th></tr></thead>
+                <colgroup><col style="width:13%"><col style="width:10%"><col style="width:29%"><col style="width:14%"><col style="width:13%"><col style="width:21%"></colgroup>
+                <thead><tr><th>Data</th><th>Tipo</th><th>Artigo</th><th>Lote</th><th class="num">Peso</th><th>Entidade</th></tr></thead>
                 <tbody>${body}</tbody></table>
-                <p style="margin-top:8px;font-size:11px;color:#475569;">${list.length} ${list.length === 1 ? 'movimento' : 'movimentos'}</p>`;
+                <p style="margin-top:8px;font-size:11px;color:#475569;"><span style="display:inline-block;width:14px;height:10px;vertical-align:middle;border:1px solid #888;background:#d0d0d0;-webkit-print-color-adjust:exact;print-color-adjust:exact"></span> Entrada (fundo cinzento) · sem fundo: Saída · ${list.length} ${list.length === 1 ? 'movimento' : 'movimentos'}</p>`;
 
             setPrintHeader('Oliveira & Gonçalves - Movimentos de Malha em Cru');   // também limpa o modo etiquetas/lista
             const s = document.getElementById('filter-mov-start').value, f = document.getElementById('filter-mov-end').value;
@@ -3431,9 +3870,18 @@
         }
 
         // ===== EXPORTAR =====
-        function exportBackupJSON() {
-            downloadBlob(JSON.stringify({ malha: lotes, malha_movimentos: movimentos, entities }, null, 2),
-                `backup_malha_${new Date().toISOString().slice(0, 10)}.json`, 'application/json');
+        // Backup completo, com as mesmas tabelas e o mesmo formato dos Fios e do backup diário:
+        // repõe-se em Fios › Relatórios › Restaurar backup.
+        async function exportBackupJSON() {
+            try {
+                const b = { app: 'og-stock', versao: 2, criado_em: new Date().toISOString() };
+                for (const t of ['products', 'lots', 'entities', 'movements', 'malha', 'malha_movimentos']) b[t] = await fetchAllRows(t, '*', [['id', true]]);
+                downloadBlob(JSON.stringify(b), `backup_${hojeInput().replace('T', '_').replace(':', 'h')}.json`, 'application/json');
+                showToast(`Backup feito: ${b.malha.length} lotes de malha e ${b.malha_movimentos.length} movimentos, mais os dados dos fios e as entidades.`);
+            } catch (e) {
+                console.error('Erro no backup:', e);
+                showToast('Erro ao fazer o backup. Nada foi descarregado.', 'error');
+            }
         }
         function exportStockCSV() {
             const head = ['SKU', 'OF', 'Tear', 'NE Fio', 'Jogo', 'Lote Fio', 'Tipo Malha', 'Fornecedor', 'Rolos', 'Peso Líq. (kg)', 'Localização', 'Criado em (data)', 'Criado em (hora)', 'Últ. utilizador'];
@@ -3443,9 +3891,9 @@
             downloadBlob('\uFEFF' + lines.join('\n'), 'stock_malha.csv', 'text/csv;charset=utf-8');
         }
         function exportMovimentosCSV() {
-            const head = ['Data', 'Hora', 'Tipo', 'Artigo', 'SKU', 'OF', 'Tear', 'Entidade', 'Rolos', 'Peso Líq. (kg)', 'Utilizador', 'Alterado por'];
+            const head = ['Data', 'Hora', 'Tipo', 'Sinal', 'Artigo', 'SKU', 'OF', 'Tear', 'Entidade', 'Rolos', 'Peso Líq. (kg)', 'Observações', 'Utilizador', 'Alterado por'];
             const lines = [head.map(csvCell).join(';')].concat(movimentos.map(m =>
-                [fmtData(m.date), fmtHora(m.date), m.type, artigoDoMov(m) === '-' ? '' : artigoDoMov(m), m.sku, m.of_num, m.tear, m.entity_name, m.rolos, m.peso, m.created_by || '', m.updated_by || ''].map(csvCell).join(';')));
+                [fmtData(m.date), fmtHora(m.date), tipoMov(m), movPositivo(m) ? '+' : '-', artigoDoMov(m) === '-' ? '' : artigoDoMov(m), m.sku, m.of_num, m.tear, m.entity_name, m.rolos, m.peso, m.observacoes || '', m.created_by || '', m.updated_by || ''].map(csvCell).join(';')));
             downloadBlob('\uFEFF' + lines.join('\n'), 'movimentos_malha.csv', 'text/csv;charset=utf-8');
         }
 
