@@ -2138,7 +2138,22 @@
 
         // VERIFICAR SESSÃO DE AUTENTICAÇÃO AO CARREGAR A PÁGINA
 
+        // Vindo do Armazém de Malhas, a sessão pode chegar no endereço (#sb_at=...&sb_rt=...): tira-a logo de lá,
+        // para não ficar na barra de endereços nem no histórico do browser, e usa-a só se ainda não houver sessão.
+        async function restoreSessionFromLink() {
+            const h = new URLSearchParams(window.location.hash.slice(1));
+            const at = h.get('sb_at'), rt = h.get('sb_rt');
+            if (!at && !rt) return;
+            history.replaceState(null, '', window.location.pathname + window.location.search);
+            if (!at || !rt) return;
+            try {
+                const { data: { session } } = await db.auth.getSession();
+                if (!session) await db.auth.setSession({ access_token: at, refresh_token: rt });
+            } catch (e) { console.error('Erro ao restaurar a sessão:', e); }
+        }
+
         window.addEventListener('DOMContentLoaded', async () => {
+            await restoreSessionFromLink();
             const { data: { session } } = await db.auth.getSession();
             
             if (session) {
