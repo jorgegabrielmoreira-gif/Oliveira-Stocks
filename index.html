@@ -969,6 +969,10 @@
                         <i data-lucide="download" class="w-4 h-4"></i>
                         <span>Exportar Backup (.json)</span>
                     </button>
+                    <button onclick="openRestoreModal()" title="Repõe os dados a partir de um ficheiro de backup" class="inline-flex items-center space-x-2 bg-rose-600 hover:bg-rose-700 text-white text-xs sm:text-sm font-medium px-4 py-2.5 rounded-xl transition shadow-xs">
+                        <i data-lucide="archive-restore" class="w-4 h-4"></i>
+                        <span>Restaurar backup</span>
+                    </button>
                     <button onclick="exportCSV()" class="inline-flex items-center space-x-2 bg-slate-800 hover:bg-slate-900 text-white text-xs sm:text-sm font-medium px-4 py-2.5 rounded-xl transition shadow-xs">
                         <i data-lucide="file-spreadsheet" class="w-4 h-4"></i>
                         <span>Exportar CSV</span>
@@ -1422,6 +1426,29 @@
                 <div class="flex justify-end gap-2 pt-1">
                     <button type="button" onclick="closeImportSupModal()" class="px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-100 rounded-xl">Fechar</button>
                     <button type="button" id="import-sup-apply" onclick="applyImportSup()" disabled class="px-4 py-2 text-sm font-medium text-white bg-amber-500 hover:bg-amber-600 rounded-xl disabled:opacity-40">Aplicar</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL: restaurar backup -->
+    <div id="restore-modal" class="fixed inset-0 bg-slate-900/50 backdrop-blur-xs z-50 flex items-center justify-center p-4 hidden no-print">
+        <div class="bg-white rounded-2xl shadow-xl max-w-xl w-full border border-slate-200 max-h-[90vh] flex flex-col my-auto">
+            <div class="px-6 py-4 border-b border-slate-100 flex items-center justify-between bg-rose-50 shrink-0">
+                <h3 class="font-bold text-rose-900 text-base">Restaurar backup</h3>
+                <button type="button" onclick="closeRestoreModal()" aria-label="Fechar" class="text-slate-400 hover:text-slate-600 p-1"><i data-lucide="x" class="w-5 h-5"></i></button>
+            </div>
+            <div class="p-6 space-y-4 overflow-y-auto custom-scrollbar flex-1 text-sm">
+                <p class="text-xs text-slate-600">Escolha um ficheiro de backup (.json): o <strong>backup_AAAA-MM-DD.json</strong> diário do repositório de backups, ou um exportado nesta aplicação. O restauro <strong>substitui todos os dados atuais</strong> (produtos, lotes, entidades e movimentos) pelos do ficheiro. Antes de restaurar, a app descarrega um backup do estado atual.</p>
+                <input type="file" id="restore-file" accept=".json,application/json" onchange="handleRestoreFile(this.files[0])" class="block w-full text-xs text-slate-600 file:mr-3 file:py-2 file:px-3 file:rounded-xl file:border-0 file:bg-rose-100 file:text-rose-800 file:font-medium">
+                <div id="restore-result" class="space-y-3"></div>
+                <div id="restore-confirm-wrap" class="hidden">
+                    <label for="restore-confirm" class="block text-xs font-medium mb-1">Para confirmar, escreva <strong>RESTAURAR</strong></label>
+                    <input type="text" id="restore-confirm" autocomplete="off" autocapitalize="characters" oninput="updateRestoreBtn()" class="w-full px-3 py-2 text-sm border-2 border-rose-200 rounded-xl outline-none">
+                </div>
+                <div class="flex justify-end gap-2 pt-1">
+                    <button type="button" onclick="closeRestoreModal()" class="px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-100 rounded-xl">Fechar</button>
+                    <button type="button" id="restore-apply" onclick="applyRestore()" disabled class="px-4 py-2 text-sm font-medium text-white bg-rose-600 hover:bg-rose-700 rounded-xl disabled:opacity-40">Restaurar</button>
                 </div>
             </div>
         </div>
@@ -2360,6 +2387,10 @@
             if (!validateForm(document.getElementById('movement-form'))) return;
             const btn = document.getElementById('movement-submit-btn');
             const editId = document.getElementById('movement-edit-id').value;
+            if (editId) {
+                const tipoSis = movSistemaTipo(movements.find(x => String(x.id) === String(editId)));
+                if (tipoSis) { showToast(MOV_SISTEMA_EDITAR[tipoSis], 'error'); return; }
+            }
             const type = document.getElementById('movement-type').value;
             const date = document.getElementById('movement-date').value;
             const product_id = document.getElementById('movement-product-id').value;
@@ -2469,6 +2500,9 @@
         }
 
         async function deleteMovement(id) {
+            const tipoSis = movSistemaTipo(movements.find(m => String(m.id) === String(id)));
+            if (tipoSis === 'divisao') return anularDivisao(id);
+            if (tipoSis === 'identificacao') { showToast('Este movimento identifica uma palete a partir de stock que já existia. Para o desfazer, use “Eliminar palete (engano)” na lista de paletes do lote.', 'error'); return; }
             if (!confirm('Tem a certeza de que deseja eliminar este movimento? O stock do produto será corrigido automaticamente.')) return;
 
             const { error } = await db.from('movements').delete().eq('id', id);
@@ -2501,7 +2535,7 @@
         }
 
         document.addEventListener('keydown', ev => {
-            if (ev.key === 'Escape') ['label-modal','product-modal','entity-modal','movement-modal','lot-modal'].forEach(id => document.getElementById(id)?.classList.add('hidden'));
+            if (ev.key === 'Escape') ['label-modal','product-modal','entity-modal','movement-modal','lot-modal','restore-modal'].forEach(id => document.getElementById(id)?.classList.add('hidden'));
         });
 
         function refreshAll() {
@@ -3252,6 +3286,59 @@
 
         // "Ocultar acertos": esconde os movimentos de Acerto de inventário no ecrã e na impressão (a escolha fica neste browser)
         const isAcerto = m => String(m.entity_name || '').trim().toLowerCase() === 'acerto de inventário';
+        // Movimentos criados pela própria app. As paletes são calculadas a partir deles (e do texto das notas), por isso não se editam à mão.
+        // 'divisao' = par entrada+saída iguais; 'identificacao' = palete criada a partir de stock que já existia; 'acerto' = acerto de peso ou de lote
+        function movSistemaTipo(m) {
+            if (!m || !isAcerto(m)) return '';
+            const n = String(m.notes || '');
+            if (/^Divisão( anulada)?:/.test(n)) return 'divisao';
+            if (/^Stock que já existia/.test(n)) return 'identificacao';
+            if (/^(Acerto do lote:|Acerto de peso:|Palete .+ eliminada \(engano\))/.test(n)) return 'acerto';
+            return '';
+        }
+        const MOV_SISTEMA_EDITAR = {
+            divisao: 'As divisões de paletes não se editam: anule a divisão (botão do lixo) e faça-a de novo.',
+            identificacao: 'Este movimento identifica uma palete e não se edita aqui. Use “Editar palete” na lista de paletes do lote.',
+            acerto: 'Os acertos feitos pela aplicação não se editam: elimine este acerto ou faça um novo em “Acertar lote”.'
+        };
+        // A outra linha de uma divisão: mesmo lote, data e peso, tipo contrário e a mesma palete de destino nas notas
+        const divisaoChave = m => String(m.notes || '').replace(/^Divisão: .*?passam para/, 'passam para');
+        function parDivisao(m) {
+            const lk = String(m.lote || '').trim().toLowerCase(), k = divisaoChave(m);
+            const c = movements.filter(x => String(x.id) !== String(m.id) && x.type !== m.type && movSistemaTipo(x) === 'divisao'
+                && String(x.product_id) === String(m.product_id) && String(x.lote || '').trim().toLowerCase() === lk
+                && String(x.date || '') === String(m.date || '') && Math.abs((Number(x.qty) || 0) - (Number(m.qty) || 0)) <= 0.0005
+                && divisaoChave(x) === k);
+            return c.length === 1 ? c[0] : null;
+        }
+        // Anular uma divisão = apagar as duas linhas no mesmo pedido (ou as duas ou nenhuma): o stock do lote não muda
+        async function anularDivisao(id) {
+            if (!movementsFull) await ensureAllMovements();
+            if (!movementsFull) { showToast('Histórico por carregar. Tente de novo.', 'error'); return; }
+            const m = movements.find(x => String(x.id) === String(id));
+            if (!m) return;
+            const par = parDivisao(m);
+            if (!par) { showToast('Não encontrei a outra linha desta divisão, por isso não a posso anular aqui. Use “Acertar lote” para corrigir os pesos.', 'error'); return; }
+            const ent = m.type === 'entrada' ? m : par, kg = Number(ent.qty) || 0;
+            const nome = String(ent.palete || '').trim();
+            const lot = findLotOf(ent);
+            if (lot) {
+                // o que a divisão pôs nesta palete (ou nas paletes fechadas) ainda tem de lá estar
+                const pals = lotPallets(lot);
+                const tem = nome ? ((pals.find(x => x.name && x.name.toLowerCase() === nome.toLowerCase()) || {}).saldo || 0)
+                    : (Number(lot.qty) || 0) - pals.reduce((t, x) => t + (x.name ? x.saldo : 0), 0);
+                if (tem < kg - 0.005) { showToast(`Não é possível anular: ${nome ? 'a palete ' + nome + ' já só tem' : 'as paletes fechadas já só têm'} ${formatKg(Math.max(0, tem))} dos ${formatKg(kg)} desta divisão. Use “Acertar lote”.`, 'error'); return; }
+            }
+            if (!confirm(`Anular esta divisão?\n\n${m.notes || ''}\n\nSão apagadas as duas linhas (a entrada e a saída de ${formatKg(kg)}). O stock do lote não muda.`)) return;
+            const ids = [m.id, par.id];
+            const { error } = await db.from('movements').delete().in('id', ids);
+            if (error) { showToast(friendlyDbError(error), 'error'); return; }
+            movements = movements.filter(x => !ids.some(i => String(i) === String(x.id)));
+            movVersion++;
+            await loadData({ products: true, lots: true });
+            showToast('Divisão anulada: as duas linhas foram apagadas.');
+            refreshAll();
+        }
         function setHideAcertos(on) {
             try { localStorage.setItem('hideAcertos', on ? '1' : '0'); } catch (e) {}
             renderMovementsTable();
@@ -3321,8 +3408,10 @@
                         <div class="flex items-center justify-center space-x-1">
                             ${m.product_id ? historyBtn(`toggleMovHistory('${esc(m.id)}')`, openMovHistory.has(String(m.id)), 'Ver histórico deste produto') : ''}
                             <button onclick="abrirCalcMov('${esc(m.id)}')" title="Calculadora" aria-label="Calculadora" class="p-1.5 text-slate-400 hover:text-indigo-600 transition"><i data-lucide="calculator" class="w-4 h-4"></i></button>
-                            <button onclick="openMovementModal('${esc(m.type)}', '${esc(m.id)}')" title="Editar Movimento" class="p-1.5 text-slate-400 hover:text-blue-600 transition"><i data-lucide="edit-3" class="w-4 h-4"></i></button>
-                            <button onclick="deleteMovement('${esc(m.id)}')" title="Eliminar Movimento" class="p-1.5 text-slate-400 hover:text-rose-600 transition"><i data-lucide="trash-2" class="w-4 h-4"></i></button>
+                            ${movSistemaTipo(m)
+                                ? `<span title="${esc(MOV_SISTEMA_EDITAR[movSistemaTipo(m)])}" aria-label="Movimento criado pela aplicação: não se edita" class="inline-flex p-1.5 text-slate-300 cursor-help"><i data-lucide="lock" class="w-4 h-4"></i></span>`
+                                : `<button onclick="openMovementModal('${esc(m.type)}', '${esc(m.id)}')" title="Editar Movimento" class="p-1.5 text-slate-400 hover:text-blue-600 transition"><i data-lucide="edit-3" class="w-4 h-4"></i></button>`}
+                            ${movSistemaTipo(m) === 'identificacao' ? '' : `<button onclick="deleteMovement('${esc(m.id)}')" title="${movSistemaTipo(m) === 'divisao' ? 'Anular divisão (apaga as duas linhas)' : 'Eliminar Movimento'}" class="p-1.5 text-slate-400 hover:text-rose-600 transition"><i data-lucide="trash-2" class="w-4 h-4"></i></button>`}
                         </div>
                     </td>
                 </tr>${m.product_id && openMovHistory.has(String(m.id)) ? productHistoryPanel(m.product_id, 9, m.id) : ''}
@@ -3883,6 +3972,10 @@
         function closeEntityModal() { document.getElementById('entity-modal').classList.add('hidden'); }
 
         function openMovementModal(type = 'entrada', id = null) {
+            if (id) {
+                const tipoSis = movSistemaTipo(movements.find(mov => String(mov.id) === String(id)));
+                if (tipoSis) { showToast(MOV_SISTEMA_EDITAR[tipoSis], 'error'); return; }
+            }
             devolucaoAberta = false;
             saidaListaReset();
             document.getElementById('movement-form').reset();
@@ -5083,9 +5176,135 @@
                 <td class="text-right">${formatEuro(map[cat].sales)}</td></tr>`).join('');
         }
 
-        async function exportBackupJSON() {
-            await ensureAllMovements();
-            downloadBlob(JSON.stringify({ products, entities, movements }, null, 2), 'backup.json', 'application/json');
+        // ===== BACKUP COMPLETO E RESTAURO =====
+        // O backup lê as 4 tabelas diretamente da base de dados, com todas as colunas (é o que o restauro precisa).
+        const BACKUP_APP = 'og-stock', BACKUP_VERSAO = 2;
+        const BACKUP_TABELAS = ['products', 'lots', 'entities', 'movements'];
+        const BACKUP_MALHAS = ['malha', 'malha_movimentos'];   // armazém de malhas: entram no backup se as tabelas existirem
+        const BACKUP_NOMES = { products: 'Produtos', lots: 'Lotes', entities: 'Entidades', movements: 'Movimentos', malha: 'Malhas: lotes', malha_movimentos: 'Malhas: movimentos' };
+        async function fetchBackupData() {
+            const [p, l, e, m] = await Promise.all(BACKUP_TABELAS.map(t => fetchAllRows(t, '*', [['id', true]])));
+            const b = { app: BACKUP_APP, versao: BACKUP_VERSAO, criado_em: new Date().toISOString(), products: p, lots: l, entities: e, movements: m };
+            for (const t of BACKUP_MALHAS) {
+                try { b[t] = await fetchAllRows(t, '*', [['id', true]]); }
+                catch (err) { if (!(err && (err.code === 'PGRST205' || err.code === '42P01'))) throw err; }   // tabela não existe: fica de fora
+            }
+            return b;
+        }
+        const backupFileName = prefix => `${prefix}_${agoraLocal().replace('T', '_').replace(':', 'h')}.json`;
+        // Devolve true se o ficheiro foi descarregado
+        async function exportBackupJSON(prefix) {
+            try {
+                const b = await fetchBackupData();
+                downloadBlob(JSON.stringify(b), backupFileName(typeof prefix === 'string' ? prefix : 'backup'), 'application/json');
+                showToast(`Backup feito: ${b.products.length} produtos, ${b.lots.length} lotes, ${b.entities.length} entidades e ${b.movements.length} movimentos${b.malha ? `, mais ${b.malha.length} lotes de malha` : ''}.`);
+                return true;
+            } catch (e) {
+                console.error('Erro no backup:', e);
+                showToast('Erro ao fazer o backup. Nada foi descarregado.', 'error');
+                return false;
+            }
+        }
+
+        // Restauro: substitui tudo pelos dados do ficheiro, de uma só vez, na base de dados (função restore_backup, em restaurar_backup.sql)
+        let restoreData = null;
+        function openRestoreModal() {
+            restoreData = null;
+            document.getElementById('restore-file').value = '';
+            document.getElementById('restore-result').innerHTML = '';
+            document.getElementById('restore-confirm').value = '';
+            document.getElementById('restore-confirm-wrap').classList.add('hidden');
+            document.getElementById('restore-apply').textContent = 'Restaurar';
+            updateRestoreBtn();
+            document.getElementById('restore-modal').classList.remove('hidden');
+            scheduleIcons();
+        }
+        function closeRestoreModal() { document.getElementById('restore-modal').classList.add('hidden'); }
+        function updateRestoreBtn() {
+            document.getElementById('restore-apply').disabled = !(restoreData && document.getElementById('restore-confirm').value.trim().toUpperCase() === 'RESTAURAR');
+        }
+        // Verifica o ficheiro; devolve { erro } ou { dados }
+        function validarBackup(b) {
+            if (!b || typeof b !== 'object' || !Array.isArray(b.products)) return { erro: 'Este ficheiro não é um backup desta aplicação.' };
+            if (!BACKUP_TABELAS.every(t => Array.isArray(b[t])) || b.app !== BACKUP_APP || !(Number(b.versao) >= BACKUP_VERSAO))
+                return { erro: 'Este backup foi feito por uma versão antiga da aplicação (sem os lotes ou sem todas as colunas) e não pode ser restaurado com segurança.' };
+            if (!b.products.length) return { erro: 'Este backup não tem produtos. Restaurá-lo apagaria tudo, por isso não é aceite.' };
+            const temId = v => v != null && v !== '';
+            const pids = new Set(b.products.map(p => String(p.id))), lids = new Set(b.lots.map(l => String(l.id)));
+            const lotes = b.lots.filter(l => !pids.has(String(l.product_id))).length;
+            const movs = b.movements.filter(m => (temId(m.product_id) && !pids.has(String(m.product_id))) || (temId(m.lot_id) && !lids.has(String(m.lot_id)))).length;
+            if (lotes || movs) return { erro: `O backup está incompleto: ${lotes} lote(s) e ${movs} movimento(s) apontam para produtos ou lotes que não estão no ficheiro. Não pode ser restaurado.` };
+            const dados = { products: b.products, lots: b.lots, entities: b.entities, movements: b.movements };
+            const temMalhas = BACKUP_MALHAS.every(t => Array.isArray(b[t]));
+            if (temMalhas) {
+                const mids = new Set(b.malha.map(x => String(x.id)));
+                const orf = b.malha_movimentos.filter(x => temId(x.malha_id) && !mids.has(String(x.malha_id))).length;
+                if (orf) return { erro: `O backup está incompleto: ${orf} movimento(s) de malhas apontam para lotes de malha que não estão no ficheiro. Não pode ser restaurado.` };
+                BACKUP_MALHAS.forEach(t => { dados[t] = b[t]; });
+            }
+            return { dados, criado_em: b.criado_em, temMalhas };
+        }
+        async function handleRestoreFile(file) {
+            const out = document.getElementById('restore-result'), wrap = document.getElementById('restore-confirm-wrap');
+            restoreData = null;
+            wrap.classList.add('hidden');
+            document.getElementById('restore-confirm').value = '';
+            updateRestoreBtn();
+            if (!file) { out.innerHTML = ''; return; }
+            const erro = t => { out.innerHTML = `<p class="text-rose-600 text-xs font-medium">${esc(t)}</p>`; };
+            let b;
+            try { b = JSON.parse(await file.text()); } catch (e) { erro('Não foi possível ler o ficheiro: não é um JSON válido.'); return; }
+            const v = validarBackup(b);
+            if (v.erro) { erro(v.erro); return; }
+            const kg = arr => arr.reduce((t, p) => t + (Number(p.qty) || 0), 0);
+            const agora = { products: products.length, lots: lots.length, entities: entities.length, movements: movements.length + (movementsFull ? '' : '+') };
+            const quando = v.criado_em && !isNaN(new Date(v.criado_em)) ? new Date(v.criado_em).toLocaleString('pt-PT') : 'data desconhecida';
+            const td = 'py-1.5 px-3';
+            out.innerHTML = `
+                <p class="text-xs text-slate-700">Backup feito em <strong>${esc(quando)}</strong>.</p>
+                <table class="w-full text-xs border border-slate-200 rounded-xl overflow-hidden">
+                    <thead><tr class="bg-slate-50 text-slate-500"><th class="${td} text-left font-semibold"></th><th class="${td} text-right font-semibold">No ficheiro</th><th class="${td} text-right font-semibold">Agora na app</th></tr></thead>
+                    <tbody>
+                        ${[...BACKUP_TABELAS, ...(v.temMalhas ? BACKUP_MALHAS : [])].map(t => `<tr class="border-t border-slate-100"><td class="${td}">${BACKUP_NOMES[t]}</td><td class="${td} text-right font-semibold">${v.dados[t].length}</td><td class="${td} text-right text-slate-500">${agora[t] ?? '—'}</td></tr>`).join('')}
+                        <tr class="border-t border-slate-100"><td class="${td}">Stock total</td><td class="${td} text-right font-semibold">${formatKg(kg(v.dados.products))}</td><td class="${td} text-right text-slate-500">${formatKg(kg(products))}</td></tr>
+                    </tbody>
+                </table>
+                ${v.temMalhas ? `<label class="flex items-start gap-2 text-xs text-slate-700 cursor-pointer"><input type="checkbox" id="restore-malhas" checked class="mt-0.5 w-4 h-4"> <span>Restaurar também o <strong>armazém de malhas</strong>. Sem esta opção, as malhas ficam como estão agora.</span></label>` : ''}
+                <p class="text-xs text-rose-700 bg-rose-50 border border-rose-200 rounded-lg p-2">Tudo o que foi registado depois deste backup deixa de existir na aplicação. Os outros utilizadores devem sair antes de restaurar.</p>`;
+            restoreData = v.dados;
+            wrap.classList.remove('hidden');
+            updateRestoreBtn();
+        }
+        async function applyRestore() {
+            if (!restoreData) return;
+            const btn = document.getElementById('restore-apply'), out = document.getElementById('restore-result');
+            const aviso = t => out.insertAdjacentHTML('beforeend', `<p class="text-rose-600 text-xs font-medium">${esc(t)}</p>`);
+            btn.disabled = true;
+            btn.textContent = 'A guardar o estado atual…';
+            const guardado = await exportBackupJSON('antes_do_restauro');   // rede de segurança: o estado de agora fica num ficheiro
+            if (!guardado) { btn.textContent = 'Restaurar'; updateRestoreBtn(); aviso('Não foi possível guardar o estado atual, por isso o restauro não avançou.'); return; }
+            btn.textContent = 'A restaurar…';
+            const p_data = { ...restoreData };
+            if (!document.getElementById('restore-malhas')?.checked) BACKUP_MALHAS.forEach(t => { delete p_data[t]; });
+            const { error } = await db.rpc('restore_backup', { p_data });
+            btn.textContent = 'Restaurar';
+            if (error) {
+                console.error('Erro no restauro:', error);
+                updateRestoreBtn();
+                if (error.code === 'PGRST202' || /Could not find the function/i.test(error.message || '')) { aviso('Falta a função de restauro na base de dados (executar restaurar_backup.sql no Supabase). Nada foi alterado.'); return; }
+                aviso(`O restauro falhou: ${error.message || 'erro desconhecido'}. É feito de uma só vez, por isso os dados devem estar como estavam; confirme nas listas.`);
+                movementsFull = false;
+                await loadData(); populateCategoryFilter(); refreshAll();
+                return;
+            }
+            restoreData = null;
+            movementsFull = false; movVersion++;
+            clearLabelSel();
+            await loadData();
+            populateCategoryFilter();
+            refreshAll();
+            closeRestoreModal();
+            showToast('Backup restaurado. O estado anterior ficou no ficheiro “antes_do_restauro…json”.');
         }
 
         // Exporta a lista de produtos como está no ecrã (pesquisa + filtros): uma linha por lote e por localização (paletes à parte)
