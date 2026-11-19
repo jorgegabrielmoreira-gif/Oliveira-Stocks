@@ -86,6 +86,7 @@
             #printable-list-area table.prod-print th, #printable-list-area table.prod-print td { padding: 4px 5px !important; font-size: 10.5px !important; vertical-align: top; }
             #printable-list-area table.prod-print .pal { display: block; font-size: 9.5px; color: #334155; margin-top: 1px; }
             #printable-list-area .lst-bar { display: block; width: 40mm; max-width: 100%; height: auto; }
+            #printable-list-area table.prod-print .lst-bar { width: 34mm; }
             #printable-list-area td.bar-cell { width: 44mm; }
             body {
                 background: white !important;
@@ -5413,7 +5414,7 @@
                 if (query && !productOwnMatch(p, query)) ls = ls.filter(l => l.lote.toLowerCase().includes(query) || lotSupplier(l).toLowerCase().includes(query) || lotSegments(p, l).some(g => String(g.loc || '').toLowerCase().includes(query)));
                 nLotes += ls.length;
                 const head = `<tr style="page-break-after:avoid">
-                    <td style="${hd}">${esc(p.sku || '-')}${p.barcode ? `<br><span style="font-weight:400">${esc(p.barcode)}</span>` : ''}</td>
+                    <td style="${hd}">${esc(p.sku || '-')}<svg class="lst-bar" data-code="${esc(p.barcode || p.sku || '-')}" style="margin-top:2px;background:#fff"></svg></td>
                     <td style="${hd}">${esc(p.name || '-')}</td>
                     <td style="${hd}">${esc(p.category || '-')}</td>
                     <td style="${hd}">${productLocHtml(p)}</td>
@@ -5432,11 +5433,15 @@
             }).join('');
             // A4 vertical, sem preços: SKU e localização mais estreitos, descrição mais larga
             document.getElementById('printable-list-area').innerHTML = `<table class="prod-print" style="table-layout:fixed;width:100%;overflow-wrap:anywhere">
-                <colgroup><col style="width:14%"><col style="width:38%"><col style="width:11%"><col style="width:16%"><col style="width:12%"><col style="width:9%"></colgroup>
-                <thead><tr><th>SKU / Lote</th><th>Descrição / Fornecedor</th><th>Categoria / Criado</th><th>Localização</th><th class="num">${F.active ? 'Stock (local)' : 'Stock'}</th><th class="num">Mín.</th></tr></thead>
+                <colgroup><col style="width:22%"><col style="width:31%"><col style="width:10%"><col style="width:15%"><col style="width:12%"><col style="width:10%"></colgroup>
+                <thead><tr><th>SKU / Código / Lote</th><th>Descrição / Fornecedor</th><th>Categoria / Criado</th><th>Localização</th><th class="num">${F.active ? 'Stock (local)' : 'Stock'}</th><th class="num">Mín.</th></tr></thead>
                 ${body}</table>
                 <p style="margin-top:8px;font-size:11px;color:#475569;"><b>Total:</b> ${list.length} ${list.length === 1 ? 'produto' : 'produtos'} · ${nLotes} ${nLotes === 1 ? 'lote' : 'lotes'} · ${formatKg(totQty)}</p>`;
 
+            document.querySelectorAll('#printable-list-area svg[data-code]').forEach(svg => {
+                try { JsBarcode(svg, svg.dataset.code, { format: 'CODE128', height: 30, width: 1.6, fontSize: 11, margin: 0 }); }
+                catch (e) { console.error(e); }
+            });
             setPrintHeader('Oliveira & Gonçalves - Relatório de Produtos' + (F.active ? ' - ' + F.label : ''));   // também limpa o modo etiquetas/lista
             let st = document.getElementById('label-page-style');
             if (!st) { st = document.createElement('style'); st.id = 'label-page-style'; document.head.appendChild(st); }
