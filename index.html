@@ -2698,17 +2698,65 @@
             }
             return r;
         }
+        // Endereçamento em rack (opcional): Prateleira 1-5 › Espaço (módulo A-Z) › Altura 1-4 › Posição 1-3. Guardado no mesmo texto, depois da fila:
+        // "Armazém 1 › Fila 3 › Prateleira 1 › Espaço A › Altura 2 › Posição 1". Cada parte é reconhecida pela palavra com que começa.
+        const LOC_RACK = ['prat', 'esp', 'alt', 'pos'];
+        const LOC_KINDS = ['arm', 'fila', 'prat', 'esp', 'alt', 'pos'];
+        const LOC_PALAVRA = { prat: 'Prateleira', esp: 'Espaço', alt: 'Altura', pos: 'Posição' };
+        const LOC_VAZIO_VAL = { arm: '', fila: '', prat: '', esp: '', alt: '', pos: '' };
+        function parseLocPartes(s) {
+            const out = Object.assign({}, LOC_VAZIO_VAL), un = [];
+            for (const p of String(s).split(LOC_SEP).map(x => x.trim()).filter(Boolean)) {
+                const n = normLoc(p);
+                if (/^prateleira\b/.test(n)) out.prat = p;
+                else if (/^espaco\b/.test(n)) out.esp = p;
+                else if (/^altura\b/.test(n)) out.alt = p;
+                else if (/^posicao\b/.test(n)) out.pos = p;
+                else un.push(p);
+            }
+            return { out, un };
+        }
         function parseLocRaw(v) {
             const s = String(v ?? '').trim().replace(/\s+/g, ' ');
-            if (!s) return { arm: '', fila: '' };
-            const i = s.indexOf(LOC_SEP);
-            if (i >= 0) return { arm: s.slice(0, i).trim(), fila: s.slice(i + LOC_SEP.length).trim() };
+            if (!s || s === '-') return Object.assign({}, LOC_VAZIO_VAL);
+            const { out, un } = parseLocPartes(s);
+            if (s.includes(LOC_SEP) || out.prat || out.esp || out.alt || out.pos) {
+                if (un.length >= 2) { out.arm = un[0]; out.fila = un.slice(1).join(LOC_SEP); }
+                else if (un.length === 1) { if (/armaz/.test(normLoc(un[0]))) out.arm = un[0]; else out.fila = un[0]; }
+                return out;
+            }
             const m = s.match(/^(.*?)\s*(?:,|\s-\s|\s\/\s|\s·\s)\s*(.+)$/);
-            if (m && /armaz/.test(normLoc(m[1]))) return { arm: m[1].trim(), fila: m[2].trim() };
-            if (/^armaz/.test(normLoc(s))) return { arm: s, fila: '' };
-            return { arm: '', fila: s };
+            if (m && /armaz/.test(normLoc(m[1]))) return Object.assign({}, LOC_VAZIO_VAL, { arm: m[1].trim(), fila: m[2].trim() });
+            if (/^armaz/.test(normLoc(s))) return Object.assign({}, LOC_VAZIO_VAL, { arm: s });
+            return Object.assign({}, LOC_VAZIO_VAL, { fila: s });
         }
-        const composeLoc = (arm, fila) => [arm, fila].map(x => String(x || '').trim().replace(/\s+/g, ' ')).filter(Boolean).join(LOC_SEP);
+        const composeLoc = (arm, fila, prat, esp, alt, pos) => {
+            const c = x => String(x || '').trim().replace(/\s+/g, ' ');
+            const pre = (v, w) => { v = c(v); return v && !normLoc(v).startsWith(normLoc(w)) ? w + ' ' + v : v; };
+            return [c(arm), c(fila), pre(prat, 'Prateleira'), pre(esp, 'Espaço').replace(/^(Espaço )([a-z])$/, (m, p, l) => p + l.toUpperCase()), pre(alt, 'Altura'), pre(pos, 'Posição')].filter(Boolean).join(LOC_SEP);
+        };
+        // "Prat. 1 · Esp. A · Alt. 2 · Pos. 1"
+        const locRackCurto = q => [['prat', 'Prat.'], ['esp', 'Esp.'], ['alt', 'Alt.'], ['pos', 'Pos.']].filter(([k]) => q[k]).map(([k, r]) => r + ' ' + String(q[k]).replace(/^\S+\s*/, '')).join(' · ');
+        // para etiquetas: armazém › fila › Prat. 1 · Esp. A · Alt. 2 · Pos. 1
+        function locEtiqueta(v) {
+            const q = parseLoc(v), r = locRackCurto(q);
+            return [q.arm, q.fila, r].filter(Boolean).join(LOC_SEP) || String(v || '');
+        }
+        // Liga a linha Prateleira / Espaço / Posição por baixo do armazém e fila (cria os campos na primeira vez)
+        function ensureRackBlock(prefix) {
+            if (document.getElementById(`${prefix}-prat-sel`)) return;
+            const a = document.getElementById(`${prefix}-arm-sel`), f = document.getElementById(`${prefix}-fila-sel`);
+            if (!a || !f) return;
+            let anc = f.parentElement;
+            while (anc && !anc.contains(a)) anc = anc.parentElement;
+            if (!anc) return;
+            const cls = 'w-full px-2 py-2 text-sm border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500/20 outline-none bg-white';
+            const div = document.createElement('div');
+            div.className = 'grid grid-cols-2 sm:grid-cols-4 gap-2 mt-2';
+            div.dataset.locRack = '1';
+            div.innerHTML = LOC_RACK.map(k => `<div><select id="${prefix}-${k}-sel" onchange="onLocSel('${prefix}','${k}')" class="${cls}" title="${LOC_PALAVRA[k]}"></select><input type="text" id="${prefix}-${k}" autocomplete="off" placeholder="${LOC_PALAVRA[k]}…" class="hidden mt-2 ${cls}"></div>`).join('');
+            anc.insertAdjacentElement('afterend', div);
+        }
         function locMatches(loc, F) {
             if (!F.arm && !F.fila) return true;
             const q = parseLoc(loc);
@@ -2717,10 +2765,15 @@
             return true;
         }
         // Armazém: 1, 2 ou escrita livre. Fila: 1 a 50 ou escrita livre (outra posição). O <input> escondido guarda o valor final.
-        const LOC_OPCOES = { arm: ['Armazém 1', 'Armazém 2'], fila: Array.from({ length: 50 }, (_, i) => 'Fila ' + (i + 1)) };
-        const LOC_VAZIO = { arm: '— Armazém —', fila: '— Fila —' };
+        const LOC_OPCOES = { arm: ['Armazém 1', 'Armazém 2'], fila: Array.from({ length: 50 }, (_, i) => 'Fila ' + (i + 1)),
+            prat: Array.from({ length: 5 }, (_, i) => 'Prateleira ' + (i + 1)),
+            esp: Array.from({ length: 26 }, (_, i) => 'Espaço ' + String.fromCharCode(65 + i)),
+            alt: Array.from({ length: 4 }, (_, i) => 'Altura ' + (i + 1)),
+            pos: Array.from({ length: 3 }, (_, i) => 'Posição ' + (i + 1)) };
+        const LOC_VAZIO = { arm: '— Armazém —', fila: '— Fila —', prat: '— Prateleira —', esp: '— Espaço —', alt: '— Altura —', pos: '— Posição —' };
         function fillLocSelects(prefix) {
-            for (const kind of ['arm', 'fila']) {
+            ensureRackBlock(prefix);
+            for (const kind of LOC_KINDS) {
                 const sel = document.getElementById(`${prefix}-${kind}-sel`);
                 if (!sel || sel.dataset.ok) continue;
                 sel.innerHTML = `<option value="">${LOC_VAZIO[kind]}</option>` + LOC_OPCOES[kind].map(v => `<option value="${v}">${v}</option>`).join('') + '<option value="__outro__">✏️ Outro (escrever)…</option>';
@@ -2737,7 +2790,7 @@
         function setLocInputs(prefix, str) {
             fillLocSelects(prefix);
             const q = parseLoc(str);
-            for (const kind of ['arm', 'fila']) {
+            for (const kind of LOC_KINDS) {
                 const sel = document.getElementById(`${prefix}-${kind}-sel`), inp = document.getElementById(`${prefix}-${kind}`);
                 if (!sel || !inp) continue;
                 const v = q[kind];
@@ -2749,11 +2802,15 @@
         }
         // Armazém numa linha e fila na outra (se só houver uma das duas, fica numa linha)
         function locDuasLinhas(v) {
-            const q = parseLoc(v);
-            return q.arm && q.fila ? `<span class="whitespace-nowrap">${esc(q.arm)}</span><br><span class="whitespace-nowrap">${esc(q.fila)}</span>` : esc(composeLoc(q.arm, q.fila) || v);
+            const q = parseLoc(v), r = locRackCurto(q);
+            const linhas = [q.arm, q.fila].filter(Boolean);
+            if (!linhas.length && !r) return esc(v);
+            if (linhas.length < 2 && !r) return esc(composeLoc(q.arm, q.fila) || v);
+            return linhas.map(x => `<span class="whitespace-nowrap">${esc(x)}</span>`).concat(r ? [`<span class="whitespace-nowrap text-slate-500">${esc(r)}</span>`] : []).join('<br>');
         }
         function getLocInputs(prefix) {
-            return composeLoc(document.getElementById(prefix + '-arm')?.value, document.getElementById(prefix + '-fila')?.value);
+            const g = k => document.getElementById(`${prefix}-${k}`)?.value;
+            return composeLoc(g('arm'), g('fila'), g('prat'), g('esp'), g('alt'), g('pos'));
         }
         // Sugestões dos campos armazém / fila (do que já existe); com armazém escrito, só as filas desse armazém
         // As listas de armazém/fila ficam preenchidas logo ao abrir a página (não dependem de os dados terem carregado)
@@ -3484,7 +3541,7 @@
                     `Entrada: ${ent ? formatDate(ent.date) : formatDate(lot.created_at)}${peso != null ? ' | Peso da palete: ' + formatKg(peso) : ''}${pal && pal.cones != null ? ' | Cones: ' + pal.cones : ''}`
                 ],
                 code: paleteCode(p, lot, nome), qr: paleteCode(p, lot, nome),
-                footL: `Loc: ${(pal && pal.local) || lot.location || p.location || 'Armazém'}`, footR: peso != null ? formatKg(peso) : ''
+                footL: `Loc: ${locEtiqueta((pal && pal.local) || lot.location || p.location) || 'Armazém'}`, footR: peso != null ? formatKg(peso) : ''
             };
         }
         // Fornecedor nas etiquetas: desligado por omissão; a escolha fica guardada neste browser
@@ -3691,7 +3748,7 @@
                         : `Lotes com stock: ${(lotsByProduct[p.id] || []).filter(l => l.qty > 0).length} | Stock mín.: ${formatKg(p.min)}`
                 ],
                 code: lot ? lotCode(p, lot) : (p.barcode || p.sku), qr: lot ? lotCode(p, lot) : p.sku,
-                footL: `Loc: ${(lot && lot.location) || p.location || 'Armazém'}`, footR: formatKg(lot ? lot.qty : p.qty)
+                footL: `Loc: ${locEtiqueta((lot && lot.location) || p.location) || 'Armazém'}`, footR: formatKg(lot ? lot.qty : p.qty)
             };
         }
         // Botão da impressora numa linha: abre a folha só com essa etiqueta
@@ -5345,7 +5402,7 @@
             if (!movementsFull) { try { await ensureAllMovements(true); } catch (e) {} }
             const { query, F, listed } = getProductsSelection();
             if (!listed.length) { showToast('Não há produtos para exportar.', 'error'); return; }
-            const header = ['SKU','Barcode','Nome','Categoria','Armazém','Fila','Lote','Palete(s)','Stock (kg)','Stock produto (kg)','Mín (kg)','Custo/kg','Venda/kg','Estado','Fornecedor'].map(csvCell).join(';');
+            const header = ['SKU','Barcode','Nome','Categoria','Armazém','Fila','Prateleira','Espaço','Altura','Posição','Lote','Palete(s)','Stock (kg)','Stock produto (kg)','Mín (kg)','Custo/kg','Venda/kg','Estado','Fornecedor'].map(csvCell).join(';');
             const estado = p => p.qty <= 0 ? 'Esgotado' : p.qty <= p.min ? 'Stock baixo' : 'Normal';
             const rows = [];
             for (const p of listed) {
@@ -5354,7 +5411,7 @@
                 if (query && !productOwnMatch(p, query)) ls = ls.filter(l => l.lote.toLowerCase().includes(query) || lotSupplier(l).toLowerCase().includes(query) || lotSegments(p, l).some(g => String(g.loc || '').toLowerCase().includes(query)));
                 if (!ls.length) {
                     const q0 = parseLoc(p.location);
-                    rows.push([p.sku, p.barcode, p.name, p.category, q0.arm, q0.fila, '', '', 0, p.qty, p.min, p.cost, p.price, estado(p), ''].map(csvCell).join(';'));
+                    rows.push([p.sku, p.barcode, p.name, p.category, q0.arm, q0.fila, q0.prat, q0.esp, q0.alt, q0.pos, '', '', 0, p.qty, p.min, p.cost, p.price, estado(p), ''].map(csvCell).join(';'));
                     continue;
                 }
                 for (const l of ls) {
@@ -5362,7 +5419,7 @@
                     if (F.active) segs = segs.filter(g => locMatches(g.loc, F));
                     for (const g of segs) {
                         const q1 = parseLoc(g.loc);
-                        rows.push([p.sku, p.barcode, p.name, p.category, q1.arm, q1.fila, l.lote, g.pals.join(' + '), g.qty, p.qty, p.min, p.cost, p.price, estado(p), lotSupplier(l)].map(csvCell).join(';'));
+                        rows.push([p.sku, p.barcode, p.name, p.category, q1.arm, q1.fila, q1.prat, q1.esp, q1.alt, q1.pos, l.lote, g.pals.join(' + '), g.qty, p.qty, p.min, p.cost, p.price, estado(p), lotSupplier(l)].map(csvCell).join(';'));
                     }
                 }
             }

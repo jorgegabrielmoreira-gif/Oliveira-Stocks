@@ -2222,7 +2222,7 @@
                     peso_inicial: liquido, peso: liquido,
                     falhas: 0,
                     classificacao: 'Hold',
-                    localizacao: composeLoc(val('entrada-arm'), val('entrada-fila')) || '-',
+                    localizacao: composeLoc(val('entrada-arm'), val('entrada-fila'), val('entrada-prat'), val('entrada-esp'), val('entrada-alt'), val('entrada-pos')) || '-',
                     observacoes: val('observacoes') || null,
                     created_at: agora.toISOString()
                 };
@@ -2293,24 +2293,78 @@
         // ("Fila 3" = só fila; "Armazém A, Prat. 3" é separado se o 1.º bloco tiver "armaz"; "-" = sem localização).
         const LOC_SEP = ' › ';
         const normLoc = x => String(x ?? '').normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/\s+/g, ' ').trim().toLowerCase();
-        function parseLoc(v) {
-            const t = String(v ?? '').trim().replace(/\s+/g, ' ');
-            if (!t || t === '-') return { arm: '', fila: '' };
-            const i = t.indexOf(LOC_SEP);
-            if (i >= 0) return { arm: t.slice(0, i).trim(), fila: t.slice(i + LOC_SEP.length).trim() };
-            const m = t.match(/^(.*?)\s*(?:,|\s-\s|\s\/\s|\s·\s)\s*(.+)$/);
-            if (m && /armaz/.test(normLoc(m[1]))) return { arm: m[1].trim(), fila: m[2].trim() };
-            if (/^armaz/.test(normLoc(t))) return { arm: t, fila: '' };
-            return { arm: '', fila: t };
+        function parseLoc(v) { return parseLocRaw(v); }
+        // Endereçamento em rack (opcional): Prateleira 1-5 › Espaço (módulo A-Z) › Altura 1-4 › Posição 1-3. Guardado no mesmo texto, depois da fila:
+        // "Armazém 1 › Fila 3 › Prateleira 1 › Espaço A › Altura 2 › Posição 1". Cada parte é reconhecida pela palavra com que começa.
+        const LOC_RACK = ['prat', 'esp', 'alt', 'pos'];
+        const LOC_KINDS = ['arm', 'fila', 'prat', 'esp', 'alt', 'pos'];
+        const LOC_PALAVRA = { prat: 'Prateleira', esp: 'Espaço', alt: 'Altura', pos: 'Posição' };
+        const LOC_VAZIO_VAL = { arm: '', fila: '', prat: '', esp: '', alt: '', pos: '' };
+        function parseLocPartes(s) {
+            const out = Object.assign({}, LOC_VAZIO_VAL), un = [];
+            for (const p of String(s).split(LOC_SEP).map(x => x.trim()).filter(Boolean)) {
+                const n = normLoc(p);
+                if (/^prateleira\b/.test(n)) out.prat = p;
+                else if (/^espaco\b/.test(n)) out.esp = p;
+                else if (/^altura\b/.test(n)) out.alt = p;
+                else if (/^posicao\b/.test(n)) out.pos = p;
+                else un.push(p);
+            }
+            return { out, un };
         }
-        const composeLoc = (arm, fila) => [arm, fila].map(x => String(x || '').trim().replace(/\s+/g, ' ')).filter(Boolean).join(LOC_SEP);
+        function parseLocRaw(v) {
+            const s = String(v ?? '').trim().replace(/\s+/g, ' ');
+            if (!s || s === '-') return Object.assign({}, LOC_VAZIO_VAL);
+            const { out, un } = parseLocPartes(s);
+            if (s.includes(LOC_SEP) || out.prat || out.esp || out.alt || out.pos) {
+                if (un.length >= 2) { out.arm = un[0]; out.fila = un.slice(1).join(LOC_SEP); }
+                else if (un.length === 1) { if (/armaz/.test(normLoc(un[0]))) out.arm = un[0]; else out.fila = un[0]; }
+                return out;
+            }
+            const m = s.match(/^(.*?)\s*(?:,|\s-\s|\s\/\s|\s·\s)\s*(.+)$/);
+            if (m && /armaz/.test(normLoc(m[1]))) return Object.assign({}, LOC_VAZIO_VAL, { arm: m[1].trim(), fila: m[2].trim() });
+            if (/^armaz/.test(normLoc(s))) return Object.assign({}, LOC_VAZIO_VAL, { arm: s });
+            return Object.assign({}, LOC_VAZIO_VAL, { fila: s });
+        }
+        const composeLoc = (arm, fila, prat, esp, alt, pos) => {
+            const c = x => String(x || '').trim().replace(/\s+/g, ' ');
+            const pre = (v, w) => { v = c(v); return v && !normLoc(v).startsWith(normLoc(w)) ? w + ' ' + v : v; };
+            return [c(arm), c(fila), pre(prat, 'Prateleira'), pre(esp, 'Espaço').replace(/^(Espaço )([a-z])$/, (m, p, l) => p + l.toUpperCase()), pre(alt, 'Altura'), pre(pos, 'Posição')].filter(Boolean).join(LOC_SEP);
+        };
+        // "Prat. 1 · Esp. A · Alt. 2 · Pos. 1"
+        const locRackCurto = q => [['prat', 'Prat.'], ['esp', 'Esp.'], ['alt', 'Alt.'], ['pos', 'Pos.']].filter(([k]) => q[k]).map(([k, r]) => r + ' ' + String(q[k]).replace(/^\S+\s*/, '')).join(' · ');
+        // para etiquetas: armazém › fila › Prat. 1 · Esp. A · Alt. 2 · Pos. 1
+        function locEtiqueta(v) {
+            const q = parseLoc(v), r = locRackCurto(q);
+            return [q.arm, q.fila, r].filter(Boolean).join(LOC_SEP) || String(v || '');
+        }
+        // Liga a linha Prateleira / Espaço / Posição por baixo do armazém e fila (cria os campos na primeira vez)
+        function ensureRackBlock(prefix) {
+            if (document.getElementById(`${prefix}-prat-sel`)) return;
+            const a = document.getElementById(`${prefix}-arm-sel`), f = document.getElementById(`${prefix}-fila-sel`);
+            if (!a || !f) return;
+            let anc = f.parentElement;
+            while (anc && !anc.contains(a)) anc = anc.parentElement;
+            if (!anc) return;
+            const cls = 'w-full px-2 py-2 text-sm border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500/20 outline-none bg-white';
+            const div = document.createElement('div');
+            div.className = 'grid grid-cols-2 sm:grid-cols-4 gap-2 mt-2';
+            div.dataset.locRack = '1';
+            div.innerHTML = LOC_RACK.map(k => `<div><select id="${prefix}-${k}-sel" onchange="onLocSel('${prefix}','${k}')" class="${cls}" title="${LOC_PALAVRA[k]}"></select><input type="text" id="${prefix}-${k}" autocomplete="off" placeholder="${LOC_PALAVRA[k]}…" class="hidden mt-2 ${cls}"></div>`).join('');
+            anc.insertAdjacentElement('afterend', div);
+        }
         const locOf = l => parseLoc(l.localizacao);
-        const locDisplay = l => { const q = locOf(l); return composeLoc(q.arm, q.fila) || '-'; };
+        const locDisplay = l => { const q = locOf(l); return composeLoc(q.arm, q.fila, q.prat, q.esp, q.alt, q.pos) || '-'; };
         // Armazém: 1, 2 ou escrita livre. Fila: 1 a 50 ou escrita livre (outra posição). O <input> escondido guarda o valor final.
-        const LOC_OPCOES = { arm: ['Armazém 1', 'Armazém 2'], fila: Array.from({ length: 50 }, (_, i) => 'Fila ' + (i + 1)) };
-        const LOC_VAZIO = { arm: '— Armazém —', fila: '— Fila —' };
+        const LOC_OPCOES = { arm: ['Armazém 1', 'Armazém 2'], fila: Array.from({ length: 50 }, (_, i) => 'Fila ' + (i + 1)),
+            prat: Array.from({ length: 5 }, (_, i) => 'Prateleira ' + (i + 1)),
+            esp: Array.from({ length: 26 }, (_, i) => 'Espaço ' + String.fromCharCode(65 + i)),
+            alt: Array.from({ length: 4 }, (_, i) => 'Altura ' + (i + 1)),
+            pos: Array.from({ length: 3 }, (_, i) => 'Posição ' + (i + 1)) };
+        const LOC_VAZIO = { arm: '— Armazém —', fila: '— Fila —', prat: '— Prateleira —', esp: '— Espaço —', alt: '— Altura —', pos: '— Posição —' };
         function fillLocSelects(prefix) {
-            for (const kind of ['arm', 'fila']) {
+            ensureRackBlock(prefix);
+            for (const kind of LOC_KINDS) {
                 const sel = document.getElementById(`${prefix}-${kind}-sel`);
                 if (!sel || sel.dataset.ok) continue;
                 sel.innerHTML = `<option value="">${LOC_VAZIO[kind]}</option>` + LOC_OPCOES[kind].map(v => `<option value="${v}">${v}</option>`).join('') + '<option value="__outro__">✏️ Outro (escrever)…</option>';
@@ -2326,7 +2380,7 @@
         function setLocInputs(prefix, str) {
             fillLocSelects(prefix);
             const q = parseLoc(str);
-            for (const kind of ['arm', 'fila']) {
+            for (const kind of LOC_KINDS) {
                 const sel = document.getElementById(`${prefix}-${kind}-sel`), inp = document.getElementById(`${prefix}-${kind}`);
                 if (!sel || !inp) continue;
                 const v = q[kind];
@@ -2712,7 +2766,7 @@
                 tipo_malha: val('edit-lote-tipo'), cor: val('edit-lote-cor') || null,
                 fornecedor: val('edit-lote-fornecedor') || null,
                 rolos: parseInt(val('edit-lote-rolos'), 10), peso: round2(val('edit-lote-peso')),
-                localizacao: composeLoc(val('edit-lote-arm'), val('edit-lote-fila')) || '-',
+                localizacao: composeLoc(val('edit-lote-arm'), val('edit-lote-fila'), val('edit-lote-prat'), val('edit-lote-esp'), val('edit-lote-alt'), val('edit-lote-pos')) || '-',
                 observacoes: val('edit-lote-obs') || null
             };
             btn.disabled = true;
@@ -2749,7 +2803,7 @@
                 lines: [`OF: ${l.of_num || '-'} | Tear: ${l.tear} | Malha: ${l.tipo_malha}`,
                         `Lote Fio: ${l.lote_fio} | Rolos: ${l.rolos} | Peso Líq.: ${formatKg(l.peso)}`],
                 code: l.sku, qr: l.sku,
-                footL: `Loc: ${locDisplay(l)}`,
+                footL: `Loc: ${locEtiqueta(l.localizacao) || '-'}`,
                 footR: labelShowSupplier ? (fornecedorLote(l) || '-') : formatKg(l.peso)
             };
         }
