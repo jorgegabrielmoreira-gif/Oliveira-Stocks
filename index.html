@@ -1473,7 +1473,7 @@
     </div>
 
     <div id="lot-modal" class="fixed inset-0 bg-slate-900/50 backdrop-blur-xs z-50 flex items-center justify-center p-4 hidden no-print">
-        <div class="bg-white rounded-2xl shadow-2xl max-w-md w-full max-h-[90vh] flex flex-col overflow-hidden">
+        <div class="bg-white rounded-2xl shadow-2xl max-w-2xl w-full max-h-[90vh] flex flex-col overflow-hidden">
             <div class="px-6 py-4 flex items-center justify-between bg-blue-50 shrink-0">
                 <h3 class="font-bold text-blue-900 text-base">Editar Lote</h3>
                 <button type="button" onclick="closeLotModal()" class="text-slate-400 hover:text-slate-600 p-1"><i data-lucide="x" class="w-5 h-5"></i></button>
@@ -2742,6 +2742,13 @@
             const q = parseLoc(v), r = locRackCurto(q);
             return [q.arm, q.fila, r].filter(Boolean).join(LOC_SEP) || String(v || '');
         }
+        // Localização nas etiquetas grandes: armazém › fila numa linha e o endereço da prateleira na linha de baixo
+        function locA5Html(v) {
+            const q = parseLoc(v), r = locRackCurto(q), top = [q.arm, q.fila].filter(Boolean).join(LOC_SEP);
+            const linha = x => `<div style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(x)}</div>`;
+            if (!top && !r) { const t = String(v ?? '').trim(); return esc(t && t !== '-' ? t : '-'); }
+            return [top, r].filter(Boolean).map(linha).join('');
+        }
         // Liga a linha Prateleira / Espaço / Posição por baixo do armazém e fila (cria os campos na primeira vez)
         function ensureRackBlock(prefix) {
             if (document.getElementById(`${prefix}-prat-sel`)) return;
@@ -2754,7 +2761,7 @@
             const div = document.createElement('div');
             div.className = 'grid grid-cols-2 sm:grid-cols-4 gap-2 mt-2';
             div.dataset.locRack = '1';
-            div.innerHTML = LOC_RACK.map(k => `<div><select id="${prefix}-${k}-sel" onchange="onLocSel('${prefix}','${k}')" class="${cls}" title="${LOC_PALAVRA[k]}"></select><input type="text" id="${prefix}-${k}" autocomplete="off" placeholder="${LOC_PALAVRA[k]}…" class="hidden mt-2 ${cls}"></div>`).join('');
+            div.innerHTML = `<label class="col-span-full block text-xs font-medium text-slate-700 -mb-1">Endereço na prateleira <span class="text-slate-400 font-normal">(opcional)</span></label>` + LOC_RACK.map(k => `<div><select id="${prefix}-${k}-sel" onchange="onLocSel('${prefix}','${k}')" class="${cls}" title="${LOC_PALAVRA[k]}"></select><input type="text" id="${prefix}-${k}" autocomplete="off" placeholder="${LOC_PALAVRA[k]}…" class="hidden mt-2 ${cls}"></div>`).join('');
             anc.insertAdjacentElement('afterend', div);
         }
         function locMatches(loc, F) {
@@ -3561,6 +3568,7 @@
             const ent = lotMovements(lot).find(m => m.type === 'entrada' && String(m.palete || '').trim().toLowerCase() === key);
             const code = esc(paleteCode(p, lot, pal.name));
             const campo = (k, v) => `<div><div class="a5-k">${esc(k)}</div><div class="a5-v">${esc(v == null || v === '' ? '-' : v)}</div></div>`;
+            const campoLoc = v => `<div style="grid-column:1/-1"><div class="a5-k">Localização</div><div class="a5-v">${locA5Html(v)}</div></div>`;
             const parcial = Math.abs(pal.saldo - pal.inicial) > 0.005;
             return `<div class="a5-label">
                 <div class="a5-head"><span class="a5-brand"><img src="logo.png" alt="" onerror="this.remove()"><span>Oliveira &amp; Gonçalves · Etiqueta de ${ehSaco(pal.name) ? 'saco' : 'palete'}</span></span><span>Impresso em ${esc(new Date().toLocaleDateString('pt-PT'))}</span></div>
@@ -3575,9 +3583,9 @@
                     <div class="a5-info">
                         <div><div class="a5-prod">${esc(p.name || '-')}</div><div class="a5-sku">SKU: ${esc(p.sku || '-')}${p.category ? ' · ' + esc(p.category) : ''}</div></div>
                         <div class="a5-grid">
+                            ${campoLoc(pal.local || lot.location || p.location)}
                             ${parcial ? campo('Peso inicial', formatKg(pal.inicial)) : ''}
                             ${campo('Cones', pal.cones != null ? pal.cones : '')}
-                            ${campo('Localização', pal.local || lot.location || p.location)}
                             ${campo('Data de entrada', ent ? formatDate(ent.date) : formatDate(lot.created_at))}
                             ${labelShowSupplier ? campo('Fornecedor', lotSupplier(lot)) : ''}
                         </div>
@@ -3591,6 +3599,7 @@
         function a5GenericHtml(o) {
             const campo = (k, v) => `<div><div class="a5-k">${esc(k)}</div><div class="a5-v">${esc(v == null || v === '' ? '-' : v)}</div></div>`;
             const p = o.p;
+            const campoLoc = v => `<div style="grid-column:1/-1"><div class="a5-k">Localização</div><div class="a5-v">${locA5Html(v)}</div></div>`;
             return `<div class="a5-label">
                 <div class="a5-head"><span class="a5-brand"><img src="logo.png" alt="" onerror="this.remove()"><span>Oliveira &amp; Gonçalves · ${esc(o.titulo)}</span></span><span>Impresso em ${esc(new Date().toLocaleDateString('pt-PT'))}</span></div>
                 <div class="a5-hero">
@@ -3603,7 +3612,7 @@
                 <div class="a5-body">
                     <div class="a5-info">
                         <div><div class="a5-prod">${esc(p.name || '-')}</div><div class="a5-sku">SKU: ${esc(p.sku || '-')}${p.category ? ' · ' + esc(p.category) : ''}</div></div>
-                        <div class="a5-grid">${o.campos.map(c => campo(c[0], c[1])).join('')}</div>
+                        <div class="a5-grid">${o.campos.filter(c => c[0] === 'Localização').map(c => campoLoc(c[1])).join('')}${o.campos.filter(c => c[0] !== 'Localização').map(c => campo(c[0], c[1])).join('')}</div>
                     </div>
                     <div class="a5-qr" data-a5-qr="${esc(o.qr)}"></div>
                 </div>
